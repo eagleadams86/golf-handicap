@@ -262,6 +262,7 @@ To go back to fully-local, set `FIREBASE_CONFIG` to `null` again.
 | `tests.html` | 58 tests pinning the pure handicap maths. Loads the real `index.html` in a hidden iframe and calls its functions directly. |
 | `privacy.html` | Privacy policy. Exists because other people may sign in with their own Google accounts. |
 | `firestore.rules` | A checked-in copy of the security rules to deploy in the Firebase console. |
+| `favicon.ico` | The shared icon used across these apps — a byte-identical copy, not a variant. |
 | `LICENSE` | MIT. |
 
 The palette is **transcribed inline** from [`claude-theme-pack`](https://github.com/eagleadams86/claude-theme-pack)

@@ -20,7 +20,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Handicap">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0e1a'/%3E%3Cpath d='M24 50V12l22 9-22 9' fill='%23818cf8'/%3E%3Ccircle cx='24' cy='50' r='5' fill='%23e7eaf6'/%3E%3C/svg%3E">
+<!-- The shared favicon used across these apps (byte-identical copy of the one in
+     claude-lottery / claude-prototypes / sprint-velocity). A relative path rather
+     than a data URI, so it stays one file to update everywhere; it still resolves
+     when the page is opened via file://, as long as favicon.ico sits beside it. -->
+<link rel="icon" href="favicon.ico">
 <script>
   // Apply the saved theme before first paint so there is no flash. Midnight is the
   // default for every app in this family; "slate" is the old name for Dark.
