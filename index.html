@@ -537,7 +537,7 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
 <div id="toast" role="status" aria-live="polite"></div>
 
 <!-- ── Dialogs ───────────────────────────────────────────────────────────── -->
-<dialog id="roundDialog">
+<dialog id="roundDialog" aria-labelledby="roundTitle">
   <form method="dialog" id="roundForm">
     <h2 id="roundTitle">Add round</h2>
     <div class="grid2">
@@ -591,8 +591,8 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
   </form>
 </dialog>
 
-<dialog id="courseDialog">
-  <h2>Courses and tees</h2>
+<dialog id="courseDialog" aria-labelledby="courseDialogTitle">
+  <h2 id="courseDialogTitle">Courses and tees</h2>
   <p class="hint">A course needs a <strong>rating</strong> and a <strong>slope</strong> for each set of tees — both are printed on the scorecard. The rating is the score a scratch golfer is expected to shoot; the slope (55–155, usually near 113) is how much harder it plays for everyone else.</p>
   <div id="courseList"></div>
   <div class="row-actions">
@@ -602,7 +602,7 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
   </div>
 </dialog>
 
-<dialog id="courseEditDialog">
+<dialog id="courseEditDialog" aria-labelledby="courseEditTitle">
   <form method="dialog" id="courseEditForm">
     <h2 id="courseEditTitle">Add course</h2>
     <div class="field">
@@ -621,9 +621,9 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
   </form>
 </dialog>
 
-<dialog id="methodDialog">
+<dialog id="methodDialog" aria-labelledby="methodTitle">
   <form method="dialog" id="methodForm">
-    <h2>My own method</h2>
+    <h2 id="methodTitle">My own method</h2>
     <p class="hint">This is the calculation the app shows first. The official World Handicap System figure is always worked out alongside it and never changes.</p>
     <div class="field">
       <label for="m_name">What to call it</label>
@@ -673,8 +673,8 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
   </form>
 </dialog>
 
-<dialog id="golferDialog">
-  <h2>Golfers</h2>
+<dialog id="golferDialog" aria-labelledby="golferTitle">
+  <h2 id="golferTitle">Golfers</h2>
   <p class="hint">Each golfer keeps their own rounds and their own handicap. Courses are shared between everyone.</p>
   <div id="golferList"></div>
   <div class="field" style="margin-top:var(--sp-6)">
@@ -693,8 +693,8 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
      irreversible, it reaches every signed-in device, and the one thing that makes
      it safe — taking a backup first — needs to be a button you can actually press
      at the moment of hesitation, which a confirm() cannot hold. -->
-<dialog id="clearDialog">
-  <h2>Clear everything?</h2>
+<dialog id="clearDialog" aria-labelledby="clearTitle">
+  <h2 id="clearTitle">Clear everything?</h2>
   <p id="clearBody"></p>
   <p class="warn" id="clearSyncWarn" role="status"></p>
   <div class="row-actions">
@@ -705,7 +705,7 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
   </div>
 </dialog>
 
-<dialog id="helpDialog">
+<dialog id="helpDialog" aria-labelledby="helpTitle">
   <h2 id="helpTitle">About</h2>
   <div id="helpBody"></div>
   <div class="row-actions"><button type="button" id="helpClose" class="primary">Close</button></div>
@@ -714,8 +714,8 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
 <!-- Escape is deliberately blocked on this one: either answer replaces one of the
      two copies, so there is no safe default to dismiss into. Both buttons are
      reachable by keyboard, so it isn't a focus trap. -->
-<dialog id="syncChoiceDialog">
-  <h2>Which copy do you want to keep?</h2>
+<dialog id="syncChoiceDialog" aria-labelledby="syncChoiceTitle">
+  <h2 id="syncChoiceTitle">Which copy do you want to keep?</h2>
   <p id="syncChoiceBody"></p>
   <div class="row-actions">
     <button type="button" id="syncKeepDeviceBtn">Keep this device's</button>
@@ -1670,7 +1670,9 @@ let editingCourse = null;
 function renderCourseList() {
   const box = document.getElementById('courseList');
   if (!state.courses.length) { box.innerHTML = '<p class="hint">No courses yet.</p>'; return; }
-  box.innerHTML = `<div class="table-scroll"><table><thead><tr>
+  box.innerHTML = `<div class="table-scroll"><table>
+    <caption class="sr-only">Courses and their tees. Select a course name to edit it.</caption>
+    <thead><tr>
       <th scope="col">Course</th><th scope="col">Tees</th><th scope="col" class="num">Rounds</th>
     </tr></thead><tbody>` + state.courses.map((c) => {
     const used = state.rounds.filter((r) => r.courseId === c.id).length;
@@ -1875,7 +1877,9 @@ const golferDialog = document.getElementById('golferDialog');
 
 function renderGolferList() {
   const box = document.getElementById('golferList');
-  box.innerHTML = `<div class="table-scroll"><table><thead><tr>
+  box.innerHTML = `<div class="table-scroll"><table>
+    <caption class="sr-only">Golfers. Select a name to rename that golfer; Remove deletes them and their rounds.</caption>
+    <thead><tr>
       <th scope="col">Name</th><th scope="col" class="num">Rounds</th><th scope="col"></th>
     </tr></thead><tbody>` + state.golfers.map((g) => {
     const n = state.rounds.filter((r) => r.golferId === g.id).length;
