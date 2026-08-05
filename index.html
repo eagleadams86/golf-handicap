@@ -523,6 +523,7 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
     <button id="importBtn">⬆︎ Restore from backup</button>
     <input type="file" id="importFile" accept="application/json,.json" class="sr-only" aria-hidden="true" tabindex="-1">
     <span class="spacer"></span>
+    <button id="clearBtn" class="danger">Clear everything</button>
   </div>
   <p id="privacyNote">🔒 Private — stored in this browser; sign in to sync your own devices. No account required to use the app.</p>
   <p class="privacy-links"><a href="privacy.html">Privacy</a> · <a href="https://github.com/eagleadams86/golf-handicap">Source on GitHub</a></p>
@@ -685,6 +686,22 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
     <button type="button" id="addGolferBtn">+ Add</button>
     <span class="spacer"></span>
     <button type="button" id="golferClose" class="primary">Done</button>
+  </div>
+</dialog>
+
+<!-- Clearing is offered as a dialog rather than a chain of confirm() boxes: it is
+     irreversible, it reaches every signed-in device, and the one thing that makes
+     it safe — taking a backup first — needs to be a button you can actually press
+     at the moment of hesitation, which a confirm() cannot hold. -->
+<dialog id="clearDialog">
+  <h2>Clear everything?</h2>
+  <p id="clearBody"></p>
+  <p class="warn" id="clearSyncWarn" role="status"></p>
+  <div class="row-actions">
+    <button type="button" id="clearBackupBtn">⬇︎ Download backup first</button>
+    <span class="spacer"></span>
+    <button type="button" id="clearCancel">Cancel</button>
+    <button type="button" id="clearConfirm" class="danger">Delete everything</button>
   </div>
 </dialog>
 
@@ -1890,7 +1907,9 @@ document.getElementById('chTee').addEventListener('change', () => render());
 
 /* ── Backup ─────────────────────────────────────────────────────────────── */
 
-document.getElementById('exportBtn').addEventListener('click', () => {
+/* Shared by the footer button and the "download a backup first" button inside the
+   clear dialog — the one place a file is written, so the two can't drift. */
+function downloadBackup() {
   const blob = new Blob([JSON.stringify(Object.assign({ exportedAt: new Date().toISOString() }, state), null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1901,7 +1920,8 @@ document.getElementById('exportBtn').addEventListener('click', () => {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   toast('Backup downloaded');
-});
+}
+document.getElementById('exportBtn').addEventListener('click', downloadBackup);
 
 document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
 document.getElementById('importFile').addEventListener('change', (e) => {
@@ -1920,6 +1940,41 @@ document.getElementById('importFile').addEventListener('change', (e) => {
     e.target.value = '';
   };
   reader.readAsText(file);
+});
+
+/* ── Clearing everything ────────────────────────────────────────────────────
+   The counterpart to the example-data button: offering one-tap sample data
+   without a one-tap way back out is how someone ends up hand-deleting 24 rounds.
+
+   Settings deliberately SURVIVE a clear. Someone clearing the sample data is
+   starting fresh with their own rounds, not asking to lose the method they just
+   spent time configuring — and the method is the part of this app people tune. */
+const clearDialog = document.getElementById('clearDialog');
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  const g = state.golfers.length, r = state.rounds.length, c = state.courses.length;
+  document.getElementById('clearBody').textContent =
+    `This deletes ${r} round${r === 1 ? '' : 's'}, ${c} course${c === 1 ? '' : 's'} and `
+    + `${g} golfer${g === 1 ? '' : 's'}. Your handicap method and theme are kept. `
+    + `There is no undo — a backup file is the only way to get any of it back.`;
+  /* Said plainly, because "clear this device" and "clear every device I own" are
+     very different acts and the button looks identical either way. */
+  const signedIn = typeof window.ghSignedIn === 'function' && window.ghSignedIn();
+  document.getElementById('clearSyncWarn').textContent = signedIn
+    ? 'You are signed in, so this also clears the copy in your Google account. Your other devices will ask before clearing themselves.'
+    : '';
+  clearDialog.showModal();
+});
+
+document.getElementById('clearBackupBtn').addEventListener('click', downloadBackup);
+document.getElementById('clearCancel').addEventListener('click', () => clearDialog.close());
+document.getElementById('clearConfirm').addEventListener('click', () => {
+  const keepSettings = state.settings;
+  state = blankState();
+  state.settings = keepSettings;
+  save();                       // the one write path, so this pushes to the cloud too
+  clearDialog.close();
+  toast('Everything cleared — starting fresh');
 });
 
 /* Example data, offered only while the app is empty so it can't overwrite
@@ -2062,6 +2117,10 @@ const privacyNote = document.getElementById('privacyNote');
 const localTs = () => Number(localStorage.getItem('gh-updated') || 0);
 
 let A, F, auth, db, user = null, unsub = null, pushTimer = null, syncError = null;
+
+/* The classic script can't see `user` (module scope), and the clear dialog has to
+   tell the truth about whether deleting reaches the user's other devices. */
+window.ghSignedIn = () => !!user;
 
 if (FIREBASE_CONFIG) {
   init().catch((e) => { console.warn('Sync unavailable:', e); btn.hidden = true; });

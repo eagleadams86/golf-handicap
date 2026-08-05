@@ -172,6 +172,13 @@ browser after a confirmation that names the counts.
 This matters more than it does in most apps: with no account, clearing your browser data is
 the one thing that will lose your history. Take a backup now and then, or turn sync on.
 
+**Clear everything** wipes the rounds, courses and golfers after a confirmation naming the
+counts, with a *Download backup first* button in the same dialog. Your handicap method and
+theme survive it — clearing is for starting fresh with real rounds, not for undoing the
+settings you tuned. If you are signed in it says so, because it also clears the copy in your
+Google account and your other devices will then ask whether to follow suit. This is the way
+back out after trying the example data.
+
 Restored files go through the same validation as everything else — a field that is missing
 or the wrong shape is replaced with a sane default rather than throwing, and any id that
 isn't a plain `[A-Za-z0-9_-]` string is regenerated with every reference rewritten to match.

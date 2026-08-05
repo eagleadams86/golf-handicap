@@ -54,6 +54,16 @@ that emphasis.
   deleted, or marked "don't count" — is named on the front page via `#handicapWarn`, and the
   *Used in* column shows which rounds each method actually leaned on. A round quietly
   missing from a handicap is worse than the bug that hiding it would avoid.
+- **The example-data button and "Clear everything" are a pair.** Offering one-tap sample
+  data without a one-tap way back out is how someone ends up hand-deleting two dozen rounds;
+  if either is ever removed, reconsider the other. Clearing uses a dialog rather than nested
+  `confirm()` boxes because the thing that makes it safe — taking a backup — has to be a
+  button you can press at the moment of hesitation, and a `confirm()` can't hold a control.
+  **Settings deliberately survive a clear** (`state.settings` is carried across
+  `blankState()`): someone clearing the demo data is starting fresh with real rounds, not
+  asking to lose the method they just configured. It goes through `save()` like everything
+  else, so it reaches the cloud copy, and `window.ghSignedIn()` is what lets the dialog say
+  so — the classic script can't see the module-scoped `user`.
 - **Deleting a course or a set of tees keeps the rounds that used it**, flagged as orphaned
   rather than deleted, after a confirmation that names the count. Losing history to a typo in
   the courses screen is the worse failure.
