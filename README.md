@@ -197,6 +197,27 @@ this repo, and all three have to be right or sync fails:
 `firestore.rules` in this repo is a **checked-in copy** of what should be deployed. Nothing
 here deploys it; if the console rules change, change the file to match.
 
+### Checking the console side from a terminal
+
+Both products answer unauthenticated probes, so you can tell whether they are set up without
+opening the console. Nothing here is a secret and nothing is written.
+
+```bash
+curl -s "https://identitytoolkit.googleapis.com/v1/projects?key=AIzaSyBgBhAMUmXvq1vXb4KdSDALC2kNqsFZmxU"
+```
+
+Healthy: a JSON body listing `authorizedDomains`, which must include `eagleadams86.github.io`.
+`CONFIGURATION_NOT_FOUND` means Authentication has never been enabled on the project.
+
+```bash
+curl -s "https://firestore.googleapis.com/v1/projects/golfhandicap-14246/databases/(default)/documents/golfhandicap/probe?key=AIzaSyBgBhAMUmXvq1vXb4KdSDALC2kNqsFZmxU"
+```
+
+Healthy: `PERMISSION_DENIED — Missing or insufficient permissions`. That is the **success**
+case: the database exists and the rules are correctly refusing an anonymous read. A message
+saying the *API has not been used in this project* means the database has not been created
+yet.
+
 The Firebase config in `index.html` is a **public client config, not a secret** — it ships
 in the page of every Firebase web app. Access is enforced by the security rules, not by
 hiding the key.
