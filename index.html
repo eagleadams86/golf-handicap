@@ -1575,8 +1575,11 @@ document.getElementById('roundSave').addEventListener('click', () => {
     note: document.getElementById('f_note').value.slice(0, 120),
     counts: document.getElementById('f_counts').checked,
   };
-  if (editingRound) state.rounds[state.rounds.findIndex((r) => r.id === rec.id)] = rec;
-  else state.rounds.push(rec);
+  /* Upsert by id rather than trusting findIndex: the round being edited can
+     vanish mid-edit (deleted in another tab, or replaced by a sync), and a -1
+     would silently assign to a "-1" property and lose the save. */
+  const at = state.rounds.findIndex((r) => r.id === rec.id);
+  if (at === -1) state.rounds.push(rec); else state.rounds[at] = rec;
   save();
   roundDialog.close();
   toast(editingRound ? 'Round updated' : 'Round saved');
@@ -2068,6 +2071,19 @@ window.ghAdopt = (incoming, updatedAt) => {
   render();
 };
 window.ghCount = () => state.rounds.length;
+
+/* Another tab of this browser is the same copy of the data — localStorage is
+   shared — so a write there is adopted here the moment it lands. Without this,
+   two tabs last-write-wins each other: tab B never hears about tab A's save,
+   and B's next save() overwrites it. Adopt and render only — never save()
+   from here: the writing tab already pushed to the cloud, and saving would
+   write the same bytes back and bounce another event. (The storage event only
+   fires in OTHER tabs, so this cannot loop.) */
+window.addEventListener('storage', (e) => {
+  if (e.key !== STORAGE_KEY || !e.newValue) return;
+  try { state = normalizeState(JSON.parse(e.newValue)); } catch { return; }
+  render();
+});
 
 /* tests.html reaches the pure functions directly — they are all plain function
    declarations, so they are already on window. This hook exists only for the
