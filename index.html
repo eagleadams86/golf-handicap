@@ -864,11 +864,16 @@ function normalizeMethod(m) {
     adjustment: clampNum(src.adjustment, -20, 20, DEFAULT_METHOD.adjustment),
   };
 }
+/* null and '' mean "absent" and take the default. Number() would quietly turn
+   both into 0, which then clamps to the bottom of the range — an empty score
+   field in a hand-edited backup would become 30, not the default 90. */
 function clampInt(v, lo, hi, dflt) {
+  if (v == null || (typeof v === 'string' && !v.trim())) return dflt;
   const n = Math.round(Number(v));
   return isFinite(n) ? Math.max(lo, Math.min(hi, n)) : dflt;
 }
 function clampNum(v, lo, hi, dflt) {
+  if (v == null || (typeof v === 'string' && !v.trim())) return dflt;
   const n = Number(v);
   return isFinite(n) ? Math.max(lo, Math.min(hi, n)) : dflt;
 }
@@ -898,6 +903,20 @@ function courseHandicap(index, slope, rating, par) {
   if (index == null || !(Number(slope) > 0)) return null;
   const raw = index * (Number(slope) / 113) + (Number(rating) - Number(par));
   return Math.round(raw);
+}
+
+/* ── Sync decision ───────────────────────────────────────────────────────────
+   Which copy wins when a sign-in finds both a local and a cloud copy. Pure so
+   tests.html can pin the two rules learned the hard way in the sibling apps:
+   the first sign-in with data on both sides ASKS rather than guessing, and an
+   empty copy never beats a copy with data in it, whatever the timestamps say.
+   The sync module at the foot of the page acts on the verdict.
+─────────────────────────────────────────────────────────────────────────── */
+function syncDecision(localCount, remoteCount, remoteIsNewer, firstSyncForAccount) {
+  if (localCount && remoteCount && firstSyncForAccount) return 'ask';
+  if (remoteCount && !localCount) return 'adopt';
+  if (localCount && !remoteCount) return 'push';
+  return remoteCount && remoteIsNewer ? 'adopt' : 'push';
 }
 
 const DAY = 86400000;
@@ -1041,28 +1060,52 @@ function normalizeState(raw) {
       primary: (s.settings && s.settings.primary === 'whs') ? 'whs' : 'rolling',
     },
   };
+  /* Duplicate ids from a damaged backup: a golfer or course claiming an id
+     already taken is dropped (the rounds pointing at that id can't tell the
+     two apart anyway, so the first claimant keeps them); a round claiming a
+     taken id gets a fresh one instead, because nothing references round ids
+     and dropping it would lose history. */
+  const seenGolfers = new Set();
   (Array.isArray(s.golfers) ? s.golfers : []).forEach((g) => {
     if (!g || typeof g !== 'object') return;
-    out.golfers.push({ id: String(g.id || uid()), name: String(g.name || 'Golfer').slice(0, 60) });
+    const id = String(g.id || uid());
+    if (seenGolfers.has(id)) return;
+    seenGolfers.add(id);
+    out.golfers.push({ id, name: String(g.name || 'Golfer').slice(0, 60) });
   });
   if (!out.golfers.length) out.golfers.push({ id: uid(), name: 'Me' });
+  const seenCourses = new Set();
   (Array.isArray(s.courses) ? s.courses : []).forEach((c) => {
     if (!c || typeof c !== 'object') return;
-    const tees = (Array.isArray(c.tees) ? c.tees : []).map((t) => ({
-      id: String((t && t.id) || uid()),
-      name: String((t && t.name) || 'Tees').slice(0, 40),
-      rating: clampNum(t && t.rating, 40, 90, 72),
-      slope: clampInt(t && t.slope, 55, 155, 113),
-      par: clampInt(t && t.par, 27, 90, 72),
-    }));
+    const id = String(c.id || uid());
+    if (seenCourses.has(id)) return;
+    const seenTees = new Set();
+    const tees = [];
+    (Array.isArray(c.tees) ? c.tees : []).forEach((t) => {
+      const tid = String((t && t.id) || uid());
+      if (seenTees.has(tid)) return;
+      seenTees.add(tid);
+      tees.push({
+        id: tid,
+        name: String((t && t.name) || 'Tees').slice(0, 40),
+        rating: clampNum(t && t.rating, 40, 90, 72),
+        slope: clampInt(t && t.slope, 55, 155, 113),
+        par: clampInt(t && t.par, 27, 90, 72),
+      });
+    });
     if (!tees.length) return;
-    out.courses.push({ id: String(c.id || uid()), name: String(c.name || 'Course').slice(0, 80), tees });
+    seenCourses.add(id);
+    out.courses.push({ id, name: String(c.name || 'Course').slice(0, 80), tees });
   });
+  const seenRounds = new Set();
   (Array.isArray(s.rounds) ? s.rounds : []).forEach((r) => {
     if (!r || typeof r !== 'object') return;
     const date = /^\d{4}-\d{2}-\d{2}$/.test(String(r.date)) ? String(r.date) : todayISO();
+    let id = String(r.id || uid());
+    if (seenRounds.has(id)) id = uid();
+    seenRounds.add(id);
     out.rounds.push({
-      id: String(r.id || uid()),
+      id,
       golferId: String(r.golferId || out.golfers[0].id),
       date,
       courseId: String(r.courseId || ''),
@@ -1072,6 +1115,19 @@ function normalizeState(raw) {
       note: String(r.note || '').slice(0, 120),
       counts: r.counts !== false,
     });
+  });
+  /* A round whose golfer no longer exists must not become invisible — no view
+     would ever show it and no warning would name it, which breaks the rule
+     that exclusions are never silent. Each unknown owner gets a "Recovered
+     rounds" golfer instead, so whoever restores a damaged backup can see
+     what they have and rename or remove it deliberately. */
+  const knownGolfers = new Set(out.golfers.map((g) => g.id));
+  const recovered = new Map();
+  out.rounds.forEach((r) => {
+    if (knownGolfers.has(r.golferId) || recovered.has(r.golferId)) return;
+    const g = { id: r.golferId, name: recovered.size ? `Recovered rounds ${recovered.size + 1}` : 'Recovered rounds' };
+    recovered.set(r.golferId, g);
+    out.golfers.push(g);
   });
   const ids = new Set(out.golfers.map((g) => g.id));
   out.activeGolfer = ids.has(String(s.activeGolfer)) ? String(s.activeGolfer) : out.golfers[0].id;
@@ -1094,8 +1150,17 @@ function load() {
    cloudPush(), anything that changes data has to come through here or it will
    silently fail to sync. */
 function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  localStorage.setItem(UPDATED_KEY, String(Date.now()));
+  /* load() is guarded, so this is too: Safari's private mode and a full quota
+     both throw here, and an unguarded throw would kill the click handler
+     mid-save with nothing on screen to say so. The in-memory state is still
+     good — render it, warn, and carry on. */
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(UPDATED_KEY, String(Date.now()));
+  } catch (e) {
+    console.warn('Could not write saved data', e);
+    toast('⚠️ This browser is blocking storage (private mode?) — changes will be lost when the tab closes');
+  }
   if (window.cloudPush) window.cloudPush();
   render();
 }
@@ -1977,6 +2042,10 @@ document.getElementById('clearConfirm').addEventListener('click', () => {
   state = blankState();
   state.settings = keepSettings;
   save();                       // the one write path, so this pushes to the cloud too
+  /* …but save() debounces its push, and a clear must not sit in that window:
+     clearing then closing the tab inside 1.2s would leave the cloud copy
+     intact, to resurrect everything on the next sign-in. */
+  if (window.cloudFlush) window.cloudFlush();
   clearDialog.close();
   toast('Everything cleared — starting fresh');
 });
@@ -2281,7 +2350,11 @@ async function startSync() {
   const localN = window.ghCount();
   const isFirstSyncForAccount = localStorage.getItem('gh-sync-uid') !== user.uid;
 
-  if (remoteN && localN && isFirstSyncForAccount) {
+  /* The which-copy-wins rules live in syncDecision() in the classic script —
+     pure, so tests.html pins them (empty never beats data; a first sign-in
+     with rounds on both sides asks). This block only acts on the verdict. */
+  const verdict = syncDecision(localN, remoteN, !!(remote && remote.updatedAt > localTs()), isFirstSyncForAccount);
+  if (verdict === 'ask') {
     const keepGoogle = await chooseSyncSource(localN, remoteN, remote.updatedAt);
     if (keepGoogle) {
       window.ghAdopt(remote.state, remote.updatedAt);
@@ -2291,12 +2364,7 @@ async function startSync() {
       await pushNow();
       window.toast('Kept this device’s rounds');
     }
-  } else if (remoteN && !localN) {
-    window.ghAdopt(remote.state, remote.updatedAt);          // nothing here to lose
-    window.toast('Loaded your rounds from the cloud ☁️');
-  } else if (localN && !remoteN) {
-    await pushNow();                                          // empty cloud copy doesn't get to win
-  } else if (remoteN && remote.updatedAt > localTs()) {
+  } else if (verdict === 'adopt') {
     window.ghAdopt(remote.state, remote.updatedAt);
     window.toast('Loaded your rounds from the cloud ☁️');
   } else {
@@ -2341,6 +2409,14 @@ window.cloudPush = () => {
   if (!user) return;
   clearTimeout(pushTimer);
   pushTimer = setTimeout(() => pushNow().catch(setSyncError), 1200);
+};
+
+/* Skips the debounce. "Clear everything" calls this so the cleared state
+   reaches the cloud before the tab can be closed. */
+window.cloudFlush = () => {
+  if (!user) return;
+  clearTimeout(pushTimer);
+  pushNow().catch(setSyncError);
 };
 </script>
 </body>

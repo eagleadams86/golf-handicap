@@ -32,7 +32,8 @@
   <br><strong>Run this whenever you touch</strong> <code>round1</code>, <code>scoreDifferential</code>,
   <code>averageLowest</code>, <code>whsIndex</code>/<code>whsSelection</code>,
   <code>rollingIndex</code>/<code>rollingSelection</code>, <code>normalizeMethod</code>,
-  <code>applyCaps</code>, <code>courseHandicap</code>, <code>indexHistory</code>,
+  <code>clampInt</code>/<code>clampNum</code>, <code>applyCaps</code>, <code>courseHandicap</code>,
+  <code>indexHistory</code>, <code>pickUsed</code>, <code>syncDecision</code>, <code>buildDemo</code>,
   <code>sanitizeIds</code> or <code>normalizeState</code>.
 </p>
 <div id="summary">Loading the app…</div>
@@ -235,6 +236,50 @@ document.getElementById('app').addEventListener('load', function () {
   describe('daysBefore');
   it('steps back a year across a leap day', () => eq(W.daysBefore('2026-01-01', 365), '2025-01-01'));
 
+  /* ── which rounds get the credit ─────────────────────────────────────── */
+  describe('pickUsed');
+  it('credits a tied value to the most recent round, once each', () => {
+    const rounds = [{ round: { id: 'newest' } }, { round: { id: 'mid' } }, { round: { id: 'oldest' } }];
+    const used = W.pickUsed(rounds, [10, 12, 10], { considered: 3, use: 2, kept: [10, 10] });
+    ok(used.has('newest'), 'the newest 10 should be credited');
+    ok(used.has('oldest'), 'the second 10 should be credited');
+    ok(!used.has('mid'), 'the 12 should not be');
+  });
+  it('never credits more rounds than were kept', () => {
+    const rounds = [{ round: { id: 'a' } }, { round: { id: 'b' } }, { round: { id: 'c' } }];
+    const used = W.pickUsed(rounds, [10, 10, 10], { considered: 3, use: 1, kept: [10] });
+    eq(used.size, 1);
+    ok(used.has('a'), 'the tie should go to the most recent round');
+  });
+  it('credits nothing without a selection', () => eq(W.pickUsed([], [], null).size, 0));
+
+  /* ── clamp helpers ───────────────────────────────────────────────────── */
+  describe('clampInt / clampNum');
+  it('treats an empty string as missing, not as zero', () => {
+    eq(W.clampInt('', 30, 200, 90), 90);
+    eq(W.clampNum('  ', 0.1, 2, 1), 1);
+  });
+  it('treats null as missing, not as zero', () => {
+    eq(W.clampInt(null, 30, 200, 90), 90);
+    eq(W.clampNum(null, -20, 20, 0), 0);
+  });
+  it('still clamps a real zero', () => eq(W.clampInt(0, 30, 200, 90), 30));
+
+  /* ── which copy wins on sign-in ──────────────────────────────────────── */
+  describe('syncDecision');
+  it('asks on the first sign-in when both sides hold rounds', () =>
+    eq(W.syncDecision(5, 8, true, true), 'ask'));
+  it('adopts the cloud copy on a fresh device, even a stale one', () =>
+    eq(W.syncDecision(0, 8, false, false), 'adopt'));
+  it('an empty cloud copy never beats local data, even stamped newer', () =>
+    eq(W.syncDecision(5, 0, true, false), 'push'));
+  it('after the first sign-in, the newer copy wins', () => {
+    eq(W.syncDecision(5, 8, true, false), 'adopt');
+    eq(W.syncDecision(5, 8, false, false), 'push');
+  });
+  it('pushes when both sides are empty — nothing to adopt', () =>
+    eq(W.syncDecision(0, 0, false, true), 'push'));
+
   /* ── data coming in from outside ─────────────────────────────────────── */
   describe('sanitizeIds');
   it('replaces an id that could break out of an attribute, and rewrites references', () => {
@@ -280,6 +325,33 @@ document.getElementById('app').addEventListener('load', function () {
   it('defaults counts to true when the field is absent', () => {
     const s = W.normalizeState({ rounds: [{ id: 'r', date: '2026-05-01', score: 90 }] });
     eq(s.rounds[0].counts, true);
+  });
+  it('gives rounds from a vanished golfer a "Recovered rounds" owner rather than hiding them', () => {
+    const s = W.normalizeState({
+      golfers: [{ id: 'a', name: 'A' }],
+      rounds: [{ id: 'r', golferId: 'ghost', date: '2026-05-01', score: 90 }],
+    });
+    const owner = s.golfers.find((g) => g.id === s.rounds[0].golferId);
+    ok(owner, 'the round should have an owner that exists');
+    eq(owner.name, 'Recovered rounds');
+  });
+  it('keeps the first of two golfers claiming the same id', () => {
+    const s = W.normalizeState({ golfers: [{ id: 'a', name: 'First' }, { id: 'a', name: 'Second' }] });
+    eq(s.golfers.length, 1);
+    eq(s.golfers[0].name, 'First');
+  });
+  it('keeps the first of two courses claiming the same id', () => {
+    const s = W.normalizeState({ courses: [
+      { id: 'c', name: 'First', tees: [{ id: 't', rating: 70, slope: 113, par: 72 }] },
+      { id: 'c', name: 'Second', tees: [{ id: 't2', rating: 70, slope: 113, par: 72 }] }] });
+    eq(s.courses.length, 1);
+    eq(s.courses[0].name, 'First');
+  });
+  it('regenerates a duplicate round id rather than letting two rounds collide', () => {
+    const s = W.normalizeState({ rounds: [
+      { id: 'r', date: '2026-05-01', score: 90 }, { id: 'r', date: '2026-05-02', score: 85 }] });
+    eq(s.rounds.length, 2);
+    ok(s.rounds[0].id !== s.rounds[1].id, 'the second round should get a fresh id');
   });
 
   /* ── example data ────────────────────────────────────────────────────── */
