@@ -1637,26 +1637,27 @@ function openCourseEdit(id) {
   document.getElementById('c_name').value = editingCourse ? editingCourse.name : '';
   const rows = document.getElementById('teeRows');
   rows.innerHTML = (editingCourse ? editingCourse.tees : [null]).map(teeRowHtml).join('');
-  wireTeeRows();
   document.getElementById('deleteCourseBtn').hidden = !editingCourse;
   document.getElementById('courseWarn').textContent = '';
   if (courseDialog.open) courseDialog.close();
   courseEditDialog.showModal();
 }
 
-function wireTeeRows() {
-  document.querySelectorAll('#teeRows .removeTee').forEach((b) => {
-    b.addEventListener('click', () => {
-      const rows = document.getElementById('teeRows');
-      if (rows.children.length <= 1) { document.getElementById('courseWarn').textContent = 'A course needs at least one set of tees.'; return; }
-      b.closest('fieldset').remove();
-    });
-  });
-}
+/* One delegated listener, attached once. Wiring each Remove button as rows were
+   added stacked duplicate handlers on the earlier buttons, and a single click
+   then removed the row AND showed a spurious "needs at least one set of tees"
+   warning from the second handler seeing the already-shortened list. */
+document.getElementById('teeRows').addEventListener('click', (e) => {
+  const b = e.target.closest('.removeTee');
+  if (!b) return;
+  const rows = document.getElementById('teeRows');
+  if (rows.children.length <= 1) { document.getElementById('courseWarn').textContent = 'A course needs at least one set of tees.'; return; }
+  document.getElementById('courseWarn').textContent = '';
+  b.closest('fieldset').remove();
+});
 
 document.getElementById('addTeeBtn').addEventListener('click', () => {
   document.getElementById('teeRows').insertAdjacentHTML('beforeend', teeRowHtml(null));
-  wireTeeRows();
 });
 
 document.getElementById('courseEditSave').addEventListener('click', () => {
