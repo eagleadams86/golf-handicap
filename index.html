@@ -1977,33 +1977,42 @@ document.getElementById('clearConfirm').addEventListener('click', () => {
   toast('Everything cleared — starting fresh');
 });
 
-/* Example data, offered only while the app is empty so it can't overwrite
-   anything. Deliberately a season's worth of one golfer's rounds — enough for
-   the official index to be issued and for the two methods to visibly disagree. */
-function loadDemo() {
-  if (state.rounds.length && !confirm('Replace what’s here with the example data?')) return;
-  const gid = state.golfers[0].id;
-  const courseId = uid(), teeWhite = uid(), teeYellow = uid();
-  state.courses = [{
-    id: courseId, name: 'Example Park GC',
-    tees: [
-      { id: teeYellow, name: 'Yellow', rating: 69.4, slope: 122, par: 71 },
-      { id: teeWhite, name: 'White', rating: 71.2, slope: 129, par: 71 },
-    ],
-  }];
+/* Example data, offered from the empty state. Deliberately a season's worth of
+   one golfer's rounds — enough for the official index to be issued and for the
+   two methods to visibly disagree. It loads for the golfer ON SCREEN, ADDS its
+   example course rather than replacing the list (someone may already have typed
+   real courses in), and never touches another golfer's rounds. The fixed
+   `demo-*` ids make a second load replace the first instead of piling up
+   duplicates. buildDemo() is pure so tests.html can pin all of that. */
+function buildDemo(gid) {
   const scores = [94, 88, 91, 86, 97, 89, 84, 92, 90, 87, 95, 83, 88, 93, 86, 91, 85, 96, 89, 82, 90, 87, 94, 86];
   const start = new Date();
   start.setHours(12, 0, 0, 0);                 // noon, so a DST shift can't move a date
   start.setDate(start.getDate() - scores.length * 9);
-  state.rounds = scores.map((s, i) => {
-    const d = new Date(start.getTime() + i * 9 * DAY);
-    return {
+  return {
+    course: {
+      id: 'demo-course', name: 'Example Park GC',
+      tees: [
+        { id: 'demo-tee-yellow', name: 'Yellow', rating: 69.4, slope: 122, par: 71 },
+        { id: 'demo-tee-white', name: 'White', rating: 71.2, slope: 129, par: 71 },
+      ],
+    },
+    rounds: scores.map((s, i) => ({
       id: uid(), golferId: gid,
-      date: isoOf(d),
-      courseId, teeId: i % 4 === 0 ? teeWhite : teeYellow,
+      date: isoOf(new Date(start.getTime() + i * 9 * DAY)),
+      courseId: 'demo-course', teeId: i % 4 === 0 ? 'demo-tee-white' : 'demo-tee-yellow',
       score: s, pcc: 0, note: '', counts: true,
-    };
-  });
+    })),
+  };
+}
+
+function loadDemo() {
+  const gid = state.activeGolfer;
+  if (state.rounds.some((r) => r.golferId === gid) && !confirm('Replace this golfer’s rounds with the example data?')) return;
+  const demo = buildDemo(gid);
+  const at = state.courses.findIndex((c) => c.id === demo.course.id);
+  if (at === -1) state.courses.push(demo.course); else state.courses[at] = demo.course;
+  state.rounds = state.rounds.filter((r) => r.golferId !== gid).concat(demo.rounds);
   save();
   toast('Example data loaded — download a backup or clear it when you’re done');
 }

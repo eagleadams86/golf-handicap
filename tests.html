@@ -282,6 +282,21 @@ document.getElementById('app').addEventListener('load', function () {
     eq(s.rounds[0].counts, true);
   });
 
+  /* ── example data ────────────────────────────────────────────────────── */
+  describe('buildDemo');
+  it('builds every round for the golfer asked for, nobody else', () => {
+    const d = W.buildDemo('g42');
+    ok(d.rounds.length >= 20, 'enough rounds for an official index');
+    ok(d.rounds.every((r) => r.golferId === 'g42'), 'all rounds should belong to g42');
+  });
+  it('uses fixed ids, so a second load replaces the first instead of duplicating it', () =>
+    eq(W.buildDemo('a').course.id, W.buildDemo('b').course.id));
+  it('points every round at a tee that exists on the demo course', () => {
+    const d = W.buildDemo('g');
+    const teeIds = d.course.tees.map((t) => t.id);
+    ok(d.rounds.every((r) => r.courseId === d.course.id && teeIds.indexOf(r.teeId) !== -1));
+  });
+
   run();
 });
 
