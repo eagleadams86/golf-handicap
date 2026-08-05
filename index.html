@@ -1,0 +1,2249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<!-- Content Security Policy. GitHub Pages can't set response headers, so this meta
+     tag is the only place to declare one (and it still applies when the file is
+     opened via file://). 'unsafe-inline' is unavoidable: the app is inline script
+     and style by design, with no build step to generate hashes. The real value is
+     the host allowlists — script only from this page and Firebase's CDN, network
+     calls only to the Firebase endpoints sync actually uses plus the GitHub API
+     (changelog), frames only from this app's Firebase auth helper. form-action is
+     'self' rather than 'none' because the dialogs submit with method="dialog",
+     which some browsers have historically checked against form-action.
+     NOTE: any new network endpoint must be added to connect-src or it is blocked.
+     Note: frame-ancestors is ignored in a meta tag; it needs a real header. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://api.github.com; frame-src https://golf-handicap.firebaseapp.com; base-uri 'none'; form-action 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Golf Handicap — rolling handicap tracker</title>
+<meta name="description" content="Track your golf rounds and see your handicap two ways: your own rolling last-N-rounds method, and the official World Handicap System calculation. Works offline, no account required.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Handicap">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0e1a'/%3E%3Cpath d='M24 50V12l22 9-22 9' fill='%23818cf8'/%3E%3Ccircle cx='24' cy='50' r='5' fill='%23e7eaf6'/%3E%3C/svg%3E">
+<script>
+  // Apply the saved theme before first paint so there is no flash. Midnight is the
+  // default for every app in this family; "slate" is the old name for Dark.
+  (function () {
+    var t = localStorage.getItem('gh-theme');
+    if (t === 'slate') t = 'dark';
+    var valid = ['midnight', 'dark', 'light', 'sepia'];
+    if (valid.indexOf(t) === -1) t = 'midnight';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+<style>
+/* ── Palette ────────────────────────────────────────────────────────────────
+   Transcribed verbatim from the generated theme.css in ~/claude-theme-pack
+   (private repo eagleadams86/claude-theme-pack), the source of truth for the
+   palette of every app in this family. It is inlined rather than linked so the
+   app still works when the file is opened straight off disk via file://.
+   NEVER retune a colour here: change the pack's tokens.json, run its
+   check_contrast.py gate, rebuild, then re-transcribe. Four themes only —
+   midnight (default, in :root), dark, light, sepia.
+─────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* Midnight — the default theme for all apps */
+  --bg: #0a0e1a;
+  --surface: #121829;
+  --surface-alt: #1b2238;
+  --border: #262f4a;
+  --border-strong: #374163;
+  --text-primary: #e7eaf6;
+  --text-secondary: #aab2d0;
+  --text-muted: #838cab;
+  --text-hint: #7f88a9;
+  --accent: #818cf8;
+  --on-accent: #0a0e1a;
+  --accent-bg: #242b4a;
+  --focus-border: #818cf8;
+  --border-control: #536396;
+  --ok: #72fe84;
+  --warn: #efbe39;
+  --serious: #f79b5c;
+  --err: #fb7874;
+  --ok-bg: #1e3635;
+  --warn-bg: #322c1b;
+  --serious-bg: #32241b;
+  --err-bg: #321b1b;
+  --btn-bg: #e7eaf6;
+  --btn-text: #0a0e1a;
+  --input-border: #374163;
+  --spinner-track: #262f4a;
+  --spinner-head: #7e87a8;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-pill: 999px;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-base: 13px;
+  --fs-md: 14px;
+  --fs-lg: 17px;
+  --fs-xl: 22px;
+  --fs-display: 30px;
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --lh-tight: 1.25;
+  --lh-base: 1.5;
+  --lh-loose: 1.7;
+  --ls-tight: -0.01em;
+  --ls-label: 0.06em;
+
+  --sp-1: 2px;
+  --sp-2: 4px;
+  --sp-3: 6px;
+  --sp-4: 8px;
+  --sp-5: 12px;
+  --sp-6: 16px;
+  --sp-7: 24px;
+  --sp-8: 32px;
+  --sp-9: 48px;
+
+  --green: var(--ok);
+  --red: var(--err);
+  --amber: var(--warn);
+  --green-bg: var(--ok-bg);
+  --red-bg: var(--err-bg);
+  --amber-bg: var(--warn-bg);
+}
+
+[data-theme="dark"] {
+  --bg: #13151b;
+  --surface: #1c1f27;
+  --surface-alt: #262a33;
+  --border: #2d313b;
+  --border-strong: #3d424e;
+  --text-primary: #eef0f5;
+  --text-secondary: #adb1bd;
+  --text-muted: #9396a3;
+  --text-hint: #8c909d;
+  --accent: #eef0f5;
+  --on-accent: #13151b;
+  --accent-bg: #3c3e46;
+  --focus-border: #eef0f5;
+  --border-control: #626a7d;
+  --ok: #72fe84;
+  --warn: #efbe39;
+  --serious: #f79b5c;
+  --err: #fb7874;
+  --ok-bg: #273c33;
+  --warn-bg: #322c1b;
+  --serious-bg: #32241b;
+  --err-bg: #321b1b;
+  --btn-bg: #eef0f5;
+  --btn-text: #13151b;
+  --input-border: #3d424e;
+  --spinner-track: #2d313b;
+  --spinner-head: #9396a3;
+}
+
+[data-theme="light"] {
+  --bg: #f5f5f3;
+  --surface: #ffffff;
+  --surface-alt: #f0f0ee;
+  --border: #e0e0dd;
+  --border-strong: #c8c8c4;
+  --text-primary: #111110;
+  --text-secondary: #555551;
+  --text-muted: #656562;
+  --text-hint: #6d6d6d;
+  --accent: #266dc3;
+  --on-accent: #ffffff;
+  --accent-bg: #e9f0f9;
+  --focus-border: #266dc3;
+  --border-control: #8e8e86;
+  --ok: #0b7a67;
+  --warn: #7e6a07;
+  --serious: #995c33;
+  --err: #8f1e2a;
+  --ok-bg: #bcfee8;
+  --warn-bg: #fff0b2;
+  --serious-bg: #fff1e8;
+  --err-bg: #ffc9bf;
+  --btn-bg: #111110;
+  --btn-text: #ffffff;
+  --input-border: #c8c8c4;
+  --spinner-track: #e0e0dd;
+  --spinner-head: #656562;
+}
+
+[data-theme="sepia"] {
+  --bg: #f3ead7;
+  --surface: #fbf5e7;
+  --surface-alt: #eee2c9;
+  --border: #e0d3b4;
+  --border-strong: #cbb992;
+  --text-primary: #3a3020;
+  --text-secondary: #5e5039;
+  --text-muted: #6a5e46;
+  --text-hint: #71644b;
+  --accent: #3a3020;
+  --on-accent: #fbf5e7;
+  --accent-bg: #e2dbcd;
+  --focus-border: #3a3020;
+  --border-control: #9c824b;
+  --ok: #087256;
+  --warn: #746206;
+  --serious: #915430;
+  --err: #8b232d;
+  --ok-bg: #bcfee8;
+  --warn-bg: #fff0b2;
+  --serious-bg: #fee3d0;
+  --err-bg: #ffc9bf;
+  --btn-bg: #3a3020;
+  --btn-text: #fbf5e7;
+  --input-border: #cbb992;
+  --spinner-track: #e0d3b4;
+  --spinner-head: #6a5e46;
+}
+
+/* ── App-specific chart colours ──────────────────────────────────────────────
+   Two series only, so they sit on the blue↔amber axis, which is the one that
+   survives red-green colour deficiency (the pack's rule 2 reasoning, applied to
+   a two-series chart). Colour is still not the only cue: the rolling line is
+   solid with round points, the WHS line is dashed with square points, and both
+   are named in the legend. These are ADDITIONS, not overrides of pack tokens,
+   so the midnight defaults live in :root exactly as the pack's own do.
+─────────────────────────────────────────────────────────────────────────── */
+:root { --c-roll: #8ab4ff; --c-whs: #e3b04b; }
+[data-theme="dark"]  { --c-roll: #8ab4ff; --c-whs: #e3b04b; }
+[data-theme="light"] { --c-roll: #1f5fb0; --c-whs: #7a5c0c; }
+[data-theme="sepia"] { --c-roll: #2c5a94; --c-whs: #6f5407; }
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  padding: 0 var(--sp-6) var(--sp-9);
+  background: var(--bg);
+  color: var(--text-primary);
+  font: var(--fw-normal) var(--fs-base)/var(--lh-base) var(--font-sans);
+}
+.wrap { max-width: 1000px; margin: 0 auto; }
+
+/* ── Header ─────────────────────────────────────────────────────────────────
+   Everything in this row is written into the markup at its final size. The
+   header paints long before the script at the foot of the page runs, so any
+   control filled in by JS grows on screen and shoves the page down — an empty
+   <select> is 40px wide until its options arrive. Starting hidden costs
+   nothing; growing does. The sync button is therefore visible by default and
+   hidden on failure, not the other way round. (Learned in Sprint Velocity.)
+─────────────────────────────────────────────────────────────────────────── */
+header.top {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-5);
+  padding: var(--sp-6) 0 var(--sp-5);
+}
+header.top h1 {
+  margin: 0; font-size: var(--fs-xl); font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-tight); display: flex; align-items: center; gap: var(--sp-4);
+}
+header.top .spacer { flex: 1 1 auto; }
+.hdr-group { display: flex; align-items: center; gap: var(--sp-3); }
+.hdr-group label { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: var(--ls-label); color: var(--text-muted); }
+
+select, input, textarea, button { font: inherit; color: inherit; }
+select, input[type="text"], input[type="number"], input[type="date"], textarea {
+  background: var(--surface); color: var(--text-primary);
+  border: 1px solid var(--input-border); border-radius: var(--radius-sm);
+  padding: var(--sp-3) var(--sp-4); min-height: 32px;
+}
+select { cursor: pointer; }
+textarea { min-height: 60px; resize: vertical; width: 100%; }
+:focus-visible { outline: 2px solid var(--focus-border); outline-offset: 2px; }
+
+button {
+  background: var(--surface-alt); color: var(--text-primary);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  padding: var(--sp-3) var(--sp-5); cursor: pointer; min-height: 32px;
+}
+button:hover { border-color: var(--border-control); }
+button.primary { background: var(--btn-bg); color: var(--btn-text); border-color: var(--btn-bg); font-weight: var(--fw-medium); }
+button.danger { color: var(--err); border-color: var(--err); background: var(--err-bg); }
+button.link { background: none; border: none; color: var(--accent); padding: 0; min-height: 0; text-decoration: underline; }
+
+/* Help buttons need breathing room — an icon must never sit flush against the
+   word it follows. Standing preference across every app in this family. */
+.help-btn {
+  margin-left: 7px; width: 18px; height: 18px; min-height: 18px; padding: 0;
+  border-radius: var(--radius-pill); font-size: var(--fs-xs); line-height: 1;
+  background: var(--surface-alt); border: 1px solid var(--border-strong);
+  color: var(--text-secondary); flex: 0 0 auto;
+}
+h2 .help-btn, .label .help-btn { vertical-align: middle; }
+th:has(.help-btn), td:has(.help-btn) { white-space: nowrap; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: var(--sp-6); margin-bottom: var(--sp-6);
+}
+.card > h2 {
+  margin: 0 0 var(--sp-5); font-size: var(--fs-lg); font-weight: var(--fw-semibold);
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-3);
+}
+.card > h2 .spacer { flex: 1 1 auto; }
+.muted { color: var(--text-secondary); }
+.hint { color: var(--text-muted); font-size: var(--fs-sm); }
+.label { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: var(--ls-label); color: var(--text-muted); }
+
+/* ── The two handicap figures ───────────────────────────────────────────────
+   Both are always on screen. Which one is "yours" only changes the emphasis —
+   the other never disappears, because the whole point of the app is being able
+   to see the two side by side. The primary card carries an accent edge AND the
+   word "Primary", so the distinction is not colour alone.
+─────────────────────────────────────────────────────────────────────────── */
+.figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--sp-5); }
+.figure {
+  background: var(--surface-alt); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: var(--sp-6); position: relative;
+}
+.figure.is-primary { border-color: var(--accent); border-width: 2px; padding: calc(var(--sp-6) - 1px); }
+.figure .big { font-size: var(--fs-display); font-weight: var(--fw-bold); letter-spacing: var(--ls-tight); line-height: var(--lh-tight); }
+.figure .big.na { font-size: var(--fs-xl); color: var(--text-muted); font-weight: var(--fw-medium); }
+.figure .sub { color: var(--text-secondary); font-size: var(--fs-sm); margin-top: var(--sp-2); }
+.figure .tag {
+  position: absolute; top: var(--sp-4); right: var(--sp-4);
+  font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: var(--ls-label);
+  color: var(--accent); font-weight: var(--fw-semibold);
+}
+.figure .swatch { display: inline-block; width: 22px; height: 3px; vertical-align: middle; margin-right: var(--sp-3); border-radius: 2px; }
+.swatch.roll { background: var(--c-roll); }
+.swatch.whs { background: repeating-linear-gradient(90deg, var(--c-whs) 0 5px, transparent 5px 9px); }
+
+.seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); overflow: hidden; }
+.seg button { border: none; border-radius: 0; background: var(--surface); padding: var(--sp-3) var(--sp-5); }
+.seg button + button { border-left: 1px solid var(--border-strong); }
+.seg button[aria-pressed="true"] { background: var(--btn-bg); color: var(--btn-text); font-weight: var(--fw-medium); }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--sp-5); }
+.stat { background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--sp-5); }
+.stat .v { font-size: var(--fs-xl); font-weight: var(--fw-semibold); }
+
+table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
+.table-scroll { overflow-x: auto; }
+th, td { padding: var(--sp-4) var(--sp-5); text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+thead th {
+  font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: var(--ls-label);
+  color: var(--text-muted); font-weight: var(--fw-semibold); border-bottom-color: var(--border-strong);
+}
+/* Row-header cells are re-styled back: the th rules above are written for
+   column headings, and a row header is body text. */
+tbody th { font-weight: var(--fw-normal); font-size: var(--fs-base); text-transform: none; letter-spacing: normal; color: var(--text-primary); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr:hover { background: var(--surface-alt); }
+tr.dropped td, tr.dropped th { color: var(--text-muted); }
+.rowbtn { background: none; border: none; padding: 0; min-height: 0; color: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font: inherit; }
+
+.pill {
+  display: inline-block; font-size: var(--fs-xs); padding: 1px var(--sp-4);
+  border-radius: var(--radius-pill); border: 1.5px solid var(--border-strong);
+  background: var(--surface-alt); color: var(--text-secondary); white-space: nowrap;
+}
+/* A status surface is a tint fill plus a full-strength edge — the tint fills
+   are near-identical to each other once red-green deficiency flattens them, so
+   the border is what actually carries the signal. Never a fill alone. */
+.pill.counts { border-color: var(--ok); background: var(--ok-bg); color: var(--text-primary); }
+.pill.excluded { border-color: var(--err); background: var(--err-bg); color: var(--text-primary); }
+
+details { border-top: 1px solid var(--border); margin-top: var(--sp-5); padding-top: var(--sp-5); }
+details > summary { cursor: pointer; color: var(--accent); font-size: var(--fs-sm); }
+details > summary:focus-visible { outline: 2px solid var(--focus-border); outline-offset: 2px; }
+.work { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-secondary); white-space: pre-wrap; margin-top: var(--sp-5); }
+
+.chart-wrap { overflow-x: auto; }
+svg.chart { display: block; width: 100%; min-width: 320px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: var(--sp-6); margin-top: var(--sp-4); font-size: var(--fs-sm); color: var(--text-secondary); }
+
+dialog {
+  background: var(--surface); color: var(--text-primary); border: 1px solid var(--border-strong);
+  border-radius: var(--radius); padding: var(--sp-7); max-width: 560px; width: calc(100% - var(--sp-8));
+}
+dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+dialog h2 { margin: 0 0 var(--sp-5); font-size: var(--fs-lg); }
+.field { margin-bottom: var(--sp-5); }
+.field > label { display: block; font-size: var(--fs-sm); color: var(--text-secondary); margin-bottom: var(--sp-2); }
+.field input, .field select { width: 100%; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-5); }
+.row-actions { display: flex; flex-wrap: wrap; gap: var(--sp-4); justify-content: flex-end; margin-top: var(--sp-6); }
+.row-actions .spacer { flex: 1 1 auto; }
+.checkline { display: flex; align-items: center; gap: var(--sp-4); }
+.checkline input { width: auto; min-height: 0; }
+
+/* Live regions are emptied, never removed from the tree — an element toggled
+   out with [hidden] announces nothing on the way back. .warn:empty collapses
+   it visually instead. */
+.warn { color: var(--warn); font-size: var(--fs-sm); margin-top: var(--sp-4); }
+.warn:empty { display: none; }
+.err-text { color: var(--err); }
+
+#toast {
+  position: fixed; left: 50%; bottom: var(--sp-7); transform: translateX(-50%);
+  background: var(--surface-alt); border: 1px solid var(--border-strong);
+  color: var(--text-primary); padding: var(--sp-4) var(--sp-6);
+  border-radius: var(--radius-pill); font-size: var(--fs-sm);
+  opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 50; max-width: 90vw; text-align: center;
+}
+#toast.show { opacity: 1; }
+
+footer { color: var(--text-muted); font-size: var(--fs-sm); margin-top: var(--sp-8); }
+footer a, .privacy-links a { color: var(--accent); }
+footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items: center; margin-bottom: var(--sp-5); }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.empty { text-align: center; padding: var(--sp-8) var(--sp-6); color: var(--text-secondary); }
+.empty p { max-width: 46ch; margin: 0 auto var(--sp-5); }
+
+@media (max-width: 560px) {
+  body { padding: 0 var(--sp-5) var(--sp-8); }
+  .grid2 { grid-template-columns: 1fr; }
+  header.top h1 { font-size: var(--fs-lg); }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1><span aria-hidden="true">⛳</span> Golf Handicap</h1>
+  <span class="spacer"></span>
+  <div class="hdr-group">
+    <label for="golferSel">Golfer</label>
+    <select id="golferSel" style="min-width:130px"><option>—————</option></select>
+    <button id="golfersBtn" title="Add, rename or remove golfers">Manage</button>
+  </div>
+  <div class="hdr-group">
+    <label for="themeSel">Theme</label>
+    <!-- Themes are listed alphabetically; midnight is the default but is not listed first. -->
+    <select id="themeSel">
+      <option value="dark">Dark</option>
+      <option value="light">Light</option>
+      <option value="midnight">Midnight</option>
+      <option value="sepia">Sepia</option>
+    </select>
+  </div>
+  <button id="syncBtn">☁️ Sign in to sync</button>
+</header>
+
+<main>
+  <section class="card" id="handicapCard">
+    <h2>
+      Current handicap
+      <button class="help-btn" type="button" data-help="handicap" aria-label="How the two handicaps are worked out">?</button>
+      <span class="spacer"></span>
+      <span class="label" id="primaryLabel">Show as primary</span>
+      <span class="seg" role="group" aria-labelledby="primaryLabel">
+        <button type="button" id="primRoll" aria-pressed="true">My method</button>
+        <button type="button" id="primWhs" aria-pressed="false">Official</button>
+      </span>
+    </h2>
+    <div class="figures">
+      <div class="figure is-primary" id="figRoll">
+        <div class="tag" id="tagRoll">Primary</div>
+        <div class="label"><span class="swatch roll" aria-hidden="true"></span><span id="rollName">Rolling last 5</span></div>
+        <div class="big na" id="rollValue">—</div>
+        <div class="sub" id="rollSub">Add some rounds to get started.</div>
+      </div>
+      <div class="figure" id="figWhs">
+        <div class="tag" id="tagWhs" hidden>Primary</div>
+        <div class="label"><span class="swatch whs" aria-hidden="true"></span>Official (World Handicap System)</div>
+        <div class="big na" id="whsValue">—</div>
+        <div class="sub" id="whsSub">Needs at least 3 rounds.</div>
+      </div>
+    </div>
+    <p class="warn" id="handicapWarn" role="status"></p>
+    <details id="workingDetails">
+      <summary>How these are worked out</summary>
+      <div class="work" id="working"></div>
+    </details>
+  </section>
+
+  <section class="card" id="statsCard">
+    <h2>At a glance</h2>
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <section class="card" id="trendCard">
+    <h2>Handicap over time
+      <button class="help-btn" type="button" data-help="trend" aria-label="About the trend chart">?</button>
+    </h2>
+    <div class="chart-wrap" id="chartWrap"></div>
+    <div class="legend">
+      <span><span class="swatch roll" aria-hidden="true"></span> <span id="legendRoll">Rolling last 5</span> — solid line, round points</span>
+      <span><span class="swatch whs" aria-hidden="true"></span> Official WHS — dashed line, square points</span>
+    </div>
+  </section>
+
+  <section class="card" id="playingCard">
+    <h2>Course handicap
+      <button class="help-btn" type="button" data-help="coursehcp" aria-label="About the course handicap">?</button>
+    </h2>
+    <div class="grid2">
+      <div class="field">
+        <label for="chCourse">Course</label>
+        <select id="chCourse"></select>
+      </div>
+      <div class="field">
+        <label for="chTee">Tee</label>
+        <select id="chTee"></select>
+      </div>
+    </div>
+    <div class="figure">
+      <div class="label">Strokes you get on the day</div>
+      <div class="big na" id="chValue">—</div>
+      <div class="sub" id="chSub">Pick a course to see the number of shots to take off.</div>
+    </div>
+  </section>
+
+  <section class="card" id="roundsCard">
+    <h2>
+      Rounds
+      <span class="spacer"></span>
+      <button class="primary" id="addRoundBtn">+ Add round</button>
+      <button id="coursesBtn">Courses</button>
+      <button id="methodBtn">My method</button>
+    </h2>
+    <div class="table-scroll" id="roundsTable"></div>
+  </section>
+</main>
+
+<footer>
+  <div class="foot-row">
+    <button id="exportBtn">⬇︎ Download backup (JSON)</button>
+    <button id="importBtn">⬆︎ Restore from backup</button>
+    <input type="file" id="importFile" accept="application/json,.json" class="sr-only" aria-hidden="true" tabindex="-1">
+    <span class="spacer"></span>
+  </div>
+  <p id="privacyNote">🔒 Private — stored in this browser; sign in to sync your own devices. No account required to use the app.</p>
+  <p class="privacy-links"><a href="privacy.html">Privacy</a> · <a href="https://github.com/eagleadams86/golf-handicap">Source on GitHub</a></p>
+  <details id="changelog">
+    <summary>Recent changes</summary>
+    <div id="changelogBody" class="hint">Loading…</div>
+  </details>
+</footer>
+
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- ── Dialogs ───────────────────────────────────────────────────────────── -->
+<dialog id="roundDialog">
+  <form method="dialog" id="roundForm">
+    <h2 id="roundTitle">Add round</h2>
+    <div class="grid2">
+      <div class="field">
+        <label for="f_date">Date played</label>
+        <input type="date" id="f_date" required>
+      </div>
+      <div class="field">
+        <label for="f_score">Adjusted gross score</label>
+        <input type="number" id="f_score" min="30" max="200" step="1" required inputmode="numeric">
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="field">
+        <label for="f_course">Course</label>
+        <select id="f_course" required></select>
+      </div>
+      <div class="field">
+        <label for="f_tee">Tee</label>
+        <select id="f_tee" required></select>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="field">
+        <label for="f_pcc">Conditions adjustment (PCC)</label>
+        <select id="f_pcc">
+          <option value="-1">−1 (easier than normal)</option>
+          <option value="0" selected>0 (normal — the usual answer)</option>
+          <option value="1">+1</option>
+          <option value="2">+2</option>
+          <option value="3">+3 (much harder)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f_note">Note (optional)</label>
+        <input type="text" id="f_note" maxlength="120" placeholder="Monthly medal, windy…">
+      </div>
+    </div>
+    <div class="field checkline">
+      <input type="checkbox" id="f_counts" checked>
+      <label for="f_counts" style="margin:0">Count this round towards my handicap</label>
+    </div>
+    <p class="hint" id="roundHint"></p>
+    <p class="warn" id="roundWarn" role="status"></p>
+    <div class="row-actions">
+      <button type="button" id="deleteRoundBtn" class="danger" hidden>Delete</button>
+      <span class="spacer"></span>
+      <button type="button" id="roundCancel">Cancel</button>
+      <button type="button" class="primary" id="roundSave">Save round</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="courseDialog">
+  <h2>Courses and tees</h2>
+  <p class="hint">A course needs a <strong>rating</strong> and a <strong>slope</strong> for each set of tees — both are printed on the scorecard. The rating is the score a scratch golfer is expected to shoot; the slope (55–155, usually near 113) is how much harder it plays for everyone else.</p>
+  <div id="courseList"></div>
+  <div class="row-actions">
+    <button type="button" id="addCourseBtn">+ Add course</button>
+    <span class="spacer"></span>
+    <button type="button" id="courseClose" class="primary">Done</button>
+  </div>
+</dialog>
+
+<dialog id="courseEditDialog">
+  <form method="dialog" id="courseEditForm">
+    <h2 id="courseEditTitle">Add course</h2>
+    <div class="field">
+      <label for="c_name">Course name</label>
+      <input type="text" id="c_name" required maxlength="80" placeholder="Royal Ashdown Forest">
+    </div>
+    <div id="teeRows"></div>
+    <button type="button" id="addTeeBtn">+ Add another set of tees</button>
+    <p class="warn" id="courseWarn" role="status"></p>
+    <div class="row-actions">
+      <button type="button" id="deleteCourseBtn" class="danger" hidden>Delete course</button>
+      <span class="spacer"></span>
+      <button type="button" id="courseEditCancel">Cancel</button>
+      <button type="button" class="primary" id="courseEditSave">Save course</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="methodDialog">
+  <form method="dialog" id="methodForm">
+    <h2>My own method</h2>
+    <p class="hint">This is the calculation the app shows first. The official World Handicap System figure is always worked out alongside it and never changes.</p>
+    <div class="field">
+      <label for="m_name">What to call it</label>
+      <input type="text" id="m_name" maxlength="40" placeholder="Rolling last 5">
+    </div>
+    <div class="grid2">
+      <div class="field">
+        <label for="m_window">Look at the last … rounds</label>
+        <input type="number" id="m_window" min="1" max="60" step="1" required inputmode="numeric">
+      </div>
+      <div class="field">
+        <label for="m_use">…and use the best … of them</label>
+        <input type="number" id="m_use" min="1" max="60" step="1" required inputmode="numeric">
+      </div>
+    </div>
+    <div class="field">
+      <label for="m_basis">Work from</label>
+      <select id="m_basis">
+        <option value="differential">Score differentials (uses course rating &amp; slope)</option>
+        <option value="overPar">Shots over par (ignores rating &amp; slope)</option>
+      </select>
+    </div>
+    <div class="grid2">
+      <div class="field">
+        <label for="m_mult">Then multiply by</label>
+        <input type="number" id="m_mult" min="0.1" max="2" step="0.01" required inputmode="decimal">
+      </div>
+      <div class="field">
+        <label for="m_adj">And add (or subtract)</label>
+        <input type="number" id="m_adj" min="-20" max="20" step="0.1" required inputmode="decimal">
+      </div>
+    </div>
+    <p class="hint" id="methodPreview"></p>
+    <hr style="border:none;border-top:1px solid var(--border);margin:var(--sp-6) 0">
+    <div class="field checkline">
+      <input type="checkbox" id="m_caps">
+      <label for="m_caps" style="margin:0">Apply the official soft cap and hard cap</label>
+      <button class="help-btn" type="button" data-help="caps" aria-label="About the caps">?</button>
+    </div>
+    <p class="warn" id="methodWarn" role="status"></p>
+    <div class="row-actions">
+      <button type="button" id="methodReset">Reset to last 5</button>
+      <span class="spacer"></span>
+      <button type="button" id="methodCancel">Cancel</button>
+      <button type="button" class="primary" id="methodSave">Save method</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="golferDialog">
+  <h2>Golfers</h2>
+  <p class="hint">Each golfer keeps their own rounds and their own handicap. Courses are shared between everyone.</p>
+  <div id="golferList"></div>
+  <div class="field" style="margin-top:var(--sp-6)">
+    <label for="g_new">Add a golfer</label>
+    <input type="text" id="g_new" maxlength="60" placeholder="Name">
+  </div>
+  <p class="warn" id="golferWarn" role="status"></p>
+  <div class="row-actions">
+    <button type="button" id="addGolferBtn">+ Add</button>
+    <span class="spacer"></span>
+    <button type="button" id="golferClose" class="primary">Done</button>
+  </div>
+</dialog>
+
+<dialog id="helpDialog">
+  <h2 id="helpTitle">About</h2>
+  <div id="helpBody"></div>
+  <div class="row-actions"><button type="button" id="helpClose" class="primary">Close</button></div>
+</dialog>
+
+<!-- Escape is deliberately blocked on this one: either answer replaces one of the
+     two copies, so there is no safe default to dismiss into. Both buttons are
+     reachable by keyboard, so it isn't a focus trap. -->
+<dialog id="syncChoiceDialog">
+  <h2>Which copy do you want to keep?</h2>
+  <p id="syncChoiceBody"></p>
+  <div class="row-actions">
+    <button type="button" id="syncKeepDeviceBtn">Keep this device's</button>
+    <button type="button" id="syncKeepGoogleBtn" class="primary">Keep the Google one</button>
+  </div>
+</dialog>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   Golf Handicap — one file, no build step, no server, works via file://.
+
+   Two handicaps, always both calculated:
+
+   1. "My method" — a configurable rolling average. Defaults to the average of
+      the last 5 rounds, which is how a lot of people actually keep their own
+      number. Everything about it is a setting: how many rounds to look at, how
+      many of the best to keep, whether to use proper score differentials or
+      just shots over par, and a multiplier/offset so older club formulas (the
+      0.96 multiplier, for instance) can be reproduced exactly.
+
+   2. The official World Handicap System index — best 8 of the last 20 score
+      differentials, with the reduced-scores table for anyone with fewer than 20
+      rounds, and the soft/hard caps.
+
+   `computeAll()` is the ONLY place either number is worked out. Every figure,
+   table, chart and explanation reads from it, so no two parts of the screen can
+   disagree about the maths.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const STORAGE_KEY = 'gh-state';
+const UPDATED_KEY = 'gh-updated';
+const THEME_KEY = 'gh-theme';
+const THEMES = ['midnight', 'dark', 'light', 'sepia'];
+
+const DEFAULT_METHOD = {
+  name: 'Rolling last 5',
+  window: 5,
+  use: 5,
+  basis: 'differential',
+  multiplier: 1,
+  adjustment: 0,
+};
+
+/* ── Pure handicap maths ─────────────────────────────────────────────────────
+   Everything below this line to the end of `courseHandicap` is pure: numbers in,
+   numbers out, no DOM and no storage. tests.html calls these directly.
+─────────────────────────────────────────────────────────────────────────── */
+
+/* Round half away from zero to one decimal. JS's Math.round breaks ties toward
+   +Infinity, which would round -2.05 to -2.0 and 2.05 to 2.1 — inconsistent, and
+   plus handicaps are negative. The epsilon nudge absorbs float error so
+   (113/113)*(85-82.05) lands on 2.9 rather than 2.8999999999999995. */
+function round1(n) {
+  if (n == null || !isFinite(n)) return null;
+  const v = n * 10;
+  const nudged = v + (v < 0 ? -1e-9 : 1e-9);
+  return (nudged < 0 ? -Math.round(-nudged) : Math.round(nudged)) / 10;
+}
+
+/* Score Differential = (113 / Slope) × (Adjusted Gross Score − Course Rating − PCC).
+   113 is the slope of a course of average difficulty, so the ratio converts a
+   score on this course into one comparable with any other. */
+function scoreDifferential(score, rating, slope, pcc) {
+  const s = Number(slope);
+  if (!(s > 0)) return null;
+  if (!isFinite(score) || !isFinite(rating)) return null;
+  return round1((113 / s) * (Number(score) - Number(rating) - (Number(pcc) || 0)));
+}
+
+/* Mean of the `count` lowest values. Used by both methods — the WHS is "best 8
+   of 20" and the rolling method is "best N of the last M", which is the same
+   shape with different numbers. */
+function averageLowest(values, count) {
+  const list = values.filter((v) => v != null && isFinite(v)).slice().sort((a, b) => a - b);
+  const take = Math.max(1, Math.min(count, list.length));
+  if (!list.length) return null;
+  let sum = 0;
+  for (let i = 0; i < take; i++) sum += list[i];
+  return sum / take;
+}
+
+/* The World Handicap System's reduced-scores table. With fewer than 20 rounds
+   you use fewer differentials, and with very few rounds an extra adjustment is
+   subtracted so a new golfer isn't handed a flattering index off one good day. */
+const WHS_TABLE = {
+  3: { use: 1, adj: -2.0 }, 4: { use: 1, adj: -1.0 }, 5: { use: 1, adj: 0 },
+  6: { use: 2, adj: -1.0 }, 7: { use: 2, adj: 0 }, 8: { use: 2, adj: 0 },
+  9: { use: 3, adj: 0 }, 10: { use: 3, adj: 0 }, 11: { use: 3, adj: 0 },
+  12: { use: 4, adj: 0 }, 13: { use: 4, adj: 0 }, 14: { use: 4, adj: 0 },
+  15: { use: 5, adj: 0 }, 16: { use: 5, adj: 0 }, 17: { use: 6, adj: 0 },
+  18: { use: 6, adj: 0 }, 19: { use: 7, adj: 0 }, 20: { use: 8, adj: 0 },
+};
+const WHS_MIN_ROUNDS = 3;
+const WHS_MAX_INDEX = 54.0;
+
+/* `diffs` is newest-first. Returns null below three rounds — the official system
+   will not issue an index at all before then, and inventing one would be worse
+   than saying so. */
+function whsIndex(diffs) {
+  const win = diffs.filter((d) => d != null).slice(0, 20);
+  if (win.length < WHS_MIN_ROUNDS) return null;
+  const cfg = WHS_TABLE[win.length];
+  const avg = averageLowest(win, cfg.use);
+  if (avg == null) return null;
+  return Math.min(WHS_MAX_INDEX, round1(avg + cfg.adj));
+}
+
+/* Which rounds the WHS calculation actually used, for the working-out panel. */
+function whsSelection(diffs) {
+  const win = diffs.filter((d) => d != null).slice(0, 20);
+  if (win.length < WHS_MIN_ROUNDS) return null;
+  const cfg = WHS_TABLE[win.length];
+  const kept = win.slice().sort((a, b) => a - b).slice(0, cfg.use);
+  return { considered: win.length, use: cfg.use, adj: cfg.adj, kept };
+}
+
+/* The configurable rolling method. `values` is newest-first and is either score
+   differentials or shots-over-par depending on the method's basis — the caller
+   picks, because the arithmetic is identical either way. */
+function rollingIndex(values, method) {
+  const m = normalizeMethod(method);
+  const win = values.filter((v) => v != null).slice(0, m.window);
+  if (!win.length) return null;
+  const avg = averageLowest(win, m.use);
+  if (avg == null) return null;
+  return round1(avg * m.multiplier + m.adjustment);
+}
+
+function rollingSelection(values, method) {
+  const m = normalizeMethod(method);
+  const win = values.filter((v) => v != null).slice(0, m.window);
+  if (!win.length) return null;
+  const take = Math.max(1, Math.min(m.use, win.length));
+  return { considered: win.length, use: take, kept: win.slice().sort((a, b) => a - b).slice(0, take) };
+}
+
+function normalizeMethod(m) {
+  const src = m || {};
+  const win = clampInt(src.window, 1, 60, DEFAULT_METHOD.window);
+  return {
+    name: typeof src.name === 'string' && src.name.trim() ? src.name.trim().slice(0, 40) : DEFAULT_METHOD.name,
+    window: win,
+    use: clampInt(src.use, 1, win, win),
+    basis: src.basis === 'overPar' ? 'overPar' : 'differential',
+    multiplier: clampNum(src.multiplier, 0.1, 2, DEFAULT_METHOD.multiplier),
+    adjustment: clampNum(src.adjustment, -20, 20, DEFAULT_METHOD.adjustment),
+  };
+}
+function clampInt(v, lo, hi, dflt) {
+  const n = Math.round(Number(v));
+  return isFinite(n) ? Math.max(lo, Math.min(hi, n)) : dflt;
+}
+function clampNum(v, lo, hi, dflt) {
+  const n = Number(v);
+  return isFinite(n) ? Math.max(lo, Math.min(hi, n)) : dflt;
+}
+
+/* Soft cap and hard cap. Once an index has been established, a run of bad
+   rounds can only push it so far above the lowest index of the past year: the
+   part of the rise beyond 3.0 strokes counts half (soft cap), and it stops dead
+   at 5.0 strokes (hard cap). Returns the kind of cap applied so the UI can say
+   which one bit rather than just showing a number that doesn't match the
+   arithmetic above it. */
+const SOFT_CAP_AT = 3.0;
+const HARD_CAP_AT = 5.0;
+function applyCaps(calculated, lowIndex) {
+  if (calculated == null || lowIndex == null) return { value: calculated, cap: null };
+  const rise = calculated - lowIndex;
+  if (rise <= SOFT_CAP_AT) return { value: calculated, cap: null };
+  let v = lowIndex + SOFT_CAP_AT + (rise - SOFT_CAP_AT) * 0.5;
+  let cap = 'soft';
+  if (v > lowIndex + HARD_CAP_AT) { v = lowIndex + HARD_CAP_AT; cap = 'hard'; }
+  return { value: round1(v), cap };
+}
+
+/* Course Handicap = Index × (Slope ÷ 113) + (Course Rating − Par).
+   The index is portable; this is what it turns into on one particular set of
+   tees on one particular course, i.e. the shots you actually get. */
+function courseHandicap(index, slope, rating, par) {
+  if (index == null || !(Number(slope) > 0)) return null;
+  const raw = index * (Number(slope) / 113) + (Number(rating) - Number(par));
+  return Math.round(raw);
+}
+
+const DAY = 86400000;
+function isoOf(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+/* Deliberately built from the LOCAL date parts, not toISOString(): the dates in
+   this app are calendar days with no time on them, and toISOString() converts to
+   UTC, which silently shifts every date back a day for anyone east of Greenwich.
+   Noon anchors the arithmetic so a daylight-saving shift can't move it either. */
+function daysBefore(iso, n) {
+  const d = new Date(iso + 'T12:00:00');
+  if (isNaN(d)) return iso;
+  return isoOf(new Date(d.getTime() - n * DAY));
+}
+
+/* Walks the rounds oldest-first and works out what each handicap was after each
+   one. Two things need this rather than a single snapshot: the trend chart, and
+   the Low Handicap Index that the caps are measured against — which is by
+   definition the lowest index of the previous 365 days, so it can only be known
+   by replaying the history.
+
+   Low Index is only established once 20 rounds exist, which matches the real
+   rule and means the caps stay dormant for a golfer just starting out. The
+   365-day lookback then covers the whole year, INCLUDING the stretch before
+   that 20th round — so an early index carrying the reduced-scores table's −2.0
+   counts, and can end up being the low index. That follows the letter of the
+   rule, and is pinned by a test so nobody "fixes" it by accident.
+
+   It is still an approximation in one respect: a real Low Index is maintained by
+   the golfer's association from the day their index was first issued, which is a
+   date this app has no way to know. It can only be as good as the history typed
+   into it.
+
+   O(n²) on the number of rounds, which is nothing at the scale of one golfer's
+   career (a 40-round season is 1,600 cheap operations). */
+const LOW_INDEX_MIN_ROUNDS = 20;
+function indexHistory(entries, method, useCaps) {
+  const out = [];
+  const past = [];
+  for (let i = 0; i < entries.length; i++) {
+    const upto = entries.slice(0, i + 1);
+    const newestFirst = upto.slice().reverse();
+    const raw = whsIndex(newestFirst.map((e) => e.diff));
+    let lowIndex = null;
+    if (useCaps && upto.length >= LOW_INDEX_MIN_ROUNDS) {
+      const cutoff = daysBefore(entries[i].date, 365);
+      const recent = past.filter((p) => p.date >= cutoff && p.whs != null).map((p) => p.whs);
+      if (recent.length) lowIndex = Math.min.apply(null, recent);
+    }
+    const capped = applyCaps(raw, lowIndex);
+    out.push({
+      date: entries[i].date,
+      whs: capped.value,
+      whsUncapped: raw,
+      cap: capped.cap,
+      lowIndex,
+      rolling: rollingIndex(newestFirst.map((e) => e.value), method),
+    });
+    past.push({ date: entries[i].date, whs: capped.value });
+  }
+  return out;
+}
+
+/* ── Ids from outside are not trusted ────────────────────────────────────────
+   Ids arrive from the JSON restore and from the cloud document, and they are
+   written into `data-id` attributes and <option value> in a dozen places. An id
+   containing quotes or a tag would break out of the attribute, and `viewOnly`
+   style guards do nothing about that because injected markup never goes through
+   save(). Anything that isn't a plain id is replaced with a fresh one and every
+   reference to it is rewritten through the same map. (Ported from Sprint
+   Velocity, where a crafted share link could otherwise run script.)
+─────────────────────────────────────────────────────────────────────────── */
+const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+function sanitizeIds(state) {
+  const map = new Map();
+  const fix = (id) => {
+    const key = String(id == null ? '' : id);
+    if (ID_RE.test(key)) return key;
+    if (!map.has(key)) map.set(key, uid());
+    return map.get(key);
+  };
+  (state.golfers || []).forEach((g) => { g.id = fix(g.id); });
+  (state.courses || []).forEach((c) => {
+    c.id = fix(c.id);
+    (c.tees || []).forEach((t) => { t.id = fix(t.id); });
+  });
+  (state.rounds || []).forEach((r) => {
+    r.id = fix(r.id);
+    r.golferId = fix(r.golferId);
+    r.courseId = fix(r.courseId);
+    r.teeId = fix(r.teeId);
+  });
+  if (state.activeGolfer != null) state.activeGolfer = fix(state.activeGolfer);
+  return state;
+}
+
+/* ── State ──────────────────────────────────────────────────────────────── */
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+function todayISO() { return isoOf(new Date()); }
+function fmtDate(iso) {
+  const d = new Date(iso + 'T00:00:00');
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function fmtIndex(v) { return v == null ? '—' : (v < 0 ? '+' + Math.abs(v).toFixed(1) : v.toFixed(1)); }
+
+function blankState() {
+  const gid = uid();
+  return {
+    version: 1,
+    golfers: [{ id: gid, name: 'Me' }],
+    activeGolfer: gid,
+    courses: [],
+    rounds: [],
+    settings: { method: Object.assign({}, DEFAULT_METHOD), applyCaps: true, primary: 'rolling' },
+  };
+}
+
+/* Everything arriving from storage, a backup file or the cloud goes through
+   here. A field that is missing or the wrong shape is replaced with a sane
+   default rather than throwing — a restore that half-works and says so beats
+   one that leaves a blank screen. */
+function normalizeState(raw) {
+  const s = (raw && typeof raw === 'object') ? raw : {};
+  const out = {
+    version: 1,
+    golfers: [],
+    activeGolfer: null,
+    courses: [],
+    rounds: [],
+    settings: {
+      method: normalizeMethod(s.settings && s.settings.method),
+      applyCaps: !(s.settings && s.settings.applyCaps === false),
+      primary: (s.settings && s.settings.primary === 'whs') ? 'whs' : 'rolling',
+    },
+  };
+  (Array.isArray(s.golfers) ? s.golfers : []).forEach((g) => {
+    if (!g || typeof g !== 'object') return;
+    out.golfers.push({ id: String(g.id || uid()), name: String(g.name || 'Golfer').slice(0, 60) });
+  });
+  if (!out.golfers.length) out.golfers.push({ id: uid(), name: 'Me' });
+  (Array.isArray(s.courses) ? s.courses : []).forEach((c) => {
+    if (!c || typeof c !== 'object') return;
+    const tees = (Array.isArray(c.tees) ? c.tees : []).map((t) => ({
+      id: String((t && t.id) || uid()),
+      name: String((t && t.name) || 'Tees').slice(0, 40),
+      rating: clampNum(t && t.rating, 40, 90, 72),
+      slope: clampInt(t && t.slope, 55, 155, 113),
+      par: clampInt(t && t.par, 27, 90, 72),
+    }));
+    if (!tees.length) return;
+    out.courses.push({ id: String(c.id || uid()), name: String(c.name || 'Course').slice(0, 80), tees });
+  });
+  (Array.isArray(s.rounds) ? s.rounds : []).forEach((r) => {
+    if (!r || typeof r !== 'object') return;
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(String(r.date)) ? String(r.date) : todayISO();
+    out.rounds.push({
+      id: String(r.id || uid()),
+      golferId: String(r.golferId || out.golfers[0].id),
+      date,
+      courseId: String(r.courseId || ''),
+      teeId: String(r.teeId || ''),
+      score: clampInt(r.score, 30, 200, 90),
+      pcc: clampInt(r.pcc, -1, 3, 0),
+      note: String(r.note || '').slice(0, 120),
+      counts: r.counts !== false,
+    });
+  });
+  const ids = new Set(out.golfers.map((g) => g.id));
+  out.activeGolfer = ids.has(String(s.activeGolfer)) ? String(s.activeGolfer) : out.golfers[0].id;
+  return sanitizeIds(out);
+}
+
+let state = blankState();
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    state = raw ? normalizeState(JSON.parse(raw)) : blankState();
+  } catch (e) {
+    console.warn('Could not read saved data', e);
+    state = blankState();
+  }
+}
+
+/* The one place that writes. Because it is also the one place that calls
+   cloudPush(), anything that changes data has to come through here or it will
+   silently fail to sync. */
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(UPDATED_KEY, String(Date.now()));
+  if (window.cloudPush) window.cloudPush();
+  render();
+}
+
+/* ── Deriving the numbers ────────────────────────────────────────────────── */
+
+function courseById(id) { return state.courses.find((c) => c.id === id) || null; }
+function teeOf(course, id) { return course ? (course.tees.find((t) => t.id === id) || null) : null; }
+function activeGolfer() { return state.golfers.find((g) => g.id === state.activeGolfer) || state.golfers[0]; }
+
+/* Rounds for the current golfer, oldest first, each carrying the two numbers the
+   methods work from: the score differential and the shots over par. A round
+   whose course was deleted keeps its place in the list but carries nulls, and is
+   shown as such rather than being silently dropped. */
+function golferEntries() {
+  const gid = state.activeGolfer;
+  return state.rounds
+    .filter((r) => r.golferId === gid)
+    .slice()
+    .sort((a, b) => (a.date === b.date ? String(a.id).localeCompare(String(b.id)) : a.date.localeCompare(b.date)))
+    .map((r) => {
+      const course = courseById(r.courseId);
+      const tee = teeOf(course, r.teeId);
+      const diff = tee ? scoreDifferential(r.score, tee.rating, tee.slope, r.pcc) : null;
+      const overPar = tee ? round1(r.score - tee.par) : null;
+      return { round: r, course, tee, date: r.date, diff, overPar, orphan: !tee };
+    });
+}
+
+/* THE chokepoint. Both figures, the rounds table's "counted" flags, the chart
+   and the working-out all come out of this one call, so they cannot drift apart. */
+function computeAll() {
+  const all = golferEntries();
+  const counted = all.filter((e) => e.round.counts && !e.orphan);
+  const method = normalizeMethod(state.settings.method);
+  const useCaps = state.settings.applyCaps !== false;
+
+  const forHistory = counted.map((e) => ({
+    date: e.date,
+    diff: e.diff,
+    value: method.basis === 'overPar' ? e.overPar : e.diff,
+  }));
+  const history = indexHistory(forHistory, method, useCaps);
+  const latest = history.length ? history[history.length - 1] : null;
+
+  const newestFirst = counted.slice().reverse();
+  const diffs = newestFirst.map((e) => e.diff);
+  const values = newestFirst.map((e) => (method.basis === 'overPar' ? e.overPar : e.diff));
+
+  const whsPick = whsSelection(diffs);
+  const rollPick = rollingSelection(values, method);
+
+  /* Mark which rounds each method actually leaned on. Both methods keep the
+     lowest N of a window, so a value equal to the Nth lowest could match more
+     than one round — the threshold-and-quota walk below hands the credit to the
+     most recent of the tied rounds, which is arbitrary but stable, and matters
+     only for the highlighting, never for the arithmetic. */
+  const usedWhs = pickUsed(newestFirst, diffs, whsPick);
+  const usedRoll = pickUsed(newestFirst, values, rollPick);
+
+  return {
+    all, counted, method, useCaps, history, latest,
+    whs: {
+      value: latest ? latest.whs : null,
+      uncapped: latest ? latest.whsUncapped : null,
+      cap: latest ? latest.cap : null,
+      lowIndex: latest ? latest.lowIndex : null,
+      pick: whsPick, used: usedWhs,
+    },
+    rolling: {
+      value: latest ? latest.rolling : null,
+      pick: rollPick, used: usedRoll,
+    },
+  };
+}
+
+function pickUsed(newestFirst, vals, pick) {
+  const used = new Set();
+  if (!pick) return used;
+  const quota = pick.kept.slice();
+  for (let i = 0; i < Math.min(newestFirst.length, pick.considered); i++) {
+    const v = vals[i];
+    const at = quota.indexOf(v);
+    if (at !== -1) { quota.splice(at, 1); used.add(newestFirst[i].round.id); }
+  }
+  return used;
+}
+
+/* ── Rendering ──────────────────────────────────────────────────────────── */
+
+let lastCompute = null;
+
+function render() {
+  const c = computeAll();
+  lastCompute = c;
+  renderGolfers();
+  renderFigures(c);
+  renderStats(c);
+  renderChart(c);
+  renderCourseHandicap(c);
+  renderRounds(c);
+  renderWorking(c);
+}
+
+function renderGolfers() {
+  const sel = document.getElementById('golferSel');
+  sel.innerHTML = state.golfers.map((g) => `<option value="${esc(g.id)}">${esc(g.name)}</option>`).join('');
+  sel.value = state.activeGolfer;
+}
+
+function renderFigures(c) {
+  const m = c.method;
+  document.getElementById('rollName').textContent = m.name;
+  document.getElementById('legendRoll').textContent = m.name;
+
+  const rollVal = document.getElementById('rollValue');
+  rollVal.textContent = fmtIndex(c.rolling.value);
+  rollVal.classList.toggle('na', c.rolling.value == null);
+  document.getElementById('rollSub').textContent = describeRolling(c);
+
+  const whsVal = document.getElementById('whsValue');
+  whsVal.textContent = fmtIndex(c.whs.value);
+  whsVal.classList.toggle('na', c.whs.value == null);
+  document.getElementById('whsSub').textContent = describeWhs(c);
+
+  const primary = state.settings.primary;
+  const rollFirst = primary !== 'whs';
+  document.getElementById('figRoll').classList.toggle('is-primary', rollFirst);
+  document.getElementById('figWhs').classList.toggle('is-primary', !rollFirst);
+  document.getElementById('tagRoll').hidden = !rollFirst;
+  document.getElementById('tagWhs').hidden = rollFirst;
+  document.getElementById('primRoll').setAttribute('aria-pressed', String(rollFirst));
+  document.getElementById('primWhs').setAttribute('aria-pressed', String(!rollFirst));
+
+  /* Exclusions are never silent: a round sitting outside the numbers unnoticed
+     is worse than the bug that hiding it would have avoided. */
+  const notes = [];
+  const orphans = c.all.filter((e) => e.orphan).length;
+  const skipped = c.all.filter((e) => !e.round.counts && !e.orphan).length;
+  if (orphans) notes.push(`${orphans} round${orphans === 1 ? '' : 's'} can't be counted — the course or tee they used has been deleted.`);
+  if (skipped) notes.push(`${skipped} round${skipped === 1 ? '' : 's'} marked "don't count" ${skipped === 1 ? 'is' : 'are'} left out of both figures.`);
+  if (c.whs.cap === 'soft') notes.push(`Soft cap applied: the official index would be ${fmtIndex(c.whs.uncapped)}, but rises more than 3.0 above the lowest index of the past year only count half.`);
+  if (c.whs.cap === 'hard') notes.push(`Hard cap applied: the official index would be ${fmtIndex(c.whs.uncapped)}, but it can't sit more than 5.0 above the lowest index of the past year.`);
+  document.getElementById('handicapWarn').textContent = notes.join(' ');
+}
+
+function describeRolling(c) {
+  const m = c.method;
+  if (!c.rolling.pick) return c.counted.length ? 'No usable rounds yet.' : 'Add some rounds to get started.';
+  const p = c.rolling.pick;
+  const basis = m.basis === 'overPar' ? 'shots over par' : 'score differentials';
+  const lead = p.use < p.considered ? `the best ${p.use} of the last ${p.considered}` : `the last ${p.considered}`;
+  const short = p.considered < m.window ? ` (only ${p.considered} round${p.considered === 1 ? '' : 's'} so far, not ${m.window})` : '';
+  return `Average of ${lead} ${basis}${short}.`;
+}
+
+function describeWhs(c) {
+  const n = c.counted.length;
+  if (n < WHS_MIN_ROUNDS) return `Needs ${WHS_MIN_ROUNDS} counting rounds — ${n} so far.`;
+  const p = c.whs.pick;
+  const adj = p.adj ? `, then ${p.adj} applied` : '';
+  return `Best ${p.use} of the last ${p.considered} score differential${p.considered === 1 ? '' : 's'}${adj}.`;
+}
+
+function renderStats(c) {
+  const entries = c.counted;
+  const diffs = entries.map((e) => e.diff).filter((d) => d != null);
+  const last = c.all.length ? c.all[c.all.length - 1] : null;
+  const best = diffs.length ? Math.min.apply(null, diffs) : null;
+
+  /* Trend compares the primary figure now against what it was five counting
+     rounds ago — far enough back to mean something, close enough to still be
+     about current form. */
+  const hist = c.history;
+  const primary = state.settings.primary === 'whs' ? 'whs' : 'rolling';
+  let trend = null;
+  if (hist.length >= 6) {
+    const now = hist[hist.length - 1][primary];
+    const then = hist[hist.length - 6][primary];
+    if (now != null && then != null) trend = round1(now - then);
+  }
+  const trendText = trend == null ? '—' : (trend === 0 ? 'level' : (trend < 0 ? '▼ ' : '▲ ') + Math.abs(trend).toFixed(1));
+
+  const tiles = [
+    ['Rounds logged', String(c.all.length)],
+    ['Counting towards handicap', String(entries.length)],
+    ['Best differential', best == null ? '—' : best.toFixed(1)],
+    ['Last round', last ? `${last.round.score} on ${fmtDate(last.date)}` : '—'],
+    ['Change over 5 rounds', trendText],
+  ];
+  document.getElementById('stats').innerHTML = tiles.map(([k, v]) =>
+    `<div class="stat"><div class="label">${esc(k)}</div><div class="v">${esc(v)}</div></div>`
+  ).join('');
+}
+
+/* Hand-rolled SVG line chart. Two series is not worth a charting library, and a
+   vendored one would be 200KB against a page that is otherwise this whole app.
+   Lines keep their colour at full strength — the pack's tint-fill rule is about
+   large flat areas, and a 2px line is not one. */
+function renderChart(c) {
+  const wrap = document.getElementById('chartWrap');
+  const pts = c.history.filter((h) => h.rolling != null || h.whs != null);
+  if (pts.length < 2) {
+    wrap.innerHTML = '<p class="hint">Two or more counting rounds will draw a trend line here.</p>';
+    return;
+  }
+  const W = 900, H = 280, padL = 44, padR = 14, padT = 14, padB = 34;
+  const vals = [];
+  pts.forEach((p) => { if (p.rolling != null) vals.push(p.rolling); if (p.whs != null) vals.push(p.whs); });
+  let lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+  if (hi - lo < 2) { const mid = (hi + lo) / 2; lo = mid - 1; hi = mid + 1; }
+  const padY = (hi - lo) * 0.12;
+  lo -= padY; hi += padY;
+  const x = (i) => padL + (i * (W - padL - padR)) / Math.max(1, pts.length - 1);
+  const y = (v) => padT + ((hi - v) * (H - padT - padB)) / (hi - lo);
+
+  const gridVals = [];
+  const step = niceStep((hi - lo) / 4);
+  for (let g = Math.ceil(lo / step) * step; g <= hi; g += step) gridVals.push(round1(g));
+
+  const line = (key) => {
+    const seg = [];
+    let cur = [];
+    pts.forEach((p, i) => {
+      if (p[key] == null) { if (cur.length) seg.push(cur); cur = []; return; }
+      cur.push(`${x(i).toFixed(1)},${y(p[key]).toFixed(1)}`);
+    });
+    if (cur.length) seg.push(cur);
+    return seg.map((s) => s.join(' ')).filter((s) => s.indexOf(' ') !== -1);
+  };
+
+  const rollPaths = line('rolling').map((d) => `<polyline points="${d}" fill="none" stroke="var(--c-roll)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`).join('');
+  const whsPaths = line('whs').map((d) => `<polyline points="${d}" fill="none" stroke="var(--c-whs)" stroke-width="2.5" stroke-dasharray="7 4" stroke-linejoin="round" stroke-linecap="round"/>`).join('');
+
+  const dots = pts.map((p, i) => {
+    let out = '';
+    if (p.rolling != null) out += `<circle cx="${x(i).toFixed(1)}" cy="${y(p.rolling).toFixed(1)}" r="3" fill="var(--c-roll)"><title>${esc(fmtDate(p.date))} — ${esc(c.method.name)}: ${fmtIndex(p.rolling)}</title></circle>`;
+    if (p.whs != null) out += `<rect x="${(x(i) - 3).toFixed(1)}" y="${(y(p.whs) - 3).toFixed(1)}" width="6" height="6" fill="var(--c-whs)"><title>${esc(fmtDate(p.date))} — Official: ${fmtIndex(p.whs)}</title></rect>`;
+    return out;
+  }).join('');
+
+  const grid = gridVals.map((g) =>
+    `<line x1="${padL}" y1="${y(g).toFixed(1)}" x2="${W - padR}" y2="${y(g).toFixed(1)}" stroke="var(--border)" stroke-width="1"/>` +
+    `<text x="${padL - 8}" y="${(y(g) + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="var(--text-muted)">${g.toFixed(1)}</text>`
+  ).join('');
+
+  const firstDate = fmtDate(pts[0].date), lastDate = fmtDate(pts[pts.length - 1].date);
+  const axis =
+    `<text x="${padL}" y="${H - 10}" font-size="11" fill="var(--text-muted)">${esc(firstDate)}</text>` +
+    `<text x="${W - padR}" y="${H - 10}" text-anchor="end" font-size="11" fill="var(--text-muted)">${esc(lastDate)}</text>`;
+
+  wrap.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Handicap over ${pts.length} rounds, from ${esc(firstDate)} to ${esc(lastDate)}. ${esc(c.method.name)} is now ${fmtIndex(c.rolling.value)}; the official index is ${fmtIndex(c.whs.value)}.">${grid}${whsPaths}${rollPaths}${dots}${axis}</svg>`;
+}
+
+function niceStep(raw) {
+  const pow = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 0.01))));
+  const n = raw / pow;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * pow;
+}
+
+function renderCourseHandicap(c) {
+  const cSel = document.getElementById('chCourse');
+  const tSel = document.getElementById('chTee');
+  const keepC = cSel.value, keepT = tSel.value;
+  cSel.innerHTML = state.courses.length
+    ? state.courses.map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')
+    : '<option value="">No courses yet</option>';
+  if (keepC && state.courses.some((x) => x.id === keepC)) cSel.value = keepC;
+  const course = courseById(cSel.value);
+  tSel.innerHTML = course
+    ? course.tees.map((t) => `<option value="${esc(t.id)}">${esc(t.name)} — CR ${t.rating}, SR ${t.slope}, par ${t.par}</option>`).join('')
+    : '<option value="">—</option>';
+  if (keepT && course && course.tees.some((t) => t.id === keepT)) tSel.value = keepT;
+  const tee = teeOf(course, tSel.value);
+
+  const index = state.settings.primary === 'whs' ? c.whs.value : c.rolling.value;
+  const which = state.settings.primary === 'whs' ? 'the official index' : c.method.name;
+  const el = document.getElementById('chValue');
+  const sub = document.getElementById('chSub');
+  if (!tee) {
+    el.textContent = '—'; el.classList.add('na');
+    sub.textContent = state.courses.length ? 'Pick a course and tee.' : 'Add a course first — the Courses button is under Rounds.';
+    return;
+  }
+  const ch = courseHandicap(index, tee.slope, tee.rating, tee.par);
+  if (ch == null) {
+    el.textContent = '—'; el.classList.add('na');
+    sub.textContent = `No handicap yet to convert — ${which} needs more rounds.`;
+    return;
+  }
+  el.textContent = String(ch); el.classList.remove('na');
+  sub.textContent = `${fmtIndex(index)} (${which}) × ${tee.slope} ÷ 113 + (${tee.rating} − ${tee.par}) = ${ch} shots off the tee at ${course.name}, ${tee.name}.`;
+}
+
+function renderRounds(c) {
+  const box = document.getElementById('roundsTable');
+  if (!c.all.length) {
+    box.innerHTML = `<div class="empty">
+      <p>No rounds yet. Add a course first, then log a round — the two handicaps appear as soon as there is something to work from.</p>
+      <button type="button" class="primary" id="firstCourseBtn">Add your first course</button>
+      <button type="button" class="link" id="demoBtn" style="margin-left:var(--sp-6)">or load some example data</button>
+    </div>`;
+    document.getElementById('firstCourseBtn').addEventListener('click', () => openCourseEdit(null));
+    document.getElementById('demoBtn').addEventListener('click', loadDemo);
+    return;
+  }
+  /* Newest first: the last round played is the one you came to look at. */
+  const rows = c.all.slice().reverse().map((e) => {
+    const r = e.round;
+    const inRoll = c.rolling.used.has(r.id);
+    const inWhs = c.whs.used.has(r.id);
+    const flags = [];
+    if (e.orphan) flags.push('<span class="pill excluded">course deleted</span>');
+    else if (!r.counts) flags.push('<span class="pill excluded">not counted</span>');
+    else {
+      if (inRoll) flags.push(`<span class="pill counts">${esc(c.method.name)}</span>`);
+      if (inWhs) flags.push('<span class="pill counts">official</span>');
+      if (!inRoll && !inWhs) flags.push('<span class="pill">not used</span>');
+    }
+    const dropped = e.orphan || !r.counts;
+    return `<tr class="${dropped ? 'dropped' : ''}">
+      <th scope="row"><button type="button" class="rowbtn" data-round="${esc(r.id)}">${esc(fmtDate(e.date))}</button></th>
+      <td>${esc(e.course ? e.course.name : '—')}</td>
+      <td>${esc(e.tee ? e.tee.name : '—')}</td>
+      <td class="num">${esc(String(r.score))}</td>
+      <td class="num">${e.diff == null ? '—' : e.diff.toFixed(1)}</td>
+      <td class="num">${e.overPar == null ? '—' : (e.overPar > 0 ? '+' : '') + e.overPar.toFixed(0)}</td>
+      <td>${flags.join(' ')}</td>
+      <td>${esc(r.note || '')}</td>
+    </tr>`;
+  }).join('');
+
+  box.innerHTML = `<table>
+    <caption class="sr-only">Every round logged, newest first. Select a date to edit that round.</caption>
+    <thead><tr>
+      <th scope="col">Date</th><th scope="col">Course</th><th scope="col">Tee</th>
+      <th scope="col" class="num">Score</th>
+      <th scope="col" class="num">Diff<button class="help-btn" type="button" data-help="diff" aria-label="What is a score differential?">?</button></th>
+      <th scope="col" class="num">vs par</th>
+      <th scope="col">Used in</th><th scope="col">Note</th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+
+  /* A clickable row needs a real control in it — a <tr> can't take focus, and
+     giving it a button role would break the grid semantics that make the
+     numeric columns readable. */
+  box.querySelectorAll('.rowbtn').forEach((b) => {
+    b.addEventListener('click', () => openRound(b.dataset.round));
+  });
+}
+
+function renderWorking(c) {
+  const el = document.getElementById('working');
+  if (!c.counted.length) { el.textContent = 'Nothing to work out yet.'; return; }
+  const m = c.method;
+  const lines = [];
+
+  lines.push(`${m.name.toUpperCase()}`);
+  if (c.rolling.pick) {
+    const p = c.rolling.pick;
+    const basis = m.basis === 'overPar' ? 'shots over par' : 'differentials';
+    const kept = p.use < p.considered ? `lowest ${p.use} kept` : 'all kept';
+    lines.push(`  Last ${p.considered} ${basis}, ${kept}: ${p.kept.map((v) => v.toFixed(1)).join(', ')}`);
+    const mean = p.kept.reduce((a, b) => a + b, 0) / p.kept.length;
+    lines.push(`  Average = ${mean.toFixed(3)}`);
+    if (m.multiplier !== 1) lines.push(`  × ${m.multiplier} = ${(mean * m.multiplier).toFixed(3)}`);
+    if (m.adjustment !== 0) lines.push(`  ${m.adjustment > 0 ? '+' : '−'} ${Math.abs(m.adjustment)} = ${(mean * m.multiplier + m.adjustment).toFixed(3)}`);
+    lines.push(`  Rounded to 1 decimal = ${fmtIndex(c.rolling.value)}`);
+  } else {
+    lines.push('  Not enough rounds yet.');
+  }
+
+  lines.push('');
+  lines.push('OFFICIAL — WORLD HANDICAP SYSTEM');
+  if (c.whs.pick) {
+    const p = c.whs.pick;
+    lines.push(`  ${p.considered} round${p.considered === 1 ? '' : 's'} in the window, so the table says: keep the lowest ${p.use}${p.adj ? `, then apply ${p.adj}` : ''}`);
+    lines.push(`  Kept: ${p.kept.map((v) => v.toFixed(1)).join(', ')}`);
+    const mean = p.kept.reduce((a, b) => a + b, 0) / p.kept.length;
+    lines.push(`  Average = ${mean.toFixed(3)}${p.adj ? ` ${p.adj > 0 ? '+' : '−'} ${Math.abs(p.adj)} = ${(mean + p.adj).toFixed(3)}` : ''}`);
+    lines.push(`  Rounded to 1 decimal = ${fmtIndex(c.whs.uncapped)}`);
+    if (c.whs.lowIndex != null) lines.push(`  Lowest index in the past year = ${fmtIndex(c.whs.lowIndex)}`);
+    if (c.whs.cap === 'soft') lines.push(`  Soft cap: rise above 3.0 halved → ${fmtIndex(c.whs.value)}`);
+    if (c.whs.cap === 'hard') lines.push(`  Hard cap: held at 5.0 above the low index → ${fmtIndex(c.whs.value)}`);
+  } else {
+    lines.push(`  Needs at least ${WHS_MIN_ROUNDS} counting rounds — ${c.counted.length} so far.`);
+  }
+
+  lines.push('');
+  lines.push('EACH ROUND — newest first');
+  c.counted.slice().reverse().slice(0, Math.max(20, m.window)).forEach((e) => {
+    lines.push(`  ${e.date}  ${String(e.round.score).padStart(3)}  at ${e.course.name} (${e.tee.name}, CR ${e.tee.rating} / SR ${e.tee.slope})`);
+    lines.push(`            (113 ÷ ${e.tee.slope}) × (${e.round.score} − ${e.tee.rating}${e.round.pcc ? ` − ${e.round.pcc}` : ''}) = ${e.diff.toFixed(1)}`);
+  });
+  el.textContent = lines.join('\n');
+}
+
+/* ── Round dialog ───────────────────────────────────────────────────────── */
+
+const roundDialog = document.getElementById('roundDialog');
+let editingRound = null;
+
+function fillCourseSelects(courseSel, teeSel, courseId, teeId) {
+  courseSel.innerHTML = state.courses.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+  if (courseId && state.courses.some((c) => c.id === courseId)) courseSel.value = courseId;
+  const course = courseById(courseSel.value);
+  teeSel.innerHTML = course
+    ? course.tees.map((t) => `<option value="${esc(t.id)}">${esc(t.name)} — CR ${t.rating}, SR ${t.slope}, par ${t.par}</option>`).join('')
+    : '';
+  if (teeId && course && course.tees.some((t) => t.id === teeId)) teeSel.value = teeId;
+}
+
+function openRound(id) {
+  if (!state.courses.length) {
+    toast('Add a course first — it needs the rating and slope.');
+    openCourseEdit(null);
+    return;
+  }
+  editingRound = id ? state.rounds.find((r) => r.id === id) || null : null;
+  const r = editingRound;
+  document.getElementById('roundTitle').textContent = r ? 'Edit round' : 'Add round';
+  document.getElementById('f_date').value = r ? r.date : todayISO();
+  document.getElementById('f_score').value = r ? r.score : '';
+  fillCourseSelects(document.getElementById('f_course'), document.getElementById('f_tee'), r ? r.courseId : lastUsed('courseId'), r ? r.teeId : lastUsed('teeId'));
+  document.getElementById('f_pcc').value = String(r ? r.pcc : 0);
+  document.getElementById('f_note').value = r ? r.note : '';
+  document.getElementById('f_counts').checked = r ? r.counts !== false : true;
+  document.getElementById('deleteRoundBtn').hidden = !r;
+  document.getElementById('roundWarn').textContent = '';
+  updateRoundHint();
+  roundDialog.showModal();
+}
+
+/* Pre-fills a new round with whatever the last one used — most people play the
+   same course off the same tees most of the time. */
+function lastUsed(field) {
+  const mine = state.rounds.filter((r) => r.golferId === state.activeGolfer);
+  return mine.length ? mine[mine.length - 1][field] : null;
+}
+
+function updateRoundHint() {
+  const course = courseById(document.getElementById('f_course').value);
+  const tee = teeOf(course, document.getElementById('f_tee').value);
+  const score = Number(document.getElementById('f_score').value);
+  const pcc = Number(document.getElementById('f_pcc').value) || 0;
+  const el = document.getElementById('roundHint');
+  if (!tee || !isFinite(score) || !score) {
+    el.textContent = 'Enter the score you would return to the club — hole scores capped at net double bogey.';
+    return;
+  }
+  const d = scoreDifferential(score, tee.rating, tee.slope, pcc);
+  el.textContent = `Score differential for this round: ${d == null ? '—' : d.toFixed(1)}  ·  (113 ÷ ${tee.slope}) × (${score} − ${tee.rating}${pcc ? ` − ${pcc}` : ''})`;
+}
+
+['f_score', 'f_pcc'].forEach((id) => document.getElementById(id).addEventListener('input', updateRoundHint));
+document.getElementById('f_course').addEventListener('change', () => {
+  fillCourseSelects(document.getElementById('f_course'), document.getElementById('f_tee'), document.getElementById('f_course').value, null);
+  updateRoundHint();
+});
+document.getElementById('f_tee').addEventListener('change', updateRoundHint);
+
+document.getElementById('roundSave').addEventListener('click', () => {
+  const date = document.getElementById('f_date').value;
+  const score = Number(document.getElementById('f_score').value);
+  const courseId = document.getElementById('f_course').value;
+  const teeId = document.getElementById('f_tee').value;
+  const warn = document.getElementById('roundWarn');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { warn.textContent = 'Pick a date.'; return; }
+  if (!(score >= 30 && score <= 200)) { warn.textContent = 'Enter a score between 30 and 200.'; return; }
+  if (!teeOf(courseById(courseId), teeId)) { warn.textContent = 'Pick a course and a set of tees.'; return; }
+
+  const rec = {
+    id: editingRound ? editingRound.id : uid(),
+    golferId: editingRound ? editingRound.golferId : state.activeGolfer,
+    date, courseId, teeId,
+    score: Math.round(score),
+    pcc: clampInt(document.getElementById('f_pcc').value, -1, 3, 0),
+    note: document.getElementById('f_note').value.slice(0, 120),
+    counts: document.getElementById('f_counts').checked,
+  };
+  if (editingRound) state.rounds[state.rounds.findIndex((r) => r.id === rec.id)] = rec;
+  else state.rounds.push(rec);
+  save();
+  roundDialog.close();
+  toast(editingRound ? 'Round updated' : 'Round saved');
+});
+
+document.getElementById('deleteRoundBtn').addEventListener('click', () => {
+  if (!editingRound) return;
+  if (!confirm('Delete this round? It will be removed from both handicaps.')) return;
+  state.rounds = state.rounds.filter((r) => r.id !== editingRound.id);
+  save();
+  roundDialog.close();
+  toast('Round deleted');
+});
+document.getElementById('roundCancel').addEventListener('click', () => roundDialog.close());
+document.getElementById('addRoundBtn').addEventListener('click', () => openRound(null));
+
+/* ── Courses ────────────────────────────────────────────────────────────── */
+
+const courseDialog = document.getElementById('courseDialog');
+const courseEditDialog = document.getElementById('courseEditDialog');
+let editingCourse = null;
+
+function renderCourseList() {
+  const box = document.getElementById('courseList');
+  if (!state.courses.length) { box.innerHTML = '<p class="hint">No courses yet.</p>'; return; }
+  box.innerHTML = `<div class="table-scroll"><table><thead><tr>
+      <th scope="col">Course</th><th scope="col">Tees</th><th scope="col" class="num">Rounds</th>
+    </tr></thead><tbody>` + state.courses.map((c) => {
+    const used = state.rounds.filter((r) => r.courseId === c.id).length;
+    return `<tr>
+      <th scope="row"><button type="button" class="rowbtn" data-course="${esc(c.id)}">${esc(c.name)}</button></th>
+      <td>${c.tees.map((t) => esc(`${t.name} (${t.rating}/${t.slope}/par ${t.par})`)).join('<br>')}</td>
+      <td class="num">${used}</td>
+    </tr>`;
+  }).join('') + '</tbody></table></div>';
+  box.querySelectorAll('.rowbtn').forEach((b) => b.addEventListener('click', () => openCourseEdit(b.dataset.course)));
+}
+
+function teeRowHtml(t) {
+  const v = t || { name: '', rating: 72, slope: 113, par: 72 };
+  return `<fieldset style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:var(--sp-5);margin-bottom:var(--sp-5)" data-tee="${esc(v.id || '')}">
+    <legend class="label">Tees</legend>
+    <div class="grid2">
+      <div class="field"><label>Name<input type="text" class="t-name" maxlength="40" placeholder="Yellow" value="${esc(v.name)}"></label></div>
+      <div class="field"><label>Par<input type="number" class="t-par" min="27" max="90" step="1" value="${esc(v.par)}"></label></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Course rating<input type="number" class="t-rating" min="40" max="90" step="0.1" value="${esc(v.rating)}"></label></div>
+      <div class="field"><label>Slope rating<input type="number" class="t-slope" min="55" max="155" step="1" value="${esc(v.slope)}"></label></div>
+    </div>
+    <button type="button" class="link removeTee">Remove these tees</button>
+  </fieldset>`;
+}
+
+function openCourseEdit(id) {
+  editingCourse = id ? courseById(id) : null;
+  document.getElementById('courseEditTitle').textContent = editingCourse ? 'Edit course' : 'Add course';
+  document.getElementById('c_name').value = editingCourse ? editingCourse.name : '';
+  const rows = document.getElementById('teeRows');
+  rows.innerHTML = (editingCourse ? editingCourse.tees : [null]).map(teeRowHtml).join('');
+  wireTeeRows();
+  document.getElementById('deleteCourseBtn').hidden = !editingCourse;
+  document.getElementById('courseWarn').textContent = '';
+  if (courseDialog.open) courseDialog.close();
+  courseEditDialog.showModal();
+}
+
+function wireTeeRows() {
+  document.querySelectorAll('#teeRows .removeTee').forEach((b) => {
+    b.addEventListener('click', () => {
+      const rows = document.getElementById('teeRows');
+      if (rows.children.length <= 1) { document.getElementById('courseWarn').textContent = 'A course needs at least one set of tees.'; return; }
+      b.closest('fieldset').remove();
+    });
+  });
+}
+
+document.getElementById('addTeeBtn').addEventListener('click', () => {
+  document.getElementById('teeRows').insertAdjacentHTML('beforeend', teeRowHtml(null));
+  wireTeeRows();
+});
+
+document.getElementById('courseEditSave').addEventListener('click', () => {
+  const name = document.getElementById('c_name').value.trim();
+  const warn = document.getElementById('courseWarn');
+  if (!name) { warn.textContent = 'Give the course a name.'; return; }
+  const tees = [];
+  let bad = '';
+  document.querySelectorAll('#teeRows fieldset').forEach((fs) => {
+    const nm = fs.querySelector('.t-name').value.trim() || 'Tees';
+    const rating = Number(fs.querySelector('.t-rating').value);
+    const slope = Number(fs.querySelector('.t-slope').value);
+    const par = Number(fs.querySelector('.t-par').value);
+    if (!(rating >= 40 && rating <= 90)) bad = `Course rating for "${nm}" should be between 40 and 90 — it's on the scorecard, usually close to par.`;
+    else if (!(slope >= 55 && slope <= 155)) bad = `Slope rating for "${nm}" should be between 55 and 155 — 113 is average.`;
+    else if (!(par >= 27 && par <= 90)) bad = `Par for "${nm}" should be between 27 and 90.`;
+    tees.push({ id: fs.dataset.tee || uid(), name: nm, rating, slope, par });
+  });
+  if (bad) { warn.textContent = bad; return; }
+  if (!tees.length) { warn.textContent = 'A course needs at least one set of tees.'; return; }
+
+  /* Removing a set of tees that rounds already reference would orphan them. The
+     rounds are kept and flagged rather than deleted — losing history to a typo
+     in the courses screen is the worse failure. */
+  if (editingCourse) {
+    const keptIds = new Set(tees.map((t) => t.id));
+    const orphaned = state.rounds.filter((r) => r.courseId === editingCourse.id && !keptIds.has(r.teeId)).length;
+    if (orphaned && !confirm(`${orphaned} round${orphaned === 1 ? '' : 's'} used a set of tees you've removed. They'll be kept but won't count towards any handicap until you edit them. Carry on?`)) return;
+    editingCourse.name = name;
+    editingCourse.tees = tees;
+  } else {
+    state.courses.push({ id: uid(), name, tees });
+  }
+  save();
+  courseEditDialog.close();
+  renderCourseList();
+  courseDialog.showModal();
+  toast('Course saved');
+});
+
+document.getElementById('deleteCourseBtn').addEventListener('click', () => {
+  if (!editingCourse) return;
+  const used = state.rounds.filter((r) => r.courseId === editingCourse.id).length;
+  const msg = used
+    ? `Delete ${editingCourse.name}? ${used} round${used === 1 ? '' : 's'} used it — they'll be kept but won't count towards any handicap.`
+    : `Delete ${editingCourse.name}?`;
+  if (!confirm(msg)) return;
+  state.courses = state.courses.filter((c) => c.id !== editingCourse.id);
+  save();
+  courseEditDialog.close();
+  renderCourseList();
+  courseDialog.showModal();
+  toast('Course deleted');
+});
+
+document.getElementById('courseEditCancel').addEventListener('click', () => {
+  courseEditDialog.close();
+  renderCourseList();
+  courseDialog.showModal();
+});
+document.getElementById('coursesBtn').addEventListener('click', () => { renderCourseList(); courseDialog.showModal(); });
+document.getElementById('addCourseBtn').addEventListener('click', () => openCourseEdit(null));
+document.getElementById('courseClose').addEventListener('click', () => courseDialog.close());
+
+/* ── Method dialog ──────────────────────────────────────────────────────── */
+
+const methodDialog = document.getElementById('methodDialog');
+
+/* The name the method would be called if nobody had typed one. */
+function autoName(m) {
+  return m.use < m.window ? `Best ${m.use} of last ${m.window}` : `Rolling last ${m.window}`;
+}
+
+function openMethod() {
+  const m = normalizeMethod(state.settings.method);
+  const nameBox = document.getElementById('m_name');
+  nameBox.value = m.name;
+  /* Marks the name as still ours, so changing the numbers re-labels the method
+     — "Rolling last 5" sitting above a best-3-of-5 calculation is worse than no
+     label at all. A hand-typed name clears the flag and survives. */
+  nameBox.dataset.auto = m.name === autoName(m) ? '1' : '';
+  document.getElementById('m_window').value = m.window;
+  document.getElementById('m_use').value = m.use;
+  document.getElementById('m_basis').value = m.basis;
+  document.getElementById('m_mult').value = m.multiplier;
+  document.getElementById('m_adj').value = m.adjustment;
+  document.getElementById('m_caps').checked = state.settings.applyCaps !== false;
+  document.getElementById('methodWarn').textContent = '';
+  updateMethodPreview();
+  methodDialog.showModal();
+}
+
+function readMethodForm() {
+  return normalizeMethod({
+    name: document.getElementById('m_name').value,
+    window: document.getElementById('m_window').value,
+    use: document.getElementById('m_use').value,
+    basis: document.getElementById('m_basis').value,
+    multiplier: document.getElementById('m_mult').value,
+    adjustment: document.getElementById('m_adj').value,
+  });
+}
+
+function updateMethodPreview() {
+  const nameBox = document.getElementById('m_name');
+  if (nameBox.dataset.auto === '1') nameBox.value = autoName(readMethodForm());
+  const m = readMethodForm();
+  const basis = m.basis === 'overPar' ? 'shots over par' : 'score differentials';
+  const best = m.use < m.window ? `the best ${m.use} of ` : 'all of ';
+  const tail = (m.multiplier !== 1 ? `, multiplied by ${m.multiplier}` : '') + (m.adjustment !== 0 ? `, then ${m.adjustment > 0 ? 'plus' : 'minus'} ${Math.abs(m.adjustment)}` : '');
+  document.getElementById('methodPreview').textContent =
+    `In words: average ${best}the last ${m.window} rounds' ${basis}${tail}.`;
+}
+['m_window', 'm_use', 'm_basis', 'm_mult', 'm_adj'].forEach((id) =>
+  document.getElementById(id).addEventListener('input', updateMethodPreview));
+document.getElementById('m_name').addEventListener('input', function () {
+  this.dataset.auto = '';   // typed in by hand from here on — stop re-labelling it
+  updateMethodPreview();
+});
+
+document.getElementById('methodSave').addEventListener('click', () => {
+  const m = readMethodForm();
+  const rawUse = Math.round(Number(document.getElementById('m_use').value));
+  if (rawUse > m.window) {
+    document.getElementById('methodWarn').textContent = `You can't use the best ${rawUse} of only ${m.window} rounds — it has been set to ${m.use}.`;
+    document.getElementById('m_use').value = m.use;
+    return;
+  }
+  state.settings.method = m;
+  state.settings.applyCaps = document.getElementById('m_caps').checked;
+  save();
+  methodDialog.close();
+  toast('Method updated');
+});
+document.getElementById('methodReset').addEventListener('click', () => {
+  state.settings.method = Object.assign({}, DEFAULT_METHOD);
+  save();
+  openMethod();
+  toast('Back to the last 5 rounds');
+});
+document.getElementById('methodCancel').addEventListener('click', () => methodDialog.close());
+document.getElementById('methodBtn').addEventListener('click', openMethod);
+
+/* ── Golfers ────────────────────────────────────────────────────────────── */
+
+const golferDialog = document.getElementById('golferDialog');
+
+function renderGolferList() {
+  const box = document.getElementById('golferList');
+  box.innerHTML = `<div class="table-scroll"><table><thead><tr>
+      <th scope="col">Name</th><th scope="col" class="num">Rounds</th><th scope="col"></th>
+    </tr></thead><tbody>` + state.golfers.map((g) => {
+    const n = state.rounds.filter((r) => r.golferId === g.id).length;
+    return `<tr>
+      <th scope="row"><button type="button" class="rowbtn" data-rename="${esc(g.id)}">${esc(g.name)}</button></th>
+      <td class="num">${n}</td>
+      <td><button type="button" class="link" data-remove="${esc(g.id)}">Remove</button></td>
+    </tr>`;
+  }).join('') + '</tbody></table></div>';
+
+  box.querySelectorAll('[data-rename]').forEach((b) => b.addEventListener('click', () => {
+    const g = state.golfers.find((x) => x.id === b.dataset.rename);
+    const name = prompt('Name', g.name);
+    if (name && name.trim()) { g.name = name.trim().slice(0, 60); save(); renderGolferList(); }
+  }));
+  box.querySelectorAll('[data-remove]').forEach((b) => b.addEventListener('click', () => {
+    const id = b.dataset.remove;
+    if (state.golfers.length === 1) { document.getElementById('golferWarn').textContent = 'There has to be at least one golfer.'; return; }
+    const n = state.rounds.filter((r) => r.golferId === id).length;
+    if (!confirm(n ? `Remove this golfer and their ${n} round${n === 1 ? '' : 's'}? This can't be undone — download a backup first if you're not sure.` : 'Remove this golfer?')) return;
+    state.golfers = state.golfers.filter((g) => g.id !== id);
+    state.rounds = state.rounds.filter((r) => r.golferId !== id);
+    if (state.activeGolfer === id) state.activeGolfer = state.golfers[0].id;
+    save();
+    renderGolferList();
+  }));
+}
+
+document.getElementById('addGolferBtn').addEventListener('click', () => {
+  const input = document.getElementById('g_new');
+  const name = input.value.trim();
+  if (!name) { document.getElementById('golferWarn').textContent = 'Type a name first.'; return; }
+  const g = { id: uid(), name: name.slice(0, 60) };
+  state.golfers.push(g);
+  state.activeGolfer = g.id;
+  input.value = '';
+  document.getElementById('golferWarn').textContent = '';
+  save();
+  renderGolferList();
+});
+document.getElementById('golferClose').addEventListener('click', () => golferDialog.close());
+document.getElementById('golfersBtn').addEventListener('click', () => {
+  document.getElementById('golferWarn').textContent = '';
+  renderGolferList();
+  golferDialog.showModal();
+});
+document.getElementById('golferSel').addEventListener('change', (e) => {
+  state.activeGolfer = e.target.value;
+  save();
+});
+
+/* ── Primary toggle, theme, help ────────────────────────────────────────── */
+
+document.getElementById('primRoll').addEventListener('click', () => { state.settings.primary = 'rolling'; save(); });
+document.getElementById('primWhs').addEventListener('click', () => { state.settings.primary = 'whs'; save(); });
+
+const themeSel = document.getElementById('themeSel');
+themeSel.value = document.documentElement.getAttribute('data-theme') || 'midnight';
+themeSel.addEventListener('change', () => {
+  const t = THEMES.indexOf(themeSel.value) === -1 ? 'midnight' : themeSel.value;
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem(THEME_KEY, t);
+});
+
+const HELP = {
+  handicap: ['The two handicaps', `<p><strong>Your method</strong> is whatever you have set under “My method” — by default, the average of your last 5 rounds' score differentials. It reacts quickly to how you are playing right now.</p>
+    <p><strong>Official</strong> is the World Handicap System index: the average of your best 8 score differentials from your last 20 rounds. With fewer than 20 rounds it uses a smaller set from a fixed table (and below 3 rounds it will not produce a number at all). Because it keeps only your best rounds, it describes your potential rather than your average day — which is why it is usually the lower of the two.</p>
+    <p>Both are calculated from exactly the same rounds. Nothing you change about your own method affects the official figure.</p>`],
+  diff: ['Score differential', `<p>A score differential turns a score on one course into a number you can compare with a score on any other course:</p>
+    <p><code>(113 ÷ slope rating) × (your score − course rating − conditions adjustment)</code></p>
+    <p>The <strong>course rating</strong> is what a scratch golfer is expected to shoot. The <strong>slope rating</strong> is how much harder the course plays for everyone else; 113 is average, so the fraction is 1 on an average course.</p>`],
+  caps: ['Soft cap and hard cap', `<p>Once you have 20 rounds, the official system limits how fast your index can rise. Compared with the lowest index you have held in the past 365 days:</p>
+    <ul><li>anything more than <strong>3.0</strong> strokes above it counts only half (the soft cap);</li>
+    <li>it can never sit more than <strong>5.0</strong> strokes above it (the hard cap).</li></ul>
+    <p>This stops a bad patch from inflating a handicap that you could still play to. Turning it off here shows the uncapped figure instead — useful for checking the arithmetic, but it is not what your club would issue.</p>
+    <p>The app takes “lowest index of the past year” from the history you have entered, so it can only be as accurate as that history.</p>`],
+  trend: ['The trend chart', `<p>One point per counting round, showing what each handicap would have been at that moment. The solid line with round points is your own method; the dashed line with square points is the official index.</p>
+    <p>Your own method moves further and faster because it looks at fewer rounds. That is not an error — it is the difference between the two.</p>`],
+  coursehcp: ['Course handicap', `<p>Your handicap index is portable. The course handicap is what it becomes on one particular course off one particular set of tees — the actual number of shots you take off on the day:</p>
+    <p><code>index × (slope ÷ 113) + (course rating − par)</code>, rounded to a whole number.</p>
+    <p>It follows whichever figure you have set as primary, so switching between your method and the official one changes it.</p>`],
+};
+
+const helpDialog = document.getElementById('helpDialog');
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.help-btn');
+  if (!btn) return;
+  const h = HELP[btn.dataset.help];
+  if (!h) return;
+  document.getElementById('helpTitle').textContent = h[0];
+  document.getElementById('helpBody').innerHTML = h[1];
+  helpDialog.showModal();
+});
+document.getElementById('helpClose').addEventListener('click', () => helpDialog.close());
+
+document.getElementById('chCourse').addEventListener('change', () => render());
+document.getElementById('chTee').addEventListener('change', () => render());
+
+/* ── Backup ─────────────────────────────────────────────────────────────── */
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(Object.assign({ exportedAt: new Date().toISOString() }, state), null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `golf-handicap-${todayISO()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast('Backup downloaded');
+});
+
+document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
+document.getElementById('importFile').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let parsed;
+    try { parsed = JSON.parse(String(reader.result)); }
+    catch { toast('That file isn’t a valid backup'); e.target.value = ''; return; }
+    const incoming = normalizeState(parsed);
+    if (!confirm(`Restore ${incoming.rounds.length} round${incoming.rounds.length === 1 ? '' : 's'} and ${incoming.courses.length} course${incoming.courses.length === 1 ? '' : 's'} for ${incoming.golfers.length} golfer${incoming.golfers.length === 1 ? '' : 's'}?\n\nThis replaces everything currently in this browser.`)) { e.target.value = ''; return; }
+    state = incoming;
+    save();
+    toast('Backup restored');
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+});
+
+/* Example data, offered only while the app is empty so it can't overwrite
+   anything. Deliberately a season's worth of one golfer's rounds — enough for
+   the official index to be issued and for the two methods to visibly disagree. */
+function loadDemo() {
+  if (state.rounds.length && !confirm('Replace what’s here with the example data?')) return;
+  const gid = state.golfers[0].id;
+  const courseId = uid(), teeWhite = uid(), teeYellow = uid();
+  state.courses = [{
+    id: courseId, name: 'Example Park GC',
+    tees: [
+      { id: teeYellow, name: 'Yellow', rating: 69.4, slope: 122, par: 71 },
+      { id: teeWhite, name: 'White', rating: 71.2, slope: 129, par: 71 },
+    ],
+  }];
+  const scores = [94, 88, 91, 86, 97, 89, 84, 92, 90, 87, 95, 83, 88, 93, 86, 91, 85, 96, 89, 82, 90, 87, 94, 86];
+  const start = new Date();
+  start.setHours(12, 0, 0, 0);                 // noon, so a DST shift can't move a date
+  start.setDate(start.getDate() - scores.length * 9);
+  state.rounds = scores.map((s, i) => {
+    const d = new Date(start.getTime() + i * 9 * DAY);
+    return {
+      id: uid(), golferId: gid,
+      date: isoOf(d),
+      courseId, teeId: i % 4 === 0 ? teeWhite : teeYellow,
+      score: s, pcc: 0, note: '', counts: true,
+    };
+  });
+  save();
+  toast('Example data loaded — download a backup or clear it when you’re done');
+}
+
+/* ── Toast ──────────────────────────────────────────────────────────────── */
+
+let toastTimer = null;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+}
+window.toast = toast;
+
+/* ── Recent changes ─────────────────────────────────────────────────────────
+   Fetched on first expand, not on load, so it costs nothing for the common
+   case. Only renders an <a> when the API's html_url really is a GitHub https
+   link — a hostile URL from the API must not be able to become a javascript:
+   href. (Same guard as the lottery calculator and Sprint Velocity.)
+─────────────────────────────────────────────────────────────────────────── */
+let changelogLoaded = false;
+document.getElementById('changelog').addEventListener('toggle', function () {
+  if (!this.open || changelogLoaded) return;
+  changelogLoaded = true;
+  const body = document.getElementById('changelogBody');
+  fetch('https://api.github.com/repos/eagleadams86/golf-handicap/commits?path=index.html&per_page=10')
+    .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+    .then((list) => {
+      if (!Array.isArray(list) || !list.length) { body.textContent = 'No changes found.'; return; }
+      body.innerHTML = '<ul>' + list.map((c) => {
+        const subject = esc(String((c.commit && c.commit.message) || '').split('\n')[0]);
+        const when = c.commit && c.commit.author ? esc(new Date(c.commit.author.date).toLocaleDateString()) : '';
+        const url = String(c.html_url || '');
+        const label = /^https:\/\/github\.com\//.test(url)
+          ? `<a href="${esc(url)}" rel="noopener noreferrer">${subject}</a>`
+          : `<span>${subject}</span>`;
+        return `<li>${label} <span class="hint">${when}</span></li>`;
+      }).join('') + '</ul>';
+    })
+    .catch(() => { body.textContent = 'Could not load the change list.'; });
+});
+
+/* ── Hooks for the sync module and tests.html ───────────────────────────── */
+
+window.ghGet = () => state;
+window.ghAdopt = (incoming, updatedAt) => {
+  state = normalizeState(incoming);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(UPDATED_KEY, String(updatedAt || Date.now()));
+  render();
+};
+window.ghCount = () => state.rounds.length;
+
+/* tests.html reaches the pure functions directly — they are all plain function
+   declarations, so they are already on window. This hook exists only for the
+   `const` values, which are not. */
+window.__ghTestHooks = { DEFAULT_METHOD, WHS_TABLE, WHS_MIN_ROUNDS, WHS_MAX_INDEX, SOFT_CAP_AT, HARD_CAP_AT };
+
+load();
+render();
+</script>
+
+<script type="module">
+/* ───────────────────────── Optional cross-device sync ─────────────────────────
+   Google sign-in + one Firestore document per user. The config below is
+   Firebase's PUBLIC client config, not a secret — access is enforced by the
+   Firestore security rules (firestore.rules in this repo), not by hiding this
+   key. Set FIREBASE_CONFIG to null to force fully-local mode: the button hides
+   and the app is 100% offline. localStorage is the source of truth either way.
+
+   Ported from PAPTrack and Sprint Velocity, including the two rules that were
+   learned the hard way there:
+
+   1. The first time a Google account syncs in this browser, if BOTH sides hold
+      rounds the user is asked which to keep, rather than the app guessing by
+      timestamp.
+   2. Underneath that, an EMPTY copy never beats a copy with data in it, whatever
+      the timestamps say. Without this, signing in on a fresh browser pushes an
+      empty state stamped `now`, and the device that actually had the rounds —
+      carrying an older timestamp — skips the dialog, takes the empty copy as
+      "newer", and empties itself. That cost real data once already.
+
+   Sync failures are surfaced on the button, not just logged: a listener that
+   errors is dropped by Firestore and never fires again, so a silent failure
+   means another device's updates simply stop arriving with nothing on screen to
+   say so.
+──────────────────────────────────────────────────────────────────────────── */
+
+/* ⛳ SETUP — replace this with your own Firebase project's web config.
+   Until it is filled in, sync is off and the app is fully local; everything
+   else works exactly the same. Step-by-step instructions are in README.md
+   under "Turning sync on". Remember to add the new project's authDomain to the
+   frame-src list in the Content-Security-Policy at the top of this file. */
+const FIREBASE_CONFIG = null;
+
+const SDK = 'https://www.gstatic.com/firebasejs/12.16.0/';
+const COLLECTION = 'golfhandicap';
+const btn = document.getElementById('syncBtn');
+const privacyNote = document.getElementById('privacyNote');
+const localTs = () => Number(localStorage.getItem('gh-updated') || 0);
+
+let A, F, auth, db, user = null, unsub = null, pushTimer = null, syncError = null;
+
+if (FIREBASE_CONFIG) {
+  init().catch((e) => { console.warn('Sync unavailable:', e); btn.hidden = true; });
+} else {
+  btn.hidden = true;
+}
+
+async function init() {
+  const [{ initializeApp }, authMod, fsMod] = await Promise.all([
+    import(SDK + 'firebase-app.js'),
+    import(SDK + 'firebase-auth.js'),
+    import(SDK + 'firebase-firestore.js'),
+  ]);
+  A = authMod; F = fsMod;
+  const app = initializeApp(FIREBASE_CONFIG);
+  auth = A.getAuth(app);
+  db = F.getFirestore(app);
+  A.onAuthStateChanged(auth, (u) => {
+    user = u;
+    clearSyncError();
+    updateUI();
+    if (unsub) { unsub(); unsub = null; }
+    if (u) startSync().catch((e) => setSyncError(e));
+  });
+  A.getRedirectResult(auth).catch(() => {}); // completes a mobile redirect sign-in, if one is in flight
+  btn.hidden = false;
+  btn.addEventListener('click', onClick);
+}
+
+/* Firestore's error codes mean nothing to anyone who hasn't read the docs, so
+   they are mapped to a plain sentence plus what to do about it. */
+function describeSyncError(e) {
+  const code = String((e && e.code) || '');
+  if (code.indexOf('permission-denied') !== -1) return 'the security rules are rejecting this account — check firestore.rules is deployed';
+  if (code.indexOf('unauthenticated') !== -1) return 'the sign-in has expired — sign out and back in';
+  if (code.indexOf('unavailable') !== -1) return 'no connection to Firebase — it will catch up when you are back online';
+  if (code.indexOf('resource-exhausted') !== -1) return 'the free Firebase quota for today is used up';
+  if (code.indexOf('invalid-argument') !== -1) return 'this data is too large for one Firestore document';
+  return 'an unexpected error — see the browser console';
+}
+function setSyncError(e) {
+  const was = syncError;
+  syncError = describeSyncError(e);
+  console.warn('sync error', e);
+  updateUI();
+  if (!was) window.toast('Not syncing — ' + syncError);
+}
+/* Only a successful push clears it. There is deliberately no retry button:
+   transient causes are retried by the SDK, permanent ones are not fixed by
+   pressing anything, and the next save recovers the state on its own. */
+function clearSyncError() { if (syncError) { syncError = null; updateUI(); } }
+
+function updateUI() {
+  if (syncError && user) {
+    btn.textContent = '⚠️ Not syncing';
+    btn.title = 'Sync problem: ' + syncError;
+    privacyNote.textContent = `⚠️ Signed in as ${user.email}, but not syncing — ${syncError}. Your rounds are still safe in this browser.`;
+    return;
+  }
+  if (user) {
+    btn.textContent = `☁️ ${user.displayName ? user.displayName.split(' ')[0] : user.email}`;
+    btn.title = 'Syncing across devices — tap to sign out';
+    privacyNote.textContent = `☁️ Signed in as ${user.email} — your rounds sync privately through your own Firebase account and still work offline.`;
+  } else {
+    btn.textContent = '☁️ Sign in to sync';
+    btn.title = 'Sign in with Google to see the same rounds on all your devices';
+    privacyNote.textContent = '🔒 Private — stored in this browser; sign in to sync your own devices. No account required to use the app.';
+  }
+}
+
+async function onClick() {
+  if (user) {
+    if (confirm('Sign out? The app keeps working with the copy on this device.')) A.signOut(auth);
+    return;
+  }
+  const provider = new A.GoogleAuthProvider();
+  try {
+    await A.signInWithPopup(auth, provider);
+  } catch (e) {
+    // Popups are unreliable on mobile Safari — fall back to a full-page redirect.
+    if (e && /popup|operation-not-supported/.test(String(e.code))) {
+      try { await A.signInWithRedirect(auth, provider); return; } catch { /* fall through */ }
+    }
+    if (String(e && e.code) !== 'auth/popup-closed-by-user') {
+      window.toast('Sign-in failed — check the Firebase setup');
+      console.warn('sign-in error', e);
+    }
+  }
+}
+
+const docRef = () => F.doc(db, COLLECTION, user.uid);
+
+/* Stamps this device's copy as the newest. "Keep this device" has to actually
+   win everywhere: pushNow() sends the timestamp the local copy already carries,
+   which — when the cloud is what looked newer — is the older of the two. Without
+   this the choice sticks here and nowhere else, and a third device holding an
+   in-between timestamp would push its copy back up and resurrect exactly what
+   was rejected. */
+const touchLocal = () => localStorage.setItem('gh-updated', String(Date.now()));
+
+function chooseSyncSource(localCount, remoteCount, remoteUpdatedAt) {
+  return new Promise((resolve) => {
+    const dlg = document.getElementById('syncChoiceDialog');
+    const body = document.getElementById('syncChoiceBody');
+    const when = remoteUpdatedAt ? new Date(remoteUpdatedAt).toLocaleString() : 'an earlier sign-in';
+    body.textContent = `This device has ${localCount} round${localCount === 1 ? '' : 's'} saved locally. Your Google account already has ${remoteCount} round${remoteCount === 1 ? '' : 's'} (last updated ${when}). Pick which to keep — the other copy will be replaced.`;
+    const deviceBtn = document.getElementById('syncKeepDeviceBtn');
+    const googleBtn = document.getElementById('syncKeepGoogleBtn');
+    const preventCancel = (e) => e.preventDefault();
+    function finish(keepGoogle) {
+      deviceBtn.removeEventListener('click', onDevice);
+      googleBtn.removeEventListener('click', onGoogle);
+      dlg.removeEventListener('cancel', preventCancel);
+      dlg.close();
+      resolve(keepGoogle);
+    }
+    const onDevice = () => finish(false);
+    const onGoogle = () => finish(true);
+    deviceBtn.addEventListener('click', onDevice);
+    googleBtn.addEventListener('click', onGoogle);
+    dlg.addEventListener('cancel', preventCancel);
+    dlg.showModal();
+  });
+}
+
+const roundCount = (data) => (data && data.state && Array.isArray(data.state.rounds)) ? data.state.rounds.length : 0;
+
+async function startSync() {
+  const snap = await F.getDoc(docRef());
+  const remote = snap.exists() ? snap.data() : null;
+  const remoteN = roundCount(remote);
+  const localN = window.ghCount();
+  const isFirstSyncForAccount = localStorage.getItem('gh-sync-uid') !== user.uid;
+
+  if (remoteN && localN && isFirstSyncForAccount) {
+    const keepGoogle = await chooseSyncSource(localN, remoteN, remote.updatedAt);
+    if (keepGoogle) {
+      window.ghAdopt(remote.state, remote.updatedAt);
+      window.toast('Loaded your rounds from the cloud ☁️');
+    } else {
+      touchLocal();
+      await pushNow();
+      window.toast('Kept this device’s rounds');
+    }
+  } else if (remoteN && !localN) {
+    window.ghAdopt(remote.state, remote.updatedAt);          // nothing here to lose
+    window.toast('Loaded your rounds from the cloud ☁️');
+  } else if (localN && !remoteN) {
+    await pushNow();                                          // empty cloud copy doesn't get to win
+  } else if (remoteN && remote.updatedAt > localTs()) {
+    window.ghAdopt(remote.state, remote.updatedAt);
+    window.toast('Loaded your rounds from the cloud ☁️');
+  } else {
+    await pushNow();
+  }
+  localStorage.setItem('gh-sync-uid', user.uid);
+
+  /* The error callback is not optional: a listener that errors is dropped by
+     Firestore and never fires again, so without it another device's updates
+     just silently stop arriving. */
+  unsub = F.onSnapshot(docRef(), (s) => {
+    if (s.metadata.hasPendingWrites || !s.exists()) return;
+    const r = s.data();
+    // A document with no state object is half-written or foreign, never an
+    // intentional "delete everything" — adopting it would clear this device.
+    if (!r || !r.state || !Array.isArray(r.state.rounds) || !(r.updatedAt > localTs())) return;
+    // Same empty-never-beats-data rule, live. Clearing everything really is
+    // something people do, so this asks rather than refusing — but it asks.
+    if (!r.state.rounds.length && window.ghCount()) {
+      const keep = !confirm('Another device has cleared all its rounds.\n\n'
+        + 'Clear this device too? Cancel keeps what’s on this device and restores it to your other devices.');
+      if (keep) {
+        touchLocal();
+        pushNow().catch(setSyncError);
+        window.toast('Kept this device’s rounds');
+        return;
+      }
+    }
+    window.ghAdopt(r.state, r.updatedAt);
+    window.toast('Synced from another device ☁️');
+  }, setSyncError);
+}
+
+async function pushNow() {
+  if (!user) return;
+  await F.setDoc(docRef(), { state: window.ghGet(), updatedAt: localTs() || Date.now() });
+  clearSyncError();
+}
+
+/* Called by save() on every local change; debounced so rapid edits batch up. */
+window.cloudPush = () => {
+  if (!user) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => pushNow().catch(setSyncError), 1200);
+};
+</script>
+</body>
+</html>

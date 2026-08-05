@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Golf Handicap — tests</title>
+<style>
+  body { font: 13px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+         background: #0a0e1a; color: #e7eaf6; margin: 0; padding: 24px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  p.lead { color: #aab2d0; margin: 0 0 24px; }
+  #summary { font-size: 17px; font-weight: 600; padding: 12px 16px; border-radius: 10px;
+             border: 2px solid #374163; background: #121829; margin-bottom: 16px; }
+  #summary.pass { border-color: #72fe84; background: #1e3635; }
+  #summary.fail { border-color: #fb7874; background: #321b1b; }
+  h2 { font-size: 14px; margin: 24px 0 6px; color: #aab2d0; text-transform: uppercase; letter-spacing: .06em; }
+  ol { margin: 0; padding-left: 22px; }
+  li { padding: 2px 0; }
+  li.ok::marker { color: #72fe84; }
+  li.bad { color: #fb7874; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  iframe { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; }
+</style>
+</head>
+<body>
+<h1>Golf Handicap — tests</h1>
+<p class="lead">
+  Pins the pure handicap maths in <code>index.html</code>. It loads the real app in a hidden
+  iframe and calls its functions directly — no copies, no build step — so a test can never
+  drift from the code it is testing. Needs <code>http://localhost</code>: <code>file://</code>
+  iframes are blocked in some browsers.
+  <br><strong>Run this whenever you touch</strong> <code>round1</code>, <code>scoreDifferential</code>,
+  <code>averageLowest</code>, <code>whsIndex</code>/<code>whsSelection</code>,
+  <code>rollingIndex</code>/<code>rollingSelection</code>, <code>normalizeMethod</code>,
+  <code>applyCaps</code>, <code>courseHandicap</code>, <code>indexHistory</code>,
+  <code>sanitizeIds</code> or <code>normalizeState</code>.
+</p>
+<div id="summary">Loading the app…</div>
+<div id="results"></div>
+<iframe id="app" src="index.html" title="app under test"></iframe>
+
+<script>
+const groups = [];
+let current = null;
+function describe(name) { current = { name, tests: [] }; groups.push(current); }
+function it(name, fn) { current.tests.push({ name, fn }); }
+
+function eq(a, b, msg) {
+  const A = JSON.stringify(a), B = JSON.stringify(b);
+  if (A !== B) throw new Error(`${msg || ''} expected ${B}, got ${A}`);
+}
+function ok(v, msg) { if (!v) throw new Error(msg || 'expected truthy'); }
+
+document.getElementById('app').addEventListener('load', function () {
+  const W = this.contentWindow;
+  const H = W.__ghTestHooks;
+  if (!H) { fail('The app did not expose __ghTestHooks — is index.html loading correctly?'); return; }
+
+  /* ── round1 ──────────────────────────────────────────────────────────── */
+  describe('round1');
+  it('absorbs float error', () => eq(W.round1(2.8999999999999995), 2.9));
+  it('rounds half away from zero, positive', () => eq(W.round1(2.05), 2.1));
+  it('rounds half away from zero, negative (plus handicaps)', () => eq(W.round1(-2.05), -2.1));
+  it('leaves whole numbers alone', () => eq(W.round1(12), 12));
+  it('returns null for nonsense', () => eq(W.round1(NaN), null));
+
+  /* ── scoreDifferential ───────────────────────────────────────────────── */
+  describe('scoreDifferential');
+  it('is score minus rating on a slope-113 course', () =>
+    eq(W.scoreDifferential(85, 72, 113, 0), 13));
+  it('scales by 113 ÷ slope', () =>
+    eq(W.scoreDifferential(90, 69.4, 122, 0), 19.1));       // (113/122) × 20.6 = 19.080…
+  it('subtracts the conditions adjustment before scaling', () =>
+    eq(W.scoreDifferential(90, 69.4, 122, 1), 18.2));       // (113/122) × 19.6 = 18.154…
+  it('treats a missing PCC as zero', () =>
+    eq(W.scoreDifferential(90, 69.4, 122, undefined), W.scoreDifferential(90, 69.4, 122, 0)));
+  it('goes negative when you beat the rating', () =>
+    eq(W.scoreDifferential(68, 72, 113, 0), -4));
+  it('refuses a slope of zero rather than dividing by it', () =>
+    eq(W.scoreDifferential(85, 72, 0, 0), null));
+
+  /* ── averageLowest ───────────────────────────────────────────────────── */
+  describe('averageLowest');
+  it('averages the N lowest, not the first N', () => eq(W.averageLowest([5, 3, 9, 1], 2), 2));
+  it('uses everything when asked for more than it has', () => eq(W.averageLowest([4, 6], 8), 5));
+  it('returns null on an empty list', () => eq(W.averageLowest([], 3), null));
+  it('ignores nulls', () => eq(W.averageLowest([2, null, 4], 2), 3));
+
+  /* ── whsIndex — the official table ───────────────────────────────────── */
+  describe('whsIndex');
+  it('refuses to issue an index below 3 rounds', () => {
+    eq(W.whsIndex([]), null);
+    eq(W.whsIndex([10, 12]), null);
+  });
+  it('3 rounds: lowest 1, minus 2.0', () => eq(W.whsIndex([14, 12, 10]), 8));
+  it('4 rounds: lowest 1, minus 1.0', () => eq(W.whsIndex([16, 14, 12, 10]), 9));
+  it('5 rounds: lowest 1, no adjustment', () => eq(W.whsIndex([18, 16, 14, 12, 10]), 10));
+  it('6 rounds: lowest 2, minus 1.0', () => eq(W.whsIndex([20, 18, 16, 14, 12, 10]), 10));
+  it('8 rounds: lowest 2, no adjustment', () =>
+    eq(W.whsIndex([24, 22, 20, 18, 16, 14, 12, 10]), 11));
+  it('20 rounds: best 8', () => {
+    const twenty = [];
+    for (let i = 1; i <= 20; i++) twenty.push(i);
+    eq(W.whsIndex(twenty), 4.5);                             // (1+2+…+8) ÷ 8
+  });
+  it('ignores anything past the most recent 20', () => {
+    const many = [];
+    for (let i = 0; i < 20; i++) many.push(20);
+    many.push(1, 1, 1);                                      // older, and much better — must not count
+    eq(W.whsIndex(many), 20);
+  });
+  it('never exceeds 54.0', () => {
+    const awful = [];
+    for (let i = 0; i < 20; i++) awful.push(80);
+    eq(W.whsIndex(awful), 54);
+  });
+  it('agrees with whsSelection about what it used', () => {
+    const diffs = [20, 18, 16, 14, 12, 10];
+    const pick = W.whsSelection(diffs);
+    eq(pick.considered, 6);
+    eq(pick.use, 2);
+    eq(pick.adj, -1);
+    eq(pick.kept, [10, 12]);
+  });
+
+  /* ── the configurable rolling method ─────────────────────────────────── */
+  describe('rollingIndex');
+  const M = (over) => Object.assign({}, H.DEFAULT_METHOD, over || {});
+  it('defaults to the plain average of the last 5', () =>
+    eq(W.rollingIndex([10, 20, 30, 40, 50, 999], M()), 30));
+  it('takes the best N of the window when asked', () =>
+    eq(W.rollingIndex([10, 20, 30, 40, 50], M({ use: 3 })), 20));
+  it('works on fewer rounds than the window, without pretending otherwise', () => {
+    eq(W.rollingIndex([12, 14], M()), 13);
+    eq(W.rollingSelection([12, 14], M()).considered, 2);
+  });
+  it('applies a multiplier (the old 0.96 club formula)', () =>
+    eq(W.rollingIndex([10, 20, 30, 40, 50], M({ multiplier: 0.96 })), 28.8));
+  it('applies an offset', () =>
+    eq(W.rollingIndex([10, 20, 30, 40, 50], M({ adjustment: -1.5 })), 28.5));
+  it('returns null with nothing to work from', () => eq(W.rollingIndex([], M()), null));
+
+  describe('normalizeMethod');
+  it('never lets "use" exceed the window', () =>
+    eq(W.normalizeMethod({ window: 5, use: 9 }).use, 5));
+  it('falls back to the defaults on nonsense', () => {
+    const m = W.normalizeMethod({ window: 'x', use: null, multiplier: 'y', adjustment: {} });
+    eq(m.window, H.DEFAULT_METHOD.window);
+    eq(m.multiplier, 1);
+    eq(m.adjustment, 0);
+  });
+  it('only accepts the two bases', () => {
+    eq(W.normalizeMethod({ basis: 'overPar' }).basis, 'overPar');
+    eq(W.normalizeMethod({ basis: 'wishful' }).basis, 'differential');
+  });
+  it('clamps the window rather than accepting 500 rounds', () =>
+    eq(W.normalizeMethod({ window: 500 }).window, 60));
+
+  /* ── soft cap / hard cap ─────────────────────────────────────────────── */
+  describe('applyCaps');
+  it('does nothing before a low index is established', () =>
+    eq(W.applyCaps(20, null), { value: 20, cap: null }));
+  it('does nothing within 3.0 of the low index', () =>
+    eq(W.applyCaps(12.9, 10), { value: 12.9, cap: null }));
+  it('leaves exactly 3.0 alone — the soft cap starts above it', () =>
+    eq(W.applyCaps(13, 10), { value: 13, cap: null }));
+  it('halves the rise beyond 3.0', () =>
+    eq(W.applyCaps(15, 10), { value: 14, cap: 'soft' }));
+  it('stops dead at 5.0 above the low index', () =>
+    eq(W.applyCaps(20, 10), { value: 15, cap: 'hard' }));
+  it('reports soft, not hard, when the soft cap lands exactly on the ceiling', () =>
+    eq(W.applyCaps(17, 10), { value: 15, cap: 'soft' }));
+
+  /* ── courseHandicap ──────────────────────────────────────────────────── */
+  describe('courseHandicap');
+  it('converts an index to shots on the day', () =>
+    eq(W.courseHandicap(12, 122, 69.4, 71), 11));             // 12×122/113 + (69.4−71) = 11.36
+  it('is the index itself on a 113-slope course rated at par', () =>
+    eq(W.courseHandicap(18, 113, 72, 72), 18));
+  it('has nothing to convert without an index', () =>
+    eq(W.courseHandicap(null, 122, 69.4, 71), null));
+
+  /* ── indexHistory ────────────────────────────────────────────────────── */
+  describe('indexHistory');
+  const seq = (n, diff) => {
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const d = new Date(2026, 0, 1 + i * 7);
+      out.push({
+        date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+        diff: typeof diff === 'function' ? diff(i) : diff,
+        value: typeof diff === 'function' ? diff(i) : diff,
+      });
+    }
+    return out;
+  };
+  it('gives one point per round', () => eq(W.indexHistory(seq(9, 15), M(), true).length, 9));
+  it('leaves the first two rounds without an official index', () => {
+    const h = W.indexHistory(seq(4, 15), M(), true);
+    eq(h[0].whs, null);
+    eq(h[1].whs, null);
+    ok(h[2].whs != null, 'the third round should produce an index');
+  });
+  it('keeps the caps dormant below 20 rounds', () => {
+    const h = W.indexHistory(seq(19, (i) => (i < 10 ? 5 : 40)), M(), true);
+    eq(h[h.length - 1].lowIndex, null);
+    eq(h[h.length - 1].cap, null);
+  });
+  /* 20 good rounds then 20 bad ones. It takes a collapse this complete to bite:
+     because the official index keeps the BEST 8 of the last 20, a handful of good
+     rounds still surviving in the window holds the index down on their own and
+     nothing is capped. That is the caps doing their job — they exist for the
+     golfer whose whole recent record has gone, not for a bad month. */
+  const collapse = seq(40, (i) => (i < 20 ? 5 : 45));
+  it('caps a collapse in form once 20 rounds exist', () => {
+    const h = W.indexHistory(collapse, M(), true);
+    const last = h[h.length - 1];
+    /* 3.0, not 5.0: the third round's index is 5.0 with the reduced-scores
+       table's −2.0 applied, and that really was an index this golfer held
+       inside the past 365 days. The lookback covers the whole year, including
+       the stretch before they had 20 scores. */
+    eq(last.lowIndex, 3, 'the lowest index of the past year should be the good spell:');
+    eq(last.whsUncapped, 45, 'the raw index should follow the recent scores:');
+    ok(last.whs < last.whsUncapped, 'the capped index should be below the raw one');
+    eq(last.cap, 'hard');
+    eq(last.whs, 8, 'the hard cap holds it 5.0 above the low index:');
+  });
+  it('does not cap when the caps are switched off', () => {
+    const last = W.indexHistory(collapse, M(), false).pop();
+    eq(last.cap, null);
+    eq(last.whs, last.whsUncapped);
+    eq(last.whs, 45);
+  });
+
+  describe('daysBefore');
+  it('steps back a year across a leap day', () => eq(W.daysBefore('2026-01-01', 365), '2025-01-01'));
+
+  /* ── data coming in from outside ─────────────────────────────────────── */
+  describe('sanitizeIds');
+  it('replaces an id that could break out of an attribute, and rewrites references', () => {
+    const bad = '"><img src=x onerror=alert(1)>';
+    const s = W.sanitizeIds({
+      golfers: [{ id: bad, name: 'X' }],
+      courses: [], rounds: [{ id: 'r1', golferId: bad, courseId: 'c1', teeId: 't1' }],
+      activeGolfer: bad,
+    });
+    ok(s.golfers[0].id !== bad, 'the hostile id should be gone');
+    ok(/^[A-Za-z0-9_-]{1,64}$/.test(s.golfers[0].id), 'the replacement should be a plain id');
+    eq(s.rounds[0].golferId, s.golfers[0].id, 'the round should still point at the same golfer:');
+    eq(s.activeGolfer, s.golfers[0].id, 'the active golfer should still point at the same golfer:');
+  });
+  it('leaves ordinary ids untouched', () => {
+    const s = W.sanitizeIds({ golfers: [{ id: 'abc-123_X', name: 'X' }], courses: [], rounds: [] });
+    eq(s.golfers[0].id, 'abc-123_X');
+  });
+
+  describe('normalizeState');
+  it('turns junk into a usable state rather than throwing', () => {
+    const s = W.normalizeState(null);
+    eq(s.golfers.length, 1);
+    eq(s.rounds.length, 0);
+    ok(s.settings.method, 'a method should always exist');
+  });
+  it('drops a course with no tees — there would be nothing to score against', () => {
+    const s = W.normalizeState({ courses: [{ id: 'c', name: 'Empty', tees: [] }] });
+    eq(s.courses.length, 0);
+  });
+  it('clamps a nonsense slope into the legal range', () => {
+    const s = W.normalizeState({ courses: [{ id: 'c', name: 'C', tees: [{ id: 't', slope: 9999, rating: 70, par: 72 }] }] });
+    eq(s.courses[0].tees[0].slope, 155);
+  });
+  it('points the active golfer at someone who exists', () => {
+    const s = W.normalizeState({ golfers: [{ id: 'a', name: 'A' }], activeGolfer: 'nobody' });
+    eq(s.activeGolfer, 'a');
+  });
+  it('keeps a round that has been marked as not counting', () => {
+    const s = W.normalizeState({ rounds: [{ id: 'r', date: '2026-05-01', score: 90, counts: false }] });
+    eq(s.rounds[0].counts, false);
+  });
+  it('defaults counts to true when the field is absent', () => {
+    const s = W.normalizeState({ rounds: [{ id: 'r', date: '2026-05-01', score: 90 }] });
+    eq(s.rounds[0].counts, true);
+  });
+
+  run();
+});
+
+function fail(msg) {
+  const s = document.getElementById('summary');
+  s.className = 'fail';
+  s.textContent = msg;
+}
+
+function run() {
+  const out = document.getElementById('results');
+  let pass = 0, total = 0;
+  const html = groups.map((g) => {
+    const items = g.tests.map((t) => {
+      total++;
+      try { t.fn(); pass++; return `<li class="ok">${escape_(t.name)}</li>`; }
+      catch (e) { return `<li class="bad">${escape_(t.name)} — ${escape_(e.message)}</li>`; }
+    }).join('');
+    return `<h2>${escape_(g.name)}</h2><ol>${items}</ol>`;
+  }).join('');
+  out.innerHTML = html;
+  const s = document.getElementById('summary');
+  s.className = pass === total ? 'pass' : 'fail';
+  s.textContent = pass === total ? `All ${total} tests pass` : `${total - pass} of ${total} tests FAILED`;
+}
+
+function escape_(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+</script>
+</body>
+</html>
