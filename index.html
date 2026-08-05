@@ -13,7 +13,7 @@
      which some browsers have historically checked against form-action.
      NOTE: any new network endpoint must be added to connect-src or it is blocked.
      Note: frame-ancestors is ignored in a meta tag; it needs a real header. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://api.github.com; frame-src https://golf-handicap.firebaseapp.com; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://api.github.com; frame-src https://golfhandicap-14246.firebaseapp.com; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Golf Handicap — rolling handicap tracker</title>
 <meta name="description" content="Track your golf rounds and see your handicap two ways: your own rolling last-N-rounds method, and the official World Handicap System calculation. Works offline, no account required.">
@@ -2035,14 +2035,23 @@ render();
    say so.
 ──────────────────────────────────────────────────────────────────────────── */
 
-/* ⛳ SETUP — replace this with your own Firebase project's web config.
-   Until it is filled in, sync is off and the app is fully local; everything
-   else works exactly the same. Step-by-step instructions are in README.md
-   under "Turning sync on". Remember to add the new project's authDomain to the
-   frame-src list in the Content-Security-Policy at the top of this file. */
-const FIREBASE_CONFIG = null;
+/* This is Firebase's PUBLIC web client config for the golfhandicap-14246
+   project, not a secret — it ships in the page of every Firebase web app, and
+   access is enforced by firestore.rules rather than by hiding this key.
+   Set it to null to force fully-local mode (the button hides and nothing is
+   ever sent anywhere). If it is ever pointed at a different project, the new
+   authDomain must also go into frame-src in the Content-Security-Policy at the
+   top of this file, or sign-in is silently blocked. */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBgBhAMUmXvq1vXb4KdSDALC2kNqsFZmxU",
+  authDomain: "golfhandicap-14246.firebaseapp.com",
+  projectId: "golfhandicap-14246",
+  storageBucket: "golfhandicap-14246.firebasestorage.app",
+  messagingSenderId: "773406549768",
+  appId: "1:773406549768:web:8d96d83ee37f7df8096ebd"
+};
 
-const SDK = 'https://www.gstatic.com/firebasejs/12.16.0/';
+const SDK = 'https://www.gstatic.com/firebasejs/12.17.1/';
 const COLLECTION = 'golfhandicap';
 const btn = document.getElementById('syncBtn');
 const privacyNote = document.getElementById('privacyNote');

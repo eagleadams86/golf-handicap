@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// Security rules for the Golf Handicap Firestore database.
+// Security rules for the golfhandicap-14246 Firestore database.
 //
 // This file is a checked-in copy of what should be deployed in the Firebase
 // console (Firestore Database → Rules). Nothing in this repo deploys it — there

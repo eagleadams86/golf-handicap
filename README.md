@@ -178,33 +178,37 @@ isn't a plain `[A-Za-z0-9_-]` string is regenerated with every reference rewritt
 
 ---
 
-## Turning sync on
+## Sync setup
 
-Sync ships **off**: `FIREBASE_CONFIG` at the bottom of `index.html` is `null`, the sync
-button is hidden, and the app is 100% local. To switch it on you need a Firebase project of
-your own. The whole thing sits inside the free tier.
+Sync runs on the **`golfhandicap-14246`** Firebase project, on the free tier. The client
+config is already in `index.html`. Three things live in the Firebase console rather than in
+this repo, and all three have to be right or sync fails:
 
-1. **Create a project** at <https://console.firebase.google.com> — *Add project*. Analytics
-   is not needed.
-2. **Add a web app** to it (the `</>` icon). Firebase shows you a config object; copy it.
-3. **Enable Google sign-in**: *Authentication → Sign-in method → Google → Enable*, then save.
-4. **Authorise the domain**: *Authentication → Settings → Authorized domains → Add domain* →
-   `eagleadams86.github.io`. (`localhost` is authorised by default for testing.)
-5. **Create the database**: *Firestore Database → Create database*. Any location; start in
-   production mode.
-6. **Deploy the rules**: *Firestore Database → Rules*, paste the contents of
-   [`firestore.rules`](firestore.rules), publish. **Do this before signing in for the first
-   time** — the defaults either deny everything or, in test mode, let any signed-in Google
-   account read every other user's rounds.
-7. **Paste the config into `index.html`**, replacing `const FIREBASE_CONFIG = null;` in the
-   `<script type="module">` block at the foot of the file.
-8. **Add the auth domain to the CSP.** The `Content-Security-Policy` meta tag at the top of
-   `index.html` has a `frame-src` entry — change it to your project's `authDomain`
-   (`your-project.firebaseapp.com`). Sign-in will be blocked without this. Any other new
-   network endpoint has to be added to `connect-src` for the same reason.
+1. **Google sign-in enabled** — *Authentication → Sign-in method → Google → Enable*.
+2. **`eagleadams86.github.io` in the authorised domains** — *Authentication → Settings →
+   Authorized domains*. (`localhost` is authorised by default, so local testing works
+   without this, which is exactly how you ship a build that only fails in production.)
+3. **The rules from [`firestore.rules`](firestore.rules) published** — *Firestore Database →
+   Rules*. **Do this before the first sign-in.** Firestore's defaults either deny everything
+   (sync silently fails) or, in test mode, let any signed-in Google account read every other
+   user's rounds — and from the outside those two look identical to a rule of
+   `request.auth != null`.
 
-The Firebase config is a **public client config, not a secret** — it is visible in every
-Firebase web app. Access is enforced by the security rules, not by hiding the key.
+`firestore.rules` in this repo is a **checked-in copy** of what should be deployed. Nothing
+here deploys it; if the console rules change, change the file to match.
+
+The Firebase config in `index.html` is a **public client config, not a secret** — it ships
+in the page of every Firebase web app. Access is enforced by the security rules, not by
+hiding the key.
+
+### Pointing it at a different project
+
+Replace `FIREBASE_CONFIG` in the `<script type="module">` block at the foot of `index.html`,
+**and** change the `authDomain` in the CSP's `frame-src` at the top of the same file — the
+sign-in popup is an iframe from that host, so it is blocked without it. Any other new
+network endpoint needs adding to `connect-src` for the same reason. Setting
+`FIREBASE_CONFIG` to `null` returns the app to fully-local: the button hides and nothing is
+ever sent anywhere.
 
 ### How syncing behaves
 

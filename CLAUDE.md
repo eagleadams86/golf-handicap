@@ -13,8 +13,15 @@ that emphasis.
   works via `file://`. Keep it that way: no npm, no bundler, no CDN calls beyond the Firebase
   SDK that optional sync loads.
 - No account is ever required. The only exception is an **optional** Google sign-in for
-  cross-device sync. `FIREBASE_CONFIG` in the bottom `<script type="module">` block controls
-  it; `null` (the shipped value until a project exists) forces fully-local mode.
+  cross-device sync, backed by the `golfhandicap-14246` Firebase project (auth + one
+  Firestore doc per user, free tier). `FIREBASE_CONFIG` in the bottom `<script type="module">`
+  block controls it; set it to `null` to force fully-local mode. The config is a public
+  client config, not a secret — access is enforced by the Firestore rules.
+- Firebase authorized domain is `eagleadams86.github.io`, so sync works at this
+  `/golf-handicap/` path unchanged. The project's `authDomain`
+  (`golfhandicap-14246.firebaseapp.com`) is also in the CSP's `frame-src` — the sign-in popup
+  is an iframe from that host and is blocked without it. **Both have to move together if the
+  project ever changes.**
 - **`computeAll()` is the only place either handicap is calculated.** Every figure, tile,
   table, chart and the working-out panel reads from it. A new number takes its value from
   there or the screen starts disagreeing with itself.
