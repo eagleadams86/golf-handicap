@@ -54,6 +54,11 @@ that emphasis.
   deleted, or marked "don't count" — is named on the front page via `#handicapWarn`, and the
   *Used in* column shows which rounds each method actually leaned on. A round quietly
   missing from a handicap is worse than the bug that hiding it would avoid.
+- **Example data is per-golfer and additive.** `buildDemo()` (pure, pinned by tests) builds
+  rounds for the golfer **on screen**, the demo course is *added* to the list (never a
+  replacement — someone may have typed real courses in), and its fixed `demo-*` ids make a
+  reload replace the previous example instead of duplicating it. Other golfers' rounds are
+  never touched.
 - **The example-data button and "Clear everything" are a pair.** Offering one-tap sample
   data without a one-tap way back out is how someone ends up hand-deleting two dozen rounds;
   if either is ever removed, reconsider the other. Clearing uses a dialog rather than nested
@@ -100,6 +105,14 @@ that emphasis.
   errors is dropped by Firestore and never fires again, so without it another device's
   updates just stop arriving silently. Sync failures are surfaced on the button, never only
   logged, and only a successful push clears the state — there is deliberately no retry button.
+  The which-copy-wins rules live in the pure `syncDecision()` in the classic script so
+  tests.html can pin them; the module only acts on the verdict. "Clear everything" calls
+  `window.cloudFlush()` to skip the push debounce — a clear must not sit in a window the
+  tab might not survive.
+- **Same-browser tabs share one copy.** A `storage` listener adopts another tab's write
+  (localStorage is shared, so the tabs would otherwise last-write-wins each other). Adopt
+  and render only — never `save()` from that listener: the writing tab already pushed to
+  the cloud, and the event only fires in *other* tabs, so it cannot loop.
 - **`privacy.html` is the privacy policy** (static, midnight only, linked from the footer via
   `.privacy-links` — deliberately a separate element from `#privacyNote`, whose textContent
   the sync code rewrites). If sync or what the app stores ever changes, update it and its
@@ -113,7 +126,8 @@ that emphasis.
 - **`tests.html` pins the pure functions — open it on a local server and check
   "All N tests pass"** whenever you touch `round1`, `scoreDifferential`, `averageLowest`,
   `whsIndex`/`whsSelection`, `rollingIndex`/`rollingSelection`, `normalizeMethod`,
-  `applyCaps`, `courseHandicap`, `indexHistory`, `sanitizeIds` or `normalizeState`. It loads
+  `clampInt`/`clampNum`, `applyCaps`, `courseHandicap`, `indexHistory`, `pickUsed`,
+  `syncDecision`, `buildDemo`, `sanitizeIds` or `normalizeState`. It loads
   the real `index.html` in a hidden iframe and calls the functions directly — no copies, no
   build step — so it needs `http://localhost` (`file://` iframes are blocked in some
   browsers). `window.__ghTestHooks` exists solely to hand it the `const` values, which aren't

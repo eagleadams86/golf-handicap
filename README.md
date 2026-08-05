@@ -27,7 +27,7 @@ to put the same rounds on your phone and your laptop.
 - [How the official index is worked out](#how-the-official-index-is-worked-out)
 - [Course handicap](#course-handicap)
 - [Backups](#backups)
-- [Turning sync on](#turning-sync-on)
+- [Sync setup](#sync-setup)
 - [What's in this repo](#whats-in-this-repo)
 - [Development](#development)
 - [Scope and known limits](#scope-and-known-limits)
@@ -252,6 +252,8 @@ offline either way.
   takes the empty copy as "newer" and empties itself. This is not hypothetical; it cost real
   data in a sibling app, which is where the rule comes from.
 - A device clearing everything **asks** the others rather than silently wiping them.
+- Two tabs of the **same browser** share one copy: an edit saved in one appears in the
+  other immediately, signed in or not.
 - **Sync failures are shown, not logged.** The button reads "⚠️ Not syncing" with the cause
   in plain English. There is deliberately no retry button: transient failures are retried by
   the SDK, permanent ones are not fixed by pressing anything, and the next save recovers the
@@ -266,7 +268,7 @@ To go back to fully-local, set `FIREBASE_CONFIG` to `null` again.
 | File | What it is |
 |---|---|
 | `index.html` | The entire app — markup, styles, logic, sync. No build step, no dependencies, no CDN calls except the Firebase SDK when sync is enabled. |
-| `tests.html` | 58 tests pinning the pure handicap maths. Loads the real `index.html` in a hidden iframe and calls its functions directly. |
+| `tests.html` | 76 tests pinning the pure handicap maths, the restore/repair rules and the sync decisions. Loads the real `index.html` in a hidden iframe and calls its functions directly. |
 | `privacy.html` | Privacy policy. Exists because other people may sign in with their own Google accounts. |
 | `firestore.rules` | A checked-in copy of the security rules to deploy in the Firebase console. |
 | `favicon.ico` | The shared icon used across these apps — a byte-identical copy, not a variant. |
@@ -293,8 +295,9 @@ tests — they need `http://localhost` because `file://` iframes are blocked in 
 
 **Run `tests.html` and check it says "All N tests pass"** whenever you touch `round1`,
 `scoreDifferential`, `averageLowest`, `whsIndex`/`whsSelection`,
-`rollingIndex`/`rollingSelection`, `normalizeMethod`, `applyCaps`, `courseHandicap`,
-`indexHistory`, `sanitizeIds` or `normalizeState`.
+`rollingIndex`/`rollingSelection`, `normalizeMethod`, `clampInt`/`clampNum`, `applyCaps`,
+`courseHandicap`, `indexHistory`, `pickUsed`, `syncDecision`, `buildDemo`, `sanitizeIds`
+or `normalizeState`.
 
 `computeAll()` is the only place either handicap is worked out. Every figure, table, chart
 and explanation reads from it, so no two parts of the screen can disagree about the maths.
