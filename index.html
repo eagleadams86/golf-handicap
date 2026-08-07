@@ -105,6 +105,9 @@
      keep a row even. */
   --chrome-h: 30px;    /* header buttons + the golfer/theme pickers beside them */
   --control-h: 38.5px; /* every button in the page body */
+  /* Read by BOTH .wrap and .headbar — see the note on .wrap for why they must
+     stay the same number. */
+  --page-w: 1100px;
 
   --sp-1: 2px;
   --sp-2: 4px;
@@ -235,14 +238,21 @@ body {
   color: var(--text-primary);
   font: var(--fw-normal) var(--fs-base)/var(--lh-base) var(--font-sans);
 }
-/* 1500px and the 16px gutter to match Team Dashboard and Sprint Velocity — the
-   three apps share one page width. The horizontal padding lives here rather
-   than on <body>, because the header bar behind it runs edge to edge. */
-.wrap { max-width: 1500px; margin: 0 auto; padding: 0 16px 64px; }
+/* The one page width, used by the content AND by the row inside the header bar.
+   They have to be the same number or the brand stops lining up with the left
+   edge of the first card, so both read it from here rather than repeating it.
+
+   1100px, not the siblings' 1500px: Team Dashboard and Sprint Velocity earn that
+   width with dense many-column tables, and this app's widest thing is a seven
+   column rounds table that just went sparse and gappy when stretched to it. The
+   16px gutter and everything else about the bar are theirs; only the number
+   differs, and it is deliberate. (`--page-w` lives with the other layout tokens
+   at the top.) */
+.wrap { max-width: var(--page-w); margin: 0 auto; padding: 0 16px 64px; }
 
 /* ── Header ─────────────────────────────────────────────────────────────────
    The sibling apps' shape: a sticky bar the full width of the window, with the
-   row inside it held to the same 1500px as the page.
+   row inside it held to the same `--page-w` as the content below.
 
    Everything in the row is written into the markup at its final size. The
    header paints long before the script at the foot of the page runs, so any
@@ -262,7 +272,7 @@ header {
   padding: 10px 0; margin-bottom: 20px;
 }
 .headbar {
-  max-width: 1500px; margin: 0 auto; padding: 0 16px;
+  max-width: var(--page-w); margin: 0 auto; padding: 0 16px;
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
 }
 /* An <h1>, so the page has a top-level heading — hence the margin reset. The

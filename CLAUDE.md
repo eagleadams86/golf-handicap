@@ -100,13 +100,19 @@ that emphasis.
   site that interpolates an id raw, and don't drop the boundary check.
 - **The header and the page width are Team Dashboard's and Sprint Velocity's.** A sticky bar
   (`<header>` outside `.wrap`, `--surface` on `--bg`, 1px bottom border, `10px 0`, 20px
-  below) with a `.headbar` inside it held to the same **1500px** as `.wrap`, and a `.brand`
+  below) with a `.headbar` inside it held to the same `--page-w` as `.wrap`, and a `.brand`
   `<h1>` at 17px/700 whose `margin: 0 auto 0 0` is what pushes the controls right. The
   horizontal 16px gutter lives on `.wrap`/`.headbar`, **not on `<body>`** — the bar runs
   edge to edge behind it. The control labels are `.sr-only` with a `title` on each control,
   as in both siblings; don't put visible captions back. `.brand .sub` is the strapline and
   is the one thing dropped on a narrow screen — the ⛳ is part of the name, so the selector
   has to stay specific.
+- **`--page-w` is 1100px, and both `.wrap` and `.headbar` read it.** They must stay the same
+  number or the brand stops lining up with the left edge of the first card — that is the
+  whole reason it is a token. This is the **one** deliberate divergence from the siblings'
+  1500px: they earn that width with dense many-column tables, and the rounds table here is
+  seven columns that went sparse and gappy stretched to it. The full-bleed sticky bar, the
+  16px gutter and everything else about the header are still theirs.
 - **Everything in the header row is written into the markup at its final size.** The header
   paints long before the script at the foot of the page runs, so a control filled in by JS
   grows on screen and shoves the page down. The sync button is therefore **visible by default
