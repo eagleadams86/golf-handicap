@@ -91,7 +91,10 @@ that emphasis.
   with three empty slots beside it: six tracks with each tile spanning two puts three across,
   and tiles 4 and 5 span three apiece to finish the second row. **There are exactly five
   tiles, and those spans assume it** — add or remove one in `renderStats` and the spans (and
-  the two-across phone rule under 620px) have to be redone in the same commit.
+  the two-across phone rule under 620px) have to be redone in the same commit. **The order of
+  the `tiles` array is layout, not editorial**: under 620px the fifth tile is the one that
+  takes the full width, so the last-round *date* sits there — it is the only value that isn't
+  a short number. Reordering the array moves that wide box to something that doesn't need it.
 - **Exclusions are never silent.** Every round that sits outside the numbers — course
   deleted, or marked "don't count" — is named on the front page via `#handicapWarn`, and the
   *Used in* column shows which rounds each method actually leaned on. A round quietly

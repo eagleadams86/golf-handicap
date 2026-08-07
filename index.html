@@ -409,7 +409,10 @@ th:has(.help-btn), td:has(.help-btn) { white-space: nowrap; }
 .stat .v { font-size: var(--fs-xl); font-weight: var(--fw-semibold); }
 /* Two across holds all the way down rather than stacking: these values are
    short, and one tile per row on a phone is a lot of scrolling for five numbers.
-   The fifth takes the full width, since there is nothing to pair it with. */
+   The fifth takes the full width, having nothing to pair with — which is why
+   `renderStats` puts the last-round date there, the one value long enough to
+   want it. That ordering and this rule go together; changing either alone
+   hands the wide box to a number that doesn't need it. */
 @media (max-width: 620px) {
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .stat, .stat:nth-child(4) { grid-column: span 1; }
@@ -1436,12 +1439,16 @@ function renderStats(c) {
   }
   const trendText = trend == null ? '—' : (trend === 0 ? 'level' : (trend < 0 ? '▼ ' : '▲ ') + Math.abs(trend).toFixed(1));
 
+  /* Order is load-bearing, not editorial: the fifth tile is the one that takes
+     the whole width on a phone, and "Last round" is the only value here that is
+     a date rather than a number, so it is the one that needs the room. Keep it
+     last unless something longer arrives. */
   const tiles = [
     ['Rounds logged', String(c.all.length)],
     ['Counting towards handicap', String(entries.length)],
     ['Best differential', best == null ? '—' : best.toFixed(1)],
-    ['Last round', last ? `${last.round.score} on ${fmtDate(last.date)}` : '—'],
     ['Change over 5 rounds', trendText],
+    ['Last round', last ? `${last.round.score} on ${fmtDate(last.date)}` : '—'],
   ];
   document.getElementById('stats').innerHTML = tiles.map(([k, v]) =>
     `<div class="stat"><div class="label">${esc(k)}</div><div class="v">${esc(v)}</div></div>`
