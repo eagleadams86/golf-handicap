@@ -238,6 +238,38 @@ network endpoint needs adding to `connect-src` for the same reason. Setting
 `FIREBASE_CONFIG` to `null` returns the app to fully-local: the button hides and nothing is
 ever sent anywhere.
 
+### Two ways in, and why
+
+`GOOGLE_CLIENT_ID`, just above `FIREBASE_CONFIG`, decides which door sign-in uses:
+
+| `GOOGLE_CLIENT_ID` | Sign-in goes via | Notes |
+|---|---|---|
+| `null` *(current)* | Firebase's popup at `<project>.firebaseapp.com` | Works wherever that hostname isn't blocked |
+| set | Google Identity Services, straight to `accounts.google.com` | Survives filters that block `firebaseapp.com` |
+
+Firebase's popup **starts** at `<project>.firebaseapp.com/__/auth/handler` and only redirects
+on to Google from there, so a proxy that blocks that first hop kills sign-in outright.
+Corporate filters do exactly that — and per **hostname**, not per domain. On one network on a
+single day, two sibling apps' hostnames were refused while a third's went through untouched,
+with identical code. Which way a filter lands on a hostname is outside our control and can
+change, so a sibling app working today is no guarantee for this one.
+
+Google Identity Services sidesteps it: the popup goes to `accounts.google.com`, returns an
+OAuth access token, and Firebase exchanges it for the same session via `signInWithCredential`.
+Same Google account, same Firestore document, same rules — only the doorway changes.
+
+**To switch over:** Cloud Console → APIs & Services → Credentials → the OAuth 2.0 Client ID
+named *Web client (auto created by Google Service)*. Copy its Client ID into
+`GOOGLE_CLIENT_ID`, and add `https://eagleadams86.github.io` under **Authorized JavaScript
+origins** — exact match including port, so `http://localhost` and `http://localhost:8014` are
+different origins. Without it Google refuses with `origin_mismatch`.
+
+While the constant is `null` nothing changes and Google's client isn't even fetched, so the
+switch is a one-line flip once the console step is done. Team Dashboard and Sprint Velocity
+have already made it and deleted their fallbacks; once this one is proven on the network that
+needed it, the popup path, the `firebaseapp.com` `frame-src` entry and `apis.google.com` can
+all go.
+
 ### How syncing behaves
 
 One Firestore document per user at `golfhandicap/{uid}`, holding `{ state, updatedAt }`.

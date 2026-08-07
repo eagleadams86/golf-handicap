@@ -22,6 +22,17 @@ that emphasis.
   (`golfhandicap-14246.firebaseapp.com`) is also in the CSP's `frame-src` — the sign-in popup
   is an iframe from that host and is blocked without it. **Both have to move together if the
   project ever changes.**
+- **Sign-in has two doors, and `GOOGLE_CLIENT_ID` picks which.** Set, it uses Google Identity
+  Services — a popup straight to `accounts.google.com`, exchanged for the same Firebase
+  session via `signInWithCredential`. Null, it uses Firebase's own popup via
+  `<project>.firebaseapp.com`. The second door is the one corporate filters break: they block
+  **individual** `firebaseapp.com` hostnames, per hostname rather than per domain, and two
+  sibling apps were refused on a network where a third went through. Team Dashboard and
+  Sprint Velocity have already switched and deleted their fallbacks. The ID is **not** in
+  `firebaseConfig` — it comes from Cloud Console → Credentials → *Web client (auto created by
+  Google Service)*, whose **Authorized JavaScript origins** must list this app's origin (exact,
+  port included) or Google returns `origin_mismatch`. Once GIS is proven on the network that
+  needed it, delete the popup path, the `firebaseapp.com` `frame-src` and `apis.google.com`.
 - **`computeAll()` is the only place either handicap is calculated.** Every figure, tile,
   table, chart and the working-out panel reads from it. A new number takes its value from
   there or the screen starts disagreeing with itself.
