@@ -384,9 +384,37 @@ th:has(.help-btn), td:has(.help-btn) { white-space: nowrap; }
 .seg button + button { border-left: 1px solid var(--border-strong); }
 .seg button[aria-pressed="true"] { background: var(--btn-bg); color: var(--btn-text); font-weight: var(--fw-medium); }
 
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--sp-5); }
-.stat { background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--sp-5); }
+/* At-a-glance tiles. Column counts are spelled out rather than left to auto-fit,
+   which at in-between widths dropped the fifth tile onto a row of its own with
+   three empty slots beside it. There are exactly five tiles (see the `tiles`
+   array in renderStats), and five reads as 3 + 2, so the last two are widened to
+   finish their row rather than leave a gap: six tracks, each tile spanning two,
+   is how three sit across a row while the trailing pair can span three apiece
+   and still meet in the middle. Five across was the other option and is what a
+   stat strip usually does, but at this page width it squeezed every tile below
+   the length of its own label — "Counting towards handicap" wrapped, and so did
+   the last-round date. If a tile is ever added or removed, these spans have to
+   be redone with it.
+   Tiles share the parent's rows via subgrid so the label and the number line up
+   straight across a row — without it a label that wraps shunts its own number
+   down out of line with its neighbours'. This is Sprint Velocity's and Team
+   Dashboard's tile; browsers without subgrid fall back to each tile laying
+   itself out, which is what it did before. */
+.stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-rows: repeat(2, auto); gap: var(--sp-5); }
+.stat { display: grid; grid-row: span 2; grid-column: span 2; grid-template-rows: subgrid;
+  align-content: start; background: var(--surface-alt); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: var(--sp-5); }
+.stat:nth-child(4), .stat:nth-child(5) { grid-column: span 3; }
 .stat .v { font-size: var(--fs-xl); font-weight: var(--fw-semibold); }
+/* Two across holds all the way down rather than stacking: these values are
+   short, and one tile per row on a phone is a lot of scrolling for five numbers.
+   The fifth takes the full width, since there is nothing to pair it with. */
+@media (max-width: 620px) {
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stat, .stat:nth-child(4) { grid-column: span 1; }
+  .stat:nth-child(5) { grid-column: span 2; }
+}
 
 table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
 .table-scroll { overflow-x: auto; }

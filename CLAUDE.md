@@ -83,6 +83,15 @@ that emphasis.
 - **Help buttons (`.help-btn`) carry `margin-left: 7px`** and cells containing one are
   `nowrap`. An icon must never sit flush against the word it follows — a standing preference
   across every app in this family.
+- **The At-a-glance tiles are Sprint Velocity's tile, and their columns are counted by
+  hand.** `.stat` shares `.stats`'s rows through `grid-template-rows: subgrid`, which is what
+  keeps the label and the number lined up across a row when one label wraps and its
+  neighbours' don't — the same reason SV and Team Dashboard do it. The column counts are
+  spelled out rather than left to `auto-fit`, which stranded the fifth tile alone on a row
+  with three empty slots beside it: six tracks with each tile spanning two puts three across,
+  and tiles 4 and 5 span three apiece to finish the second row. **There are exactly five
+  tiles, and those spans assume it** — add or remove one in `renderStats` and the spans (and
+  the two-across phone rule under 620px) have to be redone in the same commit.
 - **Exclusions are never silent.** Every round that sits outside the numbers — course
   deleted, or marked "don't count" — is named on the front page via `#handicapWarn`, and the
   *Used in* column shows which rounds each method actually leaned on. A round quietly
