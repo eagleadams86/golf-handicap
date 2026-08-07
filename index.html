@@ -286,9 +286,13 @@ button.danger { color: var(--err); border-color: var(--err); background: var(--e
 button.link { background: none; border: none; color: var(--accent); padding: 0;
   min-height: 0; font-size: inherit; text-decoration: underline; white-space: normal; }
 
-/* Header chrome is the smaller of the two sizes, and the pickers beside the
-   buttons are pinned to the same height so the row stays even. */
-header.top button { padding: 4px 9px; font-size: var(--fs-base); min-height: var(--chrome-h); }
+/* Chrome is the smaller of the two sizes: the header row, and the backup/clear
+   row in the footer. Both are utilities that sit beside small print rather than
+   actions the page is asking for, and Sprint Velocity sizes the very same three
+   controls — back up, restore, sign in — this way. At full size they towered
+   over the 12px footnote underneath them. The pickers beside a header button are
+   pinned to the same height so the row stays even. */
+header.top button, footer .foot-row button { padding: 4px 9px; font-size: var(--fs-base); min-height: var(--chrome-h); }
 header.top select { min-height: var(--chrome-h); }
 
 /* Help buttons need breathing room — an icon must never sit flush against the

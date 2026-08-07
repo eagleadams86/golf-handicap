@@ -50,10 +50,13 @@ that emphasis.
 - **Buttons are Sprint Velocity's `.btn`, transcribed.** SV is the design lead for shared
   chrome across this family, so the metrics here are its verbatim: 15px text, `7px 12px`
   padding, `--control-h: 38.5px`, hover to `--text-muted`, and a primary that is filled but
-  *not* bolded. Two sizes only — `--chrome-h: 30px` for the header row, `--control-h` for
-  everything in the page body — and the pickers sitting beside a button are pinned to the
-  same height, because a native `<select>` ignores line-height and would otherwise sit
-  shorter. Buttons deliberately run a size above the 13px body text. `.link` and `.rowbtn`
+  *not* bolded. Two sizes only: `--chrome-h: 30px` for **utilities that sit beside small
+  print** — the header row and the footer's backup/restore/clear row, which are the same
+  three controls SV renders as `.btn.small` — and `--control-h` for the actions the page is
+  actually asking for. At full size the footer row towered over the 12px footnote beneath
+  it. The pickers sitting beside a header button are pinned to the same height, because a
+  native `<select>` ignores line-height and would otherwise sit shorter. Full-size buttons
+  deliberately run a size above the 13px body text. `.link` and `.rowbtn`
   take the body size back: they sit inside sentences and tables, not on their own.
   **A change to this block belongs in Sprint Velocity too, or the two drift.**
 - **Help buttons (`.help-btn`) carry `margin-left: 7px`** and cells containing one are
