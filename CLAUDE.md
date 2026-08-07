@@ -98,11 +98,21 @@ that emphasis.
   that isn't `[A-Za-z0-9_-]{1,64}` with a fresh one and rewriting every reference through the
   same map. Ids go into `data-id` and `<option value>` in a dozen places. Don't add a render
   site that interpolates an id raw, and don't drop the boundary check.
+- **The header and the page width are Team Dashboard's and Sprint Velocity's.** A sticky bar
+  (`<header>` outside `.wrap`, `--surface` on `--bg`, 1px bottom border, `10px 0`, 20px
+  below) with a `.headbar` inside it held to the same **1500px** as `.wrap`, and a `.brand`
+  `<h1>` at 17px/700 whose `margin: 0 auto 0 0` is what pushes the controls right. The
+  horizontal 16px gutter lives on `.wrap`/`.headbar`, **not on `<body>`** — the bar runs
+  edge to edge behind it. The control labels are `.sr-only` with a `title` on each control,
+  as in both siblings; don't put visible captions back. `.brand .sub` is the strapline and
+  is the one thing dropped on a narrow screen — the ⛳ is part of the name, so the selector
+  has to stay specific.
 - **Everything in the header row is written into the markup at its final size.** The header
   paints long before the script at the foot of the page runs, so a control filled in by JS
   grows on screen and shoves the page down. The sync button is therefore **visible by default
-  and hidden on failure**, not the other way round. If you add header chrome, give it its
-  final width in the HTML.
+  and hidden on failure**, not the other way round, and midnight carries `selected` in the
+  theme picker so it never reads a different theme from the one already painted. If you add
+  header chrome, give it its final width in the HTML.
 - **Live regions stay in the tree.** `#handicapWarn` and the dialog warnings are
   `role="status"` and are emptied rather than `hidden` — an element toggled out of the tree
   announces nothing on the way back — with `.warn:empty` collapsing them visually.

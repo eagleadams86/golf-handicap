@@ -231,32 +231,48 @@
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
-  padding: 0 var(--sp-6) var(--sp-9);
   background: var(--bg);
   color: var(--text-primary);
   font: var(--fw-normal) var(--fs-base)/var(--lh-base) var(--font-sans);
 }
-.wrap { max-width: 1000px; margin: 0 auto; }
+/* 1500px and the 16px gutter to match Team Dashboard and Sprint Velocity — the
+   three apps share one page width. The horizontal padding lives here rather
+   than on <body>, because the header bar behind it runs edge to edge. */
+.wrap { max-width: 1500px; margin: 0 auto; padding: 0 16px 64px; }
 
 /* ── Header ─────────────────────────────────────────────────────────────────
-   Everything in this row is written into the markup at its final size. The
+   The sibling apps' shape: a sticky bar the full width of the window, with the
+   row inside it held to the same 1500px as the page.
+
+   Everything in the row is written into the markup at its final size. The
    header paints long before the script at the foot of the page runs, so any
    control filled in by JS grows on screen and shoves the page down — an empty
    <select> is 40px wide until its options arrive. Starting hidden costs
    nothing; growing does. The sync button is therefore visible by default and
    hidden on failure, not the other way round. (Learned in Sprint Velocity.)
+
+   The labels are screen-reader-only, as in both siblings: a row of uppercase
+   GOLFER/THEME captions was more chrome than a two-control header needs, and
+   each control carries a title instead.
 ─────────────────────────────────────────────────────────────────────────── */
-header.top {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-5);
-  padding: var(--sp-6) 0 var(--sp-5);
+header {
+  position: sticky; top: 0; z-index: 20;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 0; margin-bottom: 20px;
 }
-header.top h1 {
-  margin: 0; font-size: var(--fs-xl); font-weight: var(--fw-semibold);
-  letter-spacing: var(--ls-tight); display: flex; align-items: center; gap: var(--sp-4);
+.headbar {
+  max-width: 1500px; margin: 0 auto; padding: 0 16px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
 }
-header.top .spacer { flex: 1 1 auto; }
-.hdr-group { display: flex; align-items: center; gap: var(--sp-3); }
-.hdr-group label { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: var(--ls-label); color: var(--text-muted); }
+/* An <h1>, so the page has a top-level heading — hence the margin reset. The
+   auto right margin is what pushes the controls to the far edge. */
+.brand {
+  margin: 0 auto 0 0; font-size: 17px; font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-tight);
+  display: flex; align-items: center; gap: var(--sp-4);
+}
+.brand .sub { color: var(--text-muted); font-weight: var(--fw-medium); }
 
 select, input, textarea, button { font: inherit; color: inherit; }
 select, input[type="text"], input[type="number"], input[type="date"], textarea {
@@ -292,8 +308,8 @@ button.link { background: none; border: none; color: var(--accent); padding: 0;
    controls — back up, restore, sign in — this way. At full size they towered
    over the 12px footnote underneath them. The pickers beside a header button are
    pinned to the same height so the row stays even. */
-header.top button, footer .foot-row button { padding: 4px 9px; font-size: var(--fs-base); min-height: var(--chrome-h); }
-header.top select { min-height: var(--chrome-h); }
+.headbar button, footer .foot-row button { padding: 4px 9px; font-size: var(--fs-base); min-height: var(--chrome-h); }
+.headbar select { min-height: var(--chrome-h); padding: 4px 9px; }
 
 /* Help buttons need breathing room — an icon must never sit flush against the
    word it follows. Standing preference across every app in this family. */
@@ -430,35 +446,38 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
 .empty p { max-width: 46ch; margin: 0 auto var(--sp-5); }
 
 @media (max-width: 560px) {
-  body { padding: 0 var(--sp-5) var(--sp-8); }
+  .wrap { padding: 0 var(--sp-5) var(--sp-8); }
+  .headbar { padding: 0 var(--sp-5); }
   .grid2 { grid-template-columns: 1fr; }
-  header.top h1 { font-size: var(--fs-lg); }
+  /* The strapline is the first thing to go when the row starts wrapping — the
+     app's name has to survive on one line, the description doesn't. Only the
+     strapline: the ⛳ is part of the name. */
+  .brand .sub { display: none; }
 }
 </style>
 </head>
 <body>
-<div class="wrap">
-
-<header class="top">
-  <h1><span aria-hidden="true">⛳</span> Golf Handicap</h1>
-  <span class="spacer"></span>
-  <div class="hdr-group">
-    <label for="golferSel">Golfer</label>
-    <select id="golferSel" style="min-width:130px"><option>—————</option></select>
+<header>
+  <div class="headbar">
+    <h1 class="brand"><span class="mark" aria-hidden="true">⛳</span> Golf&nbsp;Handicap <span class="sub">· rolling and official, side by side</span></h1>
+    <label class="sr-only" for="golferSel">Golfer</label>
+    <select id="golferSel" title="Which golfer you're looking at" style="min-width:130px"><option>—————</option></select>
     <button id="golfersBtn" title="Add, rename or remove golfers">Manage</button>
-  </div>
-  <div class="hdr-group">
-    <label for="themeSel">Theme</label>
-    <!-- Themes are listed alphabetically; midnight is the default but is not listed first. -->
-    <select id="themeSel">
-      <option value="dark">Dark</option>
-      <option value="light">Light</option>
-      <option value="midnight">Midnight</option>
-      <option value="sepia">Sepia</option>
+    <label class="sr-only" for="themeSel">Theme</label>
+    <!-- Themes are listed alphabetically; midnight is the default but is not listed
+         first. It carries `selected` so the picker never reads one theme while the
+         boot script in <head> has already painted another. -->
+    <select id="themeSel" title="Change the colour theme">
+      <option value="dark">☾ Dark</option>
+      <option value="light">☀ Light</option>
+      <option value="midnight" selected>✦ Midnight</option>
+      <option value="sepia">📜 Sepia</option>
     </select>
+    <button id="syncBtn" title="Sign in with Google to see the same data on all your devices">☁️ Sign in to sync</button>
   </div>
-  <button id="syncBtn">☁️ Sign in to sync</button>
 </header>
+
+<div class="wrap">
 
 <main>
   <section class="card" id="handicapCard">
