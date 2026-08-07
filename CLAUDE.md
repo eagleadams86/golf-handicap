@@ -19,20 +19,24 @@ that emphasis.
   client config, not a secret — access is enforced by the Firestore rules.
 - Firebase authorized domain is `eagleadams86.github.io`, so sync works at this
   `/golf-handicap/` path unchanged. The project's `authDomain`
-  (`golfhandicap-14246.firebaseapp.com`) is also in the CSP's `frame-src` — the sign-in popup
-  is an iframe from that host and is blocked without it. **Both have to move together if the
-  project ever changes.**
-- **Sign-in has two doors, and `GOOGLE_CLIENT_ID` picks which.** Set, it uses Google Identity
-  Services — a popup straight to `accounts.google.com`, exchanged for the same Firebase
-  session via `signInWithCredential`. Null, it uses Firebase's own popup via
-  `<project>.firebaseapp.com`. The second door is the one corporate filters break: they block
-  **individual** `firebaseapp.com` hostnames, per hostname rather than per domain, and two
-  sibling apps were refused on a network where a third went through. Team Dashboard and
-  Sprint Velocity have already switched and deleted their fallbacks. The ID is **not** in
-  `firebaseConfig` — it comes from Cloud Console → Credentials → *Web client (auto created by
-  Google Service)*, whose **Authorized JavaScript origins** must list this app's origin (exact,
-  port included) or Google returns `origin_mismatch`. Once GIS is proven on the network that
-  needed it, delete the popup path, the `firebaseapp.com` `frame-src` and `apis.google.com`.
+  (`golfhandicap-14246.firebaseapp.com`) is **no longer** in the CSP's `frame-src` — it used
+  to have to be, because the sign-in popup was an iframe from that host, but sign-in no longer
+  goes anywhere near it (see the next rule). It stays in `FIREBASE_CONFIG` only because the
+  SDK requires the field.
+- **Sign-in uses Google Identity Services, not Firebase's popup.** `GOOGLE_CLIENT_ID` +
+  `initTokenClient()` opens a popup straight to `accounts.google.com`, and the OAuth access
+  token it returns is exchanged for the same Firebase session via `signInWithCredential`.
+  Firebase's `signInWithPopup` is **gone on purpose**: it opens at
+  `<project>.firebaseapp.com/__/auth/handler` first, and corporate filters block **individual**
+  `firebaseapp.com` hostnames — per hostname, not per domain; two sibling apps were refused on
+  a network where a third went through, with identical code. `firebaseapp.com` and
+  `apis.google.com` are therefore **not** in the CSP; only `accounts.google.com` is, in
+  `script-src`, `connect-src` and `frame-src`. `authDomain` stays in `FIREBASE_CONFIG` because
+  the SDK requires it, but nothing loads it, so it no longer needs a matching `frame-src`.
+  The client ID is **not** in `firebaseConfig` — Cloud Console → Credentials → *Web client
+  (auto created by Google Service)*, whose **Authorized JavaScript origins** must list this
+  app's origin (exact, port included) or Google returns `origin_mismatch`. All four web apps
+  in the family do this, all confirmed working on the network that needed it, 2026-08-07.
 - **`computeAll()` is the only place either handicap is calculated.** Every figure, tile,
   table, chart and the working-out panel reads from it. A new number takes its value from
   there or the screen starts disagreeing with itself.
