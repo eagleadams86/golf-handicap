@@ -1656,6 +1656,34 @@ function renderWorking(c) {
   el.textContent = lines.join('\n');
 }
 
+/* ── Dismissing a dialog ────────────────────────────────────────────────── */
+
+/* A modal <dialog> ignores backdrop clicks by default, which reads as the app
+   being stuck. Clicking outside now cancels, same as the Cancel button and
+   Escape. Ported verbatim from Sprint Velocity and Team Dashboard, including the
+   two details worth keeping:
+   · the hit test is against the dialog's box, not `e.target === dialog` — the
+     dialog has padding, and a click on that padding is still inside the window;
+   · the press has to have *started* outside too, so selecting text in a field
+     and releasing past the edge doesn't throw away what you were typing.
+   `onClose` is this app's one addition: the courses screen opens a second dialog
+   on top of the first, and its Cancel puts the list back. A dismiss that skipped
+   that would leave you staring at the page with the list gone. */
+function closeOnBackdropClick(dlg, onClose) {
+  const dismiss = onClose || (() => dlg.close());
+  const outside = (e) => {
+    const r = dlg.getBoundingClientRect();
+    return e.clientX < r.left || e.clientX > r.right
+        || e.clientY < r.top  || e.clientY > r.bottom;
+  };
+  let startedOutside = false;
+  dlg.addEventListener('mousedown', (e) => { startedOutside = outside(e); });
+  dlg.addEventListener('click', (e) => {
+    if (startedOutside && outside(e)) dismiss();
+    startedOutside = false;
+  });
+}
+
 /* ── Round dialog ───────────────────────────────────────────────────────── */
 
 const roundDialog = document.getElementById('roundDialog');
@@ -1886,6 +1914,13 @@ document.getElementById('courseEditCancel').addEventListener('click', () => {
   courseEditDialog.close();
   renderCourseList();
   courseDialog.showModal();
+});
+/* Escape took the browser's own route out and closed this dialog flat, leaving
+   the courses list it was opened from gone as well. It now backs out the same
+   way Cancel and a click outside do — one dialog, one way out of it. */
+courseEditDialog.addEventListener('cancel', (e) => {
+  e.preventDefault();
+  document.getElementById('courseEditCancel').click();
 });
 document.getElementById('coursesBtn').addEventListener('click', () => { renderCourseList(); courseDialog.showModal(); });
 document.getElementById('addCourseBtn').addEventListener('click', () => openCourseEdit(null));
@@ -2140,6 +2175,14 @@ document.getElementById('clearBtn').addEventListener('click', () => {
 
 document.getElementById('clearBackupBtn').addEventListener('click', downloadBackup);
 document.getElementById('clearCancel').addEventListener('click', () => clearDialog.close());
+/* Registered here, once every dialog above exists. Every one of them is
+   dismissable except `syncChoiceDialog`, which deliberately refuses Escape too —
+   picking which copy of your rounds survives has to be a choice, not something
+   you can click past by accident. `courseEditDialog` dismisses through its own
+   Cancel button so it can never drift from what Cancel does. */
+[roundDialog, courseDialog, methodDialog, golferDialog, clearDialog, helpDialog]
+  .forEach((dlg) => closeOnBackdropClick(dlg));
+closeOnBackdropClick(courseEditDialog, () => document.getElementById('courseEditCancel').click());
 document.getElementById('clearConfirm').addEventListener('click', () => {
   const keepSettings = state.settings;
   state = blankState();

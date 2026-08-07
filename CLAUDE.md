@@ -114,6 +114,18 @@ that emphasis.
   asking to lose the method they just configured. It goes through `save()` like everything
   else, so it reaches the cloud copy, and `window.ghSignedIn()` is what lets the dialog say
   so — the classic script can't see the module-scoped `user`.
+- **Every dialog closes on a click outside it, except one.** `closeOnBackdropClick()` is
+  Sprint Velocity's and Team Dashboard's helper, ported: it hit-tests against the dialog's
+  *box* rather than `e.target === dialog` (a click on the dialog's own padding is still
+  inside the window), and it requires the press to have **started** outside as well, so
+  selecting text in a field and releasing past the edge doesn't discard what you typed.
+  `syncChoiceDialog` is deliberately left out and blocks Escape too — which copy of your
+  rounds survives has to be a choice, not something clicked past. This app adds an optional
+  `onClose` argument the siblings don't have, because `courseEditDialog` opens on top of
+  `courseDialog` and backing out has to put the courses list back: it dismisses by clicking
+  its own Cancel button, and its `cancel` event is intercepted so **Escape, Cancel and a
+  click outside all take the same route**. A new dialog goes in the registration list at the
+  foot of the classic script, and a nested one needs the `onClose` treatment.
 - **Deleting a course or a set of tees keeps the rounds that used it**, flagged as orphaned
   rather than deleted, after a confirmation that names the count. Losing history to a typo in
   the courses screen is the worse failure.
