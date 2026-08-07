@@ -37,6 +37,12 @@ that emphasis.
   (auto created by Google Service)*, whose **Authorized JavaScript origins** must list this
   app's origin (exact, port included) or Google returns `origin_mismatch`. All four web apps
   in the family do this, all confirmed working on the network that needed it, 2026-08-07.
+  Auth is built with `initializeAuth`, **not `getAuth`** — `getAuth()` always wires in
+  `browserPopupRedirectResolver`, which the SDK initialises at startup, pulling in
+  `apis.google.com/js/api.js` for the popup-redirect gapi iframe nothing here reads (it showed
+  up only as a CSP console error). The persistences passed in are `getAuth`'s own, in its
+  order. Don't go back to `getAuth()` to "fix" a popup/redirect call — pass the resolver to
+  that call instead. Same change in Team Dashboard, Sprint Velocity and PAPTrack.
 - **`computeAll()` is the only place either handicap is calculated.** Every figure, tile,
   table, chart and the working-out panel reads from it. A new number takes its value from
   there or the screen starts disagreeing with itself.
