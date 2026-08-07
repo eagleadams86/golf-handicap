@@ -98,6 +98,14 @@
   --ls-tight: -0.01em;
   --ls-label: 0.06em;
 
+  /* Control heights, ported from Sprint Velocity so the two apps' buttons are the
+     same object. Two sizes: header chrome, and everything in the page body. A
+     native <select> ignores line-height, so it sizes shorter than a button with
+     identical padding and font — pinning the height on both is the only way to
+     keep a row even. */
+  --chrome-h: 30px;    /* header buttons + the golfer/theme pickers beside them */
+  --control-h: 38.5px; /* every button in the page body */
+
   --sp-1: 2px;
   --sp-2: 4px;
   --sp-3: 6px;
@@ -260,15 +268,28 @@ select { cursor: pointer; }
 textarea { min-height: 60px; resize: vertical; width: 100%; }
 :focus-visible { outline: 2px solid var(--focus-border); outline-offset: 2px; }
 
+/* Buttons are the shared object across this family of apps — Sprint Velocity is
+   the design lead, so these metrics are its `.btn` verbatim: 15px text, 7/12
+   padding, a 38.5px box. They deliberately sit a size above the 13px body text
+   here; a control you press wants a bigger target than a line of prose. */
 button {
   background: var(--surface-alt); color: var(--text-primary);
   border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
-  padding: var(--sp-3) var(--sp-5); cursor: pointer; min-height: 32px;
+  padding: 7px 12px; font-size: 15px; cursor: pointer;
+  min-height: var(--control-h); white-space: nowrap;
 }
-button:hover { border-color: var(--border-control); }
-button.primary { background: var(--btn-bg); color: var(--btn-text); border-color: var(--btn-bg); font-weight: var(--fw-medium); }
+button:hover { border-color: var(--text-muted); }
+button.primary { background: var(--btn-bg); color: var(--btn-text); border-color: var(--btn-bg); }
 button.danger { color: var(--err); border-color: var(--err); background: var(--err-bg); }
-button.link { background: none; border: none; color: var(--accent); padding: 0; min-height: 0; text-decoration: underline; }
+/* Link-buttons sit inside sentences, so they take the body size back, not the
+   button size. */
+button.link { background: none; border: none; color: var(--accent); padding: 0;
+  min-height: 0; font-size: inherit; text-decoration: underline; white-space: normal; }
+
+/* Header chrome is the smaller of the two sizes, and the pickers beside the
+   buttons are pinned to the same height so the row stays even. */
+header.top button { padding: 4px 9px; font-size: var(--fs-base); min-height: var(--chrome-h); }
+header.top select { min-height: var(--chrome-h); }
 
 /* Help buttons need breathing room — an icon must never sit flush against the
    word it follows. Standing preference across every app in this family. */

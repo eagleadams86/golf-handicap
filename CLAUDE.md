@@ -47,6 +47,15 @@ that emphasis.
   1.5px border in the status colour and that is what tells the states apart. Never a fill
   alone. Chart *lines* are exempt — a 2px line is not a large flat area, so it keeps the
   colour at full strength.
+- **Buttons are Sprint Velocity's `.btn`, transcribed.** SV is the design lead for shared
+  chrome across this family, so the metrics here are its verbatim: 15px text, `7px 12px`
+  padding, `--control-h: 38.5px`, hover to `--text-muted`, and a primary that is filled but
+  *not* bolded. Two sizes only — `--chrome-h: 30px` for the header row, `--control-h` for
+  everything in the page body — and the pickers sitting beside a button are pinned to the
+  same height, because a native `<select>` ignores line-height and would otherwise sit
+  shorter. Buttons deliberately run a size above the 13px body text. `.link` and `.rowbtn`
+  take the body size back: they sit inside sentences and tables, not on their own.
+  **A change to this block belongs in Sprint Velocity too, or the two drift.**
 - **Help buttons (`.help-btn`) carry `margin-left: 7px`** and cells containing one are
   `nowrap`. An icon must never sit flush against the word it follows — a standing preference
   across every app in this family.
