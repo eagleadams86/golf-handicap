@@ -47,7 +47,7 @@ to put the same rounds on your phone and your laptop.
    shows the actual arithmetic — which rounds were used, what they averaged to, and every
    step in between.
 
-Multiple golfers are supported: use **Manage** in the header. Each golfer keeps their own
+Multiple golfers are supported: use **Golfers** in the header. Each golfer keeps their own
 rounds and their own handicap; courses are shared between everyone.
 
 Under **Rounds**, the *Used in* column shows which rounds each method actually leaned on, so
