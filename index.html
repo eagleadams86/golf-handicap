@@ -362,9 +362,14 @@ th:has(.help-btn), td:has(.help-btn) { white-space: nowrap; }
    word "Primary", so the distinction is not colour alone.
 ─────────────────────────────────────────────────────────────────────────── */
 .figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--sp-5); }
+/* Centred, as are the at-a-glance tiles below — the two sets read as one row of
+   boxes down the page, so they line their contents up the same way. The
+   "Primary" tag stays pinned to the corner and is out of the flow, so it is
+   unaffected. */
 .figure {
   background: var(--surface-alt); border: 1px solid var(--border);
   border-radius: var(--radius); padding: var(--sp-6); position: relative;
+  text-align: center;
 }
 .figure.is-primary { border-color: var(--accent); border-width: 2px; padding: calc(var(--sp-6) - 1px); }
 .figure .big { font-size: var(--fs-display); font-weight: var(--fw-bold); letter-spacing: var(--ls-tight); line-height: var(--lh-tight); }
@@ -375,6 +380,13 @@ th:has(.help-btn), td:has(.help-btn) { white-space: nowrap; }
   font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: var(--ls-label);
   color: var(--accent); font-weight: var(--fw-semibold);
 }
+/* The tag is out of the flow, so a centred label will happily slide underneath
+   it — a narrow phone, a long custom method name (40 characters are allowed), or
+   "Official (World Handicap System)" holding the tag are each enough on their
+   own. Reserving the corner on both sides keeps the label centred on the card
+   rather than on what's left of it, and makes a long one wrap instead of
+   colliding. Only the card actually showing a tag pays for it. */
+.figure:has(.tag:not([hidden])) .label { padding-inline: 62px; }
 .figure .swatch { display: inline-block; width: 22px; height: 3px; vertical-align: middle; margin-right: var(--sp-3); border-radius: 2px; }
 .swatch.roll { background: var(--c-roll); }
 .swatch.whs { background: repeating-linear-gradient(90deg, var(--c-whs) 0 5px, transparent 5px 9px); }
@@ -404,7 +416,7 @@ th:has(.help-btn), td:has(.help-btn) { white-space: nowrap; }
   grid-template-rows: repeat(2, auto); gap: var(--sp-5); }
 .stat { display: grid; grid-row: span 2; grid-column: span 2; grid-template-rows: subgrid;
   align-content: start; background: var(--surface-alt); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: var(--sp-5); }
+  border-radius: var(--radius); padding: var(--sp-5); text-align: center; }
 .stat:nth-child(4), .stat:nth-child(5) { grid-column: span 3; }
 .stat .v { font-size: var(--fs-xl); font-weight: var(--fw-semibold); }
 /* Two across holds all the way down rather than stacking: these values are
