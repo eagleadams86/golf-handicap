@@ -181,15 +181,20 @@ that emphasis.
   The which-copy-wins rules live in the pure `syncDecision()` in the classic script so
   tests.html can pin them; the module only acts on the verdict. "Clear everything" calls
   `window.cloudFlush()` to skip the push debounce — a clear must not sit in a window the
-  tab might not survive.
+  tab might not survive. Ordinary edits get the same protection from `flushPending()`, which
+  sends a *pending* debounced push on visibilitychange-hidden/pagehide (pending-only, so
+  app-switching doesn't fire pointless pushes) — without it, "edit then close the tab" left
+  the cloud stale until the next edit on that device.
 - **Same-browser tabs share one copy.** A `storage` listener adopts another tab's write
   (localStorage is shared, so the tabs would otherwise last-write-wins each other). Adopt
   and render only — never `save()` from that listener: the writing tab already pushed to
   the cloud, and the event only fires in *other* tabs, so it cannot loop.
-- **`privacy.html` is the privacy policy** (static, midnight only, linked from the footer via
+- **`privacy.html` is the privacy policy** (static, linked from the footer via
   `.privacy-links` — deliberately a separate element from `#privacyNote`, whose textContent
-  the sync code rewrites). If sync or what the app stores ever changes, update it and its
-  effective date in the same commit.
+  the sync code rewrites). It follows the saved theme: the same pre-paint boot script as
+  index.html plus the four theme blocks inlined for just the tokens it uses (inline, not a
+  stylesheet link, so `file://` keeps working). If sync or what the app stores ever changes,
+  update it and its effective date in the same commit.
 - **`firestore.rules` is a checked-in copy of what is deployed in the console.** Nothing here
   deploys it. If the console rules change, change this file to match.
 - **The CSP meta tag is the only place a policy can be declared** (GitHub Pages can't set

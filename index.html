@@ -2656,7 +2656,7 @@ async function pushNow() {
 window.cloudPush = () => {
   if (!user) return;
   clearTimeout(pushTimer);
-  pushTimer = setTimeout(() => pushNow().catch(setSyncError), 1200);
+  pushTimer = setTimeout(() => { pushTimer = null; pushNow().catch(setSyncError); }, 1200);
 };
 
 /* Skips the debounce. "Clear everything" calls this so the cleared state
@@ -2664,8 +2664,29 @@ window.cloudPush = () => {
 window.cloudFlush = () => {
   if (!user) return;
   clearTimeout(pushTimer);
+  pushTimer = null;
   pushNow().catch(setSyncError);
 };
+
+/* The same window, closed for ordinary edits too: "edit, then close the tab
+   inside 1.2s" would leave the push scheduled but never sent — localStorage has
+   the change, the cloud doesn't, and the other devices stay stale until the
+   NEXT edit on this one. Flush a pending push the moment the page is hidden;
+   pagehide too, for the paths that skip visibilitychange. Pending-only (unlike
+   cloudFlush), so switching apps doesn't fire a pointless push every time.
+   Best-effort by nature — the next edit or sign-in re-sends regardless, so
+   nothing is ever lost, only late. Ported from Flow Metrics (Team Dashboard). */
+const flushPending = () => {
+  if (user && pushTimer) {
+    clearTimeout(pushTimer);
+    pushTimer = null;
+    pushNow().catch(() => { /* page is going away — nowhere left to report */ });
+  }
+};
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushPending();
+});
+addEventListener('pagehide', flushPending);
 </script>
 </body>
 </html>
