@@ -208,7 +208,7 @@ that emphasis.
   `syncDecision`, `buildDemo`, `sanitizeIds` or `normalizeState`. It loads
   the real `index.html` in a hidden iframe and calls the functions directly — no copies, no
   build step — so it needs `http://localhost` (`file://` iframes are blocked in some
-  browsers). `window.__ghTestHooks` exists solely to hand it the `const` values, which aren't
+  browsers). CI runs the same page headless on every push (`.github/workflows/tests.yml`) and fails the build if the summary goes red. `window.__ghTestHooks` exists solely to hand it the `const` values, which aren't
   on `window`; function declarations it reaches directly. **When a rule in this file changes,
   change the matching test in the same commit.**
 - After changes: **browser-test locally first** (`python3 -m http.server 8014`), then commit,

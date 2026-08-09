@@ -341,6 +341,12 @@ tests — they need `http://localhost` because `file://` iframes are blocked in 
 `courseHandicap`, `indexHistory`, `pickUsed`, `syncDecision`, `buildDemo`, `sanitizeIds`
 or `normalizeState`.
 
+![tests](https://github.com/eagleadams86/golf-handicap/actions/workflows/tests.yml/badge.svg)
+
+The suite also runs on every push: [`.github/workflows/tests.yml`](.github/workflows/tests.yml)
+serves the folder, opens `tests.html` in headless Chromium and fails the build if the
+summary goes red or the page throws — same workflow as the rest of the app family.
+
 `computeAll()` is the only place either handicap is worked out. Every figure, table, chart
 and explanation reads from it, so no two parts of the screen can disagree about the maths.
 If you add a new figure, take it from there.
