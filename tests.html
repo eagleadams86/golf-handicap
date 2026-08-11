@@ -28,7 +28,8 @@
   Pins the pure handicap maths in <code>index.html</code>. It loads the real app in a hidden
   iframe and calls its functions directly — no copies, no build step — so a test can never
   drift from the code it is testing. Needs <code>http://localhost</code>: <code>file://</code>
-  iframes are blocked in some browsers.
+  iframes are blocked in some browsers — and it only runs there, since that hidden iframe is a
+  real copy of the app, which anywhere else would be your signed-in one.
   <br><strong>Run this whenever you touch</strong> <code>round1</code>, <code>scoreDifferential</code>,
   <code>averageLowest</code>, <code>whsIndex</code>/<code>whsSelection</code>,
   <code>rollingIndex</code>/<code>rollingSelection</code>, <code>normalizeMethod</code>,
@@ -38,7 +39,8 @@
 </p>
 <div id="summary">Loading the app…</div>
 <div id="results"></div>
-<iframe id="app" src="index.html" title="app under test"></iframe>
+<!-- The iframe is built in script, not here: it boots the real app, so it must
+     not exist until the localhost gate at the foot of this file has passed. -->
 
 <script>
 const groups = [];
@@ -52,7 +54,7 @@ function eq(a, b, msg) {
 }
 function ok(v, msg) { if (!v) throw new Error(msg || 'expected truthy'); }
 
-document.getElementById('app').addEventListener('load', function () {
+function onAppLoad() {
   const W = this.contentWindow;
   const H = W.__ghTestHooks;
   if (!H) { fail('The app did not expose __ghTestHooks — is index.html loading correctly?'); return; }
@@ -370,7 +372,46 @@ document.getElementById('app').addEventListener('load', function () {
   });
 
   run();
-});
+}
+
+/* ── The localhost gate ─────────────────────────────────────────────────────
+   Booting the app is itself the side effect worth guarding: on the published
+   origin that hidden iframe would be a real, signed-in copy, and
+   onAuthStateChanged would start a Firestore session — or raise the "another
+   device cleared its rounds" dialog — where nobody can see it. So the check
+   comes before the iframe exists, not inside its load handler. GitHub Pages
+   publishes this file next to the app, so "somewhere else" is a page anyone
+   can open.
+
+   '' covers file://, which has no host: the suite can't run there either way
+   (file:// iframes are blocked), so it falls through to the ordinary advice. */
+const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]', ''];
+
+if (LOCAL_HOSTS.includes(location.hostname)) {
+  const frame = document.createElement('iframe');
+  frame.id = 'app';
+  frame.title = 'app under test';
+  /* index.html checks for this and leaves the sync module uninitialised. */
+  frame.setAttribute('data-gh-tests', '');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.addEventListener('load', onAppLoad, { once: true });
+  frame.src = 'index.html';           /* set before append: one load event, the real one */
+  document.body.appendChild(frame);
+} else {
+  fail('Not run here — this page boots a live copy of the app.');
+  const p = document.createElement('p');
+  p.style.cssText = 'color:#aab2d0;line-height:1.7;max-width:70ch';
+  p.innerHTML =
+    'The suite loads the app in a hidden frame to test it. On <strong></strong> that frame ' +
+    'would be your real, signed-in copy, quietly starting a sync session where you can\'t ' +
+    'see it. It runs on <code>localhost</code> only, against a copy served from the repo ' +
+    'folder:<br><br><code>cd ~/claude-golf-handicap &amp;&amp; python3 -m http.server 8014' +
+    '</code><br>then open <code>http://localhost:8014/tests.html</code>.<br><br>' +
+    'Nothing has been changed by opening this page — <a href="index.html" ' +
+    'style="color:#8ab4ff">back to the app</a>.';
+  p.querySelector('strong').textContent = location.hostname;
+  document.getElementById('results').appendChild(p);
+}
 
 function fail(msg) {
   const s = document.getElementById('summary');

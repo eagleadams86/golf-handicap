@@ -341,6 +341,16 @@ tests — they need `http://localhost` because `file://` iframes are blocked in 
 `courseHandicap`, `indexHistory`, `pickUsed`, `syncDecision`, `buildDemo`, `sanitizeIds`
 or `normalizeState`.
 
+**It only runs on localhost, and enforces that itself.** The test code writes nothing, but
+the iframe boots the real app — and GitHub Pages publishes `tests.html` next to it, at
+`/golf-handicap/tests.html`, where that iframe would be your signed-in copy: sync would start
+inside an invisible frame, and the which-copy dialog could fire where nobody can answer it.
+Two guards. The iframe carries `data-gh-tests`, which the sync module checks so it never
+initialises in the harness; and a gate at the foot of `tests.html` checks `location.hostname`
+and, anywhere but `localhost` / `127.0.0.1` / `[::1]`, never creates the iframe at all — it
+explains why and says how to run the suite properly. CI reaches the page on `localhost:8014`,
+so it is unaffected.
+
 ![tests](https://github.com/eagleadams86/golf-handicap/actions/workflows/tests.yml/badge.svg)
 
 The suite also runs on every push: [`.github/workflows/tests.yml`](.github/workflows/tests.yml)

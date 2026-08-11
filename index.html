@@ -2405,7 +2405,16 @@ let A, F, auth, db, user = null, unsub = null, pushTimer = null, syncError = nul
    tell the truth about whether deleting reaches the user's other devices. */
 window.ghSignedIn = () => !!user;
 
-if (FIREBASE_CONFIG) {
+/* tests.html loads this page in a hidden iframe (marked data-gh-tests) to reach
+   the pure functions. The harness must not boot a real session: if this origin
+   had ever signed in, onAuthStateChanged would fire inside the invisible iframe
+   and sync — or the which-copy dialog nobody can see — would run mid-test. Same
+   guard as the sibling Team Dashboard and Sprint Velocity apps. */
+let inTestHarness = false;
+try { inTestHarness = !!(window.frameElement && window.frameElement.hasAttribute('data-gh-tests')); }
+catch (e) { /* cross-origin parent — not the harness */ }
+
+if (FIREBASE_CONFIG && !inTestHarness) {
   init().catch((e) => { console.warn('Sync unavailable:', e); btn.hidden = true; });
 } else {
   btn.hidden = true;

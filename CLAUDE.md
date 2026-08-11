@@ -208,7 +208,15 @@ that emphasis.
   `syncDecision`, `buildDemo`, `sanitizeIds` or `normalizeState`. It loads
   the real `index.html` in a hidden iframe and calls the functions directly — no copies, no
   build step — so it needs `http://localhost` (`file://` iframes are blocked in some
-  browsers). CI runs the same page headless on every push (`.github/workflows/tests.yml`) and fails the build if the summary goes red. `window.__ghTestHooks` exists solely to hand it the `const` values, which aren't
+  browsers). **It also refuses to run anywhere else, and that is load-bearing:** Pages
+  publishes `tests.html` beside the app, where the iframe would be the signed-in copy and
+  `onAuthStateChanged` would start a real sync — or raise the which-copy dialog — inside an
+  invisible frame. Two guards, both needed: the iframe carries `data-gh-tests`, which the
+  sync module checks before `init()`, and the gate at the foot of `tests.html` never creates
+  the iframe at all off localhost (booting the app IS the side effect, so the check can't
+  live in the load handler). Don't put the iframe back in the markup. CI runs the same page
+  headless on every push (`.github/workflows/tests.yml`) on `localhost:8014`, so the gate
+  lets it through, and fails the build if the summary goes red. `window.__ghTestHooks` exists solely to hand it the `const` values, which aren't
   on `window`; function declarations it reaches directly. **When a rule in this file changes,
   change the matching test in the same commit.**
 - After changes: **browser-test locally first** (`python3 -m http.server 8014`), then commit,
