@@ -150,8 +150,21 @@ that emphasis.
   horizontal 16px gutter lives on `.wrap`/`.headbar`, **not on `<body>`** — the bar runs
   edge to edge behind it. The control labels are `.sr-only` with a `title` on each control,
   as in both siblings; don't put visible captions back. `.brand .sub` is the strapline and
-  is the one thing dropped on a narrow screen — the ⛳ is part of the name, so the selector
+  is the one thing dropped on a narrow screen — the mark is part of the name, so the selector
   has to stay specific.
+- **The mark is the app's own icon, drawn, not an emoji.** A flagstick on the green with a
+  ball beside it, on the family tile Money Map, PAPTrack, Sprint Predictability and Flow
+  Metrics all wear: midnight page, soft disc in the corner, one accent gradient. It replaced
+  the ⛳ this line used to open with. It exists twice — `make_favicon.py` (Pillow →
+  `favicon.ico`) and the inline SVG data URI in `<head>` — and the two must stay the same
+  picture: the SVG is what a browser shows in the tab (and it needs no sibling file, so it
+  survives `file://`), the `.ico` is the fallback a browser fetches from the site root on its
+  own and what the header `<img>` wears. Re-running the script means bumping `?v=` on **every**
+  `favicon.ico` reference, `privacy.html` included, or the old icon stays cached for months.
+  `favicon.ico` used to be one file shared byte-for-byte with claude-lottery / prototypes /
+  sprint-velocity; each app has its own mark now, so there is nothing left to keep in step.
+  The two extra tints (`#a5b4fc`, `#141c33`) are artwork, not palette — copied byte-for-byte
+  from Money Map's icon rather than re-picked, so nothing new enters the theme pack.
 - **`--page-w` is 1100px, and both `.wrap` and `.headbar` read it.** They must stay the same
   number or the brand stops lining up with the left edge of the first card — that is the
   whole reason it is a token. This is the **one** deliberate divergence from the siblings'

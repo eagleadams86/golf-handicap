@@ -313,8 +313,15 @@ To go back to fully-local, set `FIREBASE_CONFIG` to `null` again.
 | `tests.html` | 76 tests pinning the pure handicap maths, the restore/repair rules and the sync decisions. Loads the real `index.html` in a hidden iframe and calls its functions directly. |
 | `privacy.html` | Privacy policy. Exists because other people may sign in with their own Google accounts. |
 | `firestore.rules` | A checked-in copy of the security rules to deploy in the Firebase console. |
-| `favicon.ico` | The shared icon used across these apps — a byte-identical copy, not a variant. |
+| `favicon.ico` | The app's icon — the fallback a browser fetches from the site root on its own. |
+| `make_favicon.py` | Draws `favicon.ico` to match the inline SVG icon in `index.html`. |
 | `LICENSE` | MIT. |
+
+The icon is a flagstick on the green with a ball beside it, on the tile the whole app family
+wears; the header shows the same mark, where a ⛳ used to sit. `make_favicon.py` (Pillow)
+keeps `favicon.ico` and the page's inline SVG the same picture, rather than leaving a binary
+nobody can review in a diff. Re-run it with `python3 make_favicon.py`, then bump the `?v=` on
+every `favicon.ico` reference — browsers hold on to an icon for a long time.
 
 The palette is **transcribed inline** from [`claude-theme-pack`](https://github.com/eagleadams86/claude-theme-pack)
 (private), the source of truth for every app in this family. It is inlined rather than

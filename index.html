@@ -30,11 +30,17 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Handicap">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<!-- The shared favicon used across these apps (byte-identical copy of the one in
-     claude-lottery / claude-prototypes / sprint-velocity). A relative path rather
-     than a data URI, so it stays one file to update everywhere; it still resolves
-     when the page is opened via file://, as long as favicon.ico sits beside it. -->
-<link rel="icon" href="favicon.ico">
+<!-- The app's own mark: a flagstick on the green with a ball beside it, on the tile
+     the whole family wears — midnight page, soft disc in the corner, the accent
+     gradient. (It used to be one favicon.ico shared byte-for-byte with the other
+     repos; each app has its own mark now, so there is nothing left to keep in step.)
+     The SVG is what every current browser shows, and it needs no sibling file, so it
+     survives file:// as well; favicon.ico is the fallback a browser fetches from the
+     site root on its own, and what a bookmark uses. The two are the same picture —
+     make_favicon.py draws this geometry — so keep them in step. img-src allows data:
+     URIs, so the SVG costs no extra request. -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'> <defs><linearGradient id='g' x1='10' y1='52' x2='54' y2='12' gradientUnits='userSpaceOnUse'> <stop offset='0' stop-color='%23818cf8'/><stop offset='1' stop-color='%23a5b4fc'/></linearGradient></defs> <rect width='64' height='64' rx='14' fill='%230a0e1a'/> <circle cx='14' cy='52' r='20' fill='%23141c33'/> <path d='M21 16V47' fill='none' stroke='url(%23g)' stroke-width='5.5' stroke-linecap='round'/> <path d='M21 17 L44 25 L21 33 Z' fill='url(%23g)'/> <circle cx='41' cy='43' r='5.5' fill='%23a5b4fc'/> </svg>">
+<link rel="alternate icon" href="favicon.ico?v=1">
 <script>
   // Apply the saved theme before first paint so there is no flash. Midnight is the
   // default for every app in this family; "slate" is the old name for Dark.
@@ -293,6 +299,11 @@ header {
   display: flex; align-items: center; gap: var(--sp-4);
 }
 .brand .sub { color: var(--text-muted); font-weight: var(--fw-medium); }
+/* Width and height are on the element as well as here, so the row is laid out at
+   its final size before the icon arrives — the same final-width rule as the rest of
+   this bar. `flex: none` because .brand is a flex row and an image would otherwise
+   be squeezed by a long strapline. */
+.brand .mark { width: 22px; height: 22px; flex: none; }
 
 select, input, textarea, button { font: inherit; color: inherit; }
 select, input[type="text"], input[type="number"], input[type="date"], textarea {
@@ -522,7 +533,12 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
 <body>
 <header>
   <div class="headbar">
-    <h1 class="brand"><span class="mark" aria-hidden="true">⛳</span> Golf&nbsp;Handicap <span class="sub">· rolling and official, side by side</span></h1>
+    <!-- The mark from the browser tab, worn in the header too — it replaced the ⛳
+         this line used to open with. ?v= is not decoration: a browser holds on to a
+         favicon for a long time, and without it the header would keep showing
+         whatever icon it cached the first time. Bump it on every reference (here,
+         the <link> in <head>, and privacy.html's) when make_favicon.py is re-run. -->
+    <h1 class="brand"><img class="mark" src="favicon.ico?v=1" width="22" height="22" alt=""> Golf&nbsp;Handicap <span class="sub">· rolling and official, side by side</span></h1>
     <label class="sr-only" for="golferSel">Golfer</label>
     <select id="golferSel" title="Which golfer you're looking at" style="min-width:130px"><option>—————</option></select>
     <button id="golfersBtn" title="Add, rename or remove golfers">Golfers</button>
