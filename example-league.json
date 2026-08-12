@@ -1,0 +1,1414 @@
+{
+  "version": 1,
+  "golfers": [
+    {
+      "id": "g-1",
+      "name": "Alex Nash"
+    },
+    {
+      "id": "g-2",
+      "name": "Priya Raman"
+    },
+    {
+      "id": "g-3",
+      "name": "Dad"
+    },
+    {
+      "id": "g-4",
+      "name": "Marcus Bell"
+    },
+    {
+      "id": "g-5",
+      "name": "Joan Whitlock"
+    },
+    {
+      "id": "g-6",
+      "name": "Sam Okafor"
+    },
+    {
+      "id": "g-7",
+      "name": "Ruth Carey"
+    },
+    {
+      "id": "g-8",
+      "name": "New Member"
+    }
+  ],
+  "activeGolfer": "g-3",
+  "courses": [
+    {
+      "id": "c-parkland",
+      "name": "Ashfield Park",
+      "tees": [
+        {
+          "id": "t-ash-yellow",
+          "name": "Yellow",
+          "rating": 69.4,
+          "slope": 122,
+          "par": 71
+        },
+        {
+          "id": "t-ash-white",
+          "name": "White",
+          "rating": 71.2,
+          "slope": 129,
+          "par": 71
+        },
+        {
+          "id": "t-ash-red",
+          "name": "Red",
+          "rating": 67.8,
+          "slope": 118,
+          "par": 71
+        }
+      ]
+    },
+    {
+      "id": "c-links",
+      "name": "Carrick Links",
+      "tees": [
+        {
+          "id": "t-car-white",
+          "name": "White",
+          "rating": 72.6,
+          "slope": 134,
+          "par": 72
+        },
+        {
+          "id": "t-car-yellow",
+          "name": "Yellow",
+          "rating": 70.9,
+          "slope": 127,
+          "par": 72
+        }
+      ]
+    },
+    {
+      "id": "c-heath",
+      "name": "Highmoor Heath",
+      "tees": [
+        {
+          "id": "t-high-blue",
+          "name": "Blue",
+          "rating": 73.1,
+          "slope": 138,
+          "par": 72
+        },
+        {
+          "id": "t-high-white",
+          "name": "White",
+          "rating": 70.5,
+          "slope": 125,
+          "par": 72
+        }
+      ]
+    },
+    {
+      "id": "c-mill",
+      "name": "Old Mill (short course)",
+      "tees": [
+        {
+          "id": "t-mill-white",
+          "name": "White",
+          "rating": 66.2,
+          "slope": 109,
+          "par": 69
+        },
+        {
+          "id": "t-mill-yellow",
+          "name": "Yellow",
+          "rating": 64.8,
+          "slope": 104,
+          "par": 69
+        }
+      ]
+    },
+    {
+      "id": "c-dunes",
+      "name": "Kilbryde Dunes",
+      "tees": [
+        {
+          "id": "t-dunes-championship",
+          "name": "Championship",
+          "rating": 74.8,
+          "slope": 142,
+          "par": 72
+        },
+        {
+          "id": "t-dunes-medal",
+          "name": "Medal",
+          "rating": 72.0,
+          "slope": 131,
+          "par": 72
+        },
+        {
+          "id": "t-dunes-forward",
+          "name": "Forward",
+          "rating": 68.9,
+          "slope": 119,
+          "par": 72
+        }
+      ]
+    },
+    {
+      "id": "c-brookvale",
+      "name": "Brookvale Municipal",
+      "tees": [
+        {
+          "id": "t-brook-main",
+          "name": "Main",
+          "rating": 70.1,
+          "slope": 115,
+          "par": 70
+        }
+      ]
+    }
+  ],
+  "rounds": [
+    {
+      "id": "r-001",
+      "golferId": "g-1",
+      "date": "2026-01-15",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-yellow",
+      "score": 75,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-002",
+      "golferId": "g-1",
+      "date": "2026-01-23",
+      "courseId": "c-links",
+      "teeId": "t-car-white",
+      "score": 77,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-003",
+      "golferId": "g-1",
+      "date": "2026-01-31",
+      "courseId": "c-heath",
+      "teeId": "t-high-white",
+      "score": 76,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-004",
+      "golferId": "g-1",
+      "date": "2026-02-08",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-championship",
+      "score": 80,
+      "pcc": 0,
+      "note": "windy",
+      "counts": true
+    },
+    {
+      "id": "r-005",
+      "golferId": "g-1",
+      "date": "2026-02-16",
+      "courseId": "c-brookvale",
+      "teeId": "t-brook-main",
+      "score": 74,
+      "pcc": 0,
+      "note": "society day",
+      "counts": true
+    },
+    {
+      "id": "r-006",
+      "golferId": "g-1",
+      "date": "2026-02-24",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-red",
+      "score": 73,
+      "pcc": 1,
+      "note": "medal",
+      "counts": true
+    },
+    {
+      "id": "r-007",
+      "golferId": "g-1",
+      "date": "2026-03-04",
+      "courseId": "c-heath",
+      "teeId": "t-high-blue",
+      "score": 75,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-008",
+      "golferId": "g-1",
+      "date": "2026-03-12",
+      "courseId": "c-mill",
+      "teeId": "t-mill-yellow",
+      "score": 72,
+      "pcc": 0,
+      "note": "back nine fell apart",
+      "counts": true
+    },
+    {
+      "id": "r-009",
+      "golferId": "g-1",
+      "date": "2026-03-20",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-forward",
+      "score": 72,
+      "pcc": 0,
+      "note": "best of the year",
+      "counts": true
+    },
+    {
+      "id": "r-010",
+      "golferId": "g-1",
+      "date": "2026-03-28",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-white",
+      "score": 76,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-011",
+      "golferId": "g-1",
+      "date": "2026-04-05",
+      "courseId": "c-links",
+      "teeId": "t-car-yellow",
+      "score": 75,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-012",
+      "golferId": "g-1",
+      "date": "2026-04-13",
+      "courseId": "c-mill",
+      "teeId": "t-mill-white",
+      "score": 69,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-013",
+      "golferId": "g-1",
+      "date": "2026-04-21",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-medal",
+      "score": 75,
+      "pcc": 0,
+      "note": "windy",
+      "counts": true
+    },
+    {
+      "id": "r-014",
+      "golferId": "g-1",
+      "date": "2026-04-29",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-yellow",
+      "score": 73,
+      "pcc": 0,
+      "note": "society day",
+      "counts": true
+    },
+    {
+      "id": "r-015",
+      "golferId": "g-1",
+      "date": "2026-05-07",
+      "courseId": "c-links",
+      "teeId": "t-car-white",
+      "score": 78,
+      "pcc": 0,
+      "note": "medal",
+      "counts": true
+    },
+    {
+      "id": "r-016",
+      "golferId": "g-1",
+      "date": "2026-05-15",
+      "courseId": "c-heath",
+      "teeId": "t-high-white",
+      "score": 72,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-017",
+      "golferId": "g-1",
+      "date": "2026-05-23",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-championship",
+      "score": 80,
+      "pcc": 0,
+      "note": "back nine fell apart",
+      "counts": true
+    },
+    {
+      "id": "r-018",
+      "golferId": "g-1",
+      "date": "2026-05-31",
+      "courseId": "c-brookvale",
+      "teeId": "t-brook-main",
+      "score": 74,
+      "pcc": 0,
+      "note": "best of the year",
+      "counts": true
+    },
+    {
+      "id": "r-019",
+      "golferId": "g-1",
+      "date": "2026-06-08",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-red",
+      "score": 71,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-020",
+      "golferId": "g-1",
+      "date": "2026-06-16",
+      "courseId": "c-heath",
+      "teeId": "t-high-blue",
+      "score": 73,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-021",
+      "golferId": "g-1",
+      "date": "2026-06-24",
+      "courseId": "c-mill",
+      "teeId": "t-mill-yellow",
+      "score": 68,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-022",
+      "golferId": "g-1",
+      "date": "2026-07-02",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-forward",
+      "score": 73,
+      "pcc": 0,
+      "note": "windy",
+      "counts": true
+    },
+    {
+      "id": "r-023",
+      "golferId": "g-1",
+      "date": "2026-07-10",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-white",
+      "score": 73,
+      "pcc": 0,
+      "note": "society day",
+      "counts": true
+    },
+    {
+      "id": "r-024",
+      "golferId": "g-1",
+      "date": "2026-07-18",
+      "courseId": "c-links",
+      "teeId": "t-car-yellow",
+      "score": 74,
+      "pcc": 0,
+      "note": "medal",
+      "counts": true
+    },
+    {
+      "id": "r-025",
+      "golferId": "g-1",
+      "date": "2026-07-26",
+      "courseId": "c-mill",
+      "teeId": "t-mill-white",
+      "score": 69,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-026",
+      "golferId": "g-1",
+      "date": "2026-08-03",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-medal",
+      "score": 74,
+      "pcc": 0,
+      "note": "back nine fell apart",
+      "counts": true
+    },
+    {
+      "id": "r-027",
+      "golferId": "g-2",
+      "date": "2026-01-30",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-white",
+      "score": 88,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-028",
+      "golferId": "g-2",
+      "date": "2026-02-07",
+      "courseId": "c-links",
+      "teeId": "t-car-yellow",
+      "score": 80,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-029",
+      "golferId": "g-2",
+      "date": "2026-02-15",
+      "courseId": "c-mill",
+      "teeId": "t-mill-white",
+      "score": 78,
+      "pcc": 0,
+      "note": "windy",
+      "counts": false
+    },
+    {
+      "id": "r-030",
+      "golferId": "g-2",
+      "date": "2026-02-23",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-medal",
+      "score": 78,
+      "pcc": 0,
+      "note": "society day",
+      "counts": true
+    },
+    {
+      "id": "r-031",
+      "golferId": "g-2",
+      "date": "2026-03-03",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-yellow",
+      "score": 75,
+      "pcc": 0,
+      "note": "medal",
+      "counts": true
+    },
+    {
+      "id": "r-032",
+      "golferId": "g-2",
+      "date": "2026-03-11",
+      "courseId": "c-links",
+      "teeId": "t-car-white",
+      "score": 83,
+      "pcc": 1,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-033",
+      "golferId": "g-2",
+      "date": "2026-03-19",
+      "courseId": "c-heath",
+      "teeId": "t-high-white",
+      "score": 75,
+      "pcc": 0,
+      "note": "back nine fell apart",
+      "counts": true
+    },
+    {
+      "id": "r-034",
+      "golferId": "g-2",
+      "date": "2026-03-27",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-championship",
+      "score": 85,
+      "pcc": 0,
+      "note": "best of the year",
+      "counts": true
+    },
+    {
+      "id": "r-035",
+      "golferId": "g-2",
+      "date": "2026-04-04",
+      "courseId": "c-brookvale",
+      "teeId": "t-brook-main",
+      "score": 79,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-036",
+      "golferId": "g-2",
+      "date": "2026-04-12",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-red",
+      "score": 78,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-037",
+      "golferId": "g-2",
+      "date": "2026-04-20",
+      "courseId": "c-heath",
+      "teeId": "t-high-blue",
+      "score": 91,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-038",
+      "golferId": "g-2",
+      "date": "2026-04-28",
+      "courseId": "c-mill",
+      "teeId": "t-mill-yellow",
+      "score": 72,
+      "pcc": 0,
+      "note": "windy",
+      "counts": true
+    },
+    {
+      "id": "r-039",
+      "golferId": "g-2",
+      "date": "2026-05-06",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-forward",
+      "score": 78,
+      "pcc": 0,
+      "note": "society day",
+      "counts": true
+    },
+    {
+      "id": "r-040",
+      "golferId": "g-2",
+      "date": "2026-05-14",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-white",
+      "score": 77,
+      "pcc": 0,
+      "note": "medal",
+      "counts": true
+    },
+    {
+      "id": "r-041",
+      "golferId": "g-2",
+      "date": "2026-05-22",
+      "courseId": "c-links",
+      "teeId": "t-car-yellow",
+      "score": 76,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-042",
+      "golferId": "g-2",
+      "date": "2026-05-30",
+      "courseId": "c-mill",
+      "teeId": "t-mill-white",
+      "score": 79,
+      "pcc": 0,
+      "note": "back nine fell apart",
+      "counts": true
+    },
+    {
+      "id": "r-043",
+      "golferId": "g-2",
+      "date": "2026-06-07",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-medal",
+      "score": 84,
+      "pcc": 0,
+      "note": "best of the year",
+      "counts": true
+    },
+    {
+      "id": "r-044",
+      "golferId": "g-2",
+      "date": "2026-06-15",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-yellow",
+      "score": 81,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-045",
+      "golferId": "g-2",
+      "date": "2026-06-23",
+      "courseId": "c-links",
+      "teeId": "t-car-white",
+      "score": 77,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-046",
+      "golferId": "g-2",
+      "date": "2026-07-01",
+      "courseId": "c-heath",
+      "teeId": "t-high-white",
+      "score": 78,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-047",
+      "golferId": "g-2",
+      "date": "2026-07-09",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-championship",
+      "score": 84,
+      "pcc": 0,
+      "note": "windy",
+      "counts": true
+    },
+    {
+      "id": "r-048",
+      "golferId": "g-2",
+      "date": "2026-07-17",
+      "courseId": "c-brookvale",
+      "teeId": "t-brook-main",
+      "score": 79,
+      "pcc": 0,
+      "note": "society day",
+      "counts": true
+    },
+    {
+      "id": "r-049",
+      "golferId": "g-2",
+      "date": "2026-07-25",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-red",
+      "score": 76,
+      "pcc": 0,
+      "note": "medal",
+      "counts": true
+    },
+    {
+      "id": "r-050",
+      "golferId": "g-2",
+      "date": "2026-08-02",
+      "courseId": "c-heath",
+      "teeId": "t-high-blue",
+      "score": 78,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-051",
+      "golferId": "g-3",
+      "date": "2026-02-14",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-red",
+      "score": 76,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-052",
+      "golferId": "g-3",
+      "date": "2026-02-22",
+      "courseId": "c-heath",
+      "teeId": "t-high-blue",
+      "score": 88,
+      "pcc": 0,
+      "note": "windy",
+      "counts": true
+    },
+    {
+      "id": "r-053",
+      "golferId": "g-3",
+      "date": "2026-03-02",
+      "courseId": "c-mill",
+      "teeId": "t-mill-yellow",
+      "score": 80,
+      "pcc": 0,
+      "note": "society day",
+      "counts": true
+    },
+    {
+      "id": "r-054",
+      "golferId": "g-3",
+      "date": "2026-03-10",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-forward",
+      "score": 82,
+      "pcc": 0,
+      "note": "medal",
+      "counts": true
+    },
+    {
+      "id": "r-055",
+      "golferId": "g-3",
+      "date": "2026-03-18",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-white",
+      "score": 85,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-056",
+      "golferId": "g-3",
+      "date": "2026-03-26",
+      "courseId": "c-links",
+      "teeId": "t-car-yellow",
+      "score": 85,
+      "pcc": 1,
+      "note": "back nine fell apart",
+      "counts": true
+    },
+    {
+      "id": "r-057",
+      "golferId": "g-3",
+      "date": "2026-04-03",
+      "courseId": "c-mill",
+      "teeId": "t-mill-white",
+      "score": 82,
+      "pcc": 0,
+      "note": "best of the year",
+      "counts": true
+    },
+    {
+      "id": "r-058",
+      "golferId": "g-3",
+      "date": "2026-04-11",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-medal",
+      "score": 89,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-059",
+      "golferId": "g-3",
+      "date": "2026-04-19",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-yellow",
+      "score": 83,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-060",
+      "golferId": "g-3",
+      "date": "2026-04-27",
+      "courseId": "c-links",
+      "teeId": "t-car-white",
+      "score": 85,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-061",
+      "golferId": "g-3",
+      "date": "2026-05-05",
+      "courseId": "c-heath",
+      "teeId": "t-high-white",
+      "score": 84,
+      "pcc": 0,
+      "note": "windy",
+      "counts": true
+    },
+    {
+      "id": "r-062",
+      "golferId": "g-3",
+      "date": "2026-05-13",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-championship",
+      "score": 87,
+      "pcc": 0,
+      "note": "society day",
+      "counts": true
+    },
+    {
+      "id": "r-063",
+      "golferId": "g-3",
+      "date": "2026-05-21",
+      "courseId": "c-brookvale",
+      "teeId": "t-brook-main",
+      "score": 82,
+      "pcc": 0,
+      "note": "medal",
+      "counts": true
+    },
+    {
+      "id": "r-064",
+      "golferId": "g-3",
+      "date": "2026-05-29",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-red",
+      "score": 85,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-065",
+      "golferId": "g-3",
+      "date": "2026-06-06",
+      "courseId": "c-heath",
+      "teeId": "t-high-blue",
+      "score": 86,
+      "pcc": 0,
+      "note": "back nine fell apart",
+      "counts": true
+    },
+    {
+      "id": "r-066",
+      "golferId": "g-3",
+      "date": "2026-06-14",
+      "courseId": "c-mill",
+      "teeId": "t-mill-yellow",
+      "score": 73,
+      "pcc": 0,
+      "note": "best of the year",
+      "counts": true
+    },
+    {
+      "id": "r-067",
+      "golferId": "g-3",
+      "date": "2026-06-22",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-forward",
+      "score": 84,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-068",
+      "golferId": "g-3",
+      "date": "2026-06-30",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-white",
+      "score": 78,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-069",
+      "golferId": "g-3",
+      "date": "2026-07-08",
+      "courseId": "c-links",
+      "teeId": "t-car-yellow",
+      "score": 83,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-070",
+      "golferId": "g-3",
+      "date": "2026-07-16",
+      "courseId": "c-mill",
+      "teeId": "t-mill-white",
+      "score": 86,
+      "pcc": 0,
+      "note": "windy",
+      "counts": true
+    },
+    {
+      "id": "r-071",
+      "golferId": "g-3",
+      "date": "2026-07-24",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-medal",
+      "score": 84,
+      "pcc": 0,
+      "note": "society day",
+      "counts": true
+    },
+    {
+      "id": "r-072",
+      "golferId": "g-3",
+      "date": "2026-08-01",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-yellow",
+      "score": 82,
+      "pcc": 0,
+      "note": "medal",
+      "counts": true
+    },
+    {
+      "id": "r-073",
+      "golferId": "g-4",
+      "date": "2026-03-04",
+      "courseId": "c-links",
+      "teeId": "t-car-white",
+      "score": 88,
+      "pcc": 0,
+      "note": "windy",
+      "counts": true
+    },
+    {
+      "id": "r-074",
+      "golferId": "g-4",
+      "date": "2026-03-12",
+      "courseId": "c-heath",
+      "teeId": "t-high-white",
+      "score": 93,
+      "pcc": 0,
+      "note": "society day",
+      "counts": true
+    },
+    {
+      "id": "r-075",
+      "golferId": "g-4",
+      "date": "2026-03-20",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-championship",
+      "score": 98,
+      "pcc": 0,
+      "note": "medal",
+      "counts": false
+    },
+    {
+      "id": "r-076",
+      "golferId": "g-4",
+      "date": "2026-03-28",
+      "courseId": "c-brookvale",
+      "teeId": "t-brook-main",
+      "score": 91,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-077",
+      "golferId": "g-4",
+      "date": "2026-04-05",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-red",
+      "score": 90,
+      "pcc": 0,
+      "note": "back nine fell apart",
+      "counts": true
+    },
+    {
+      "id": "r-078",
+      "golferId": "g-4",
+      "date": "2026-04-13",
+      "courseId": "c-heath",
+      "teeId": "t-high-blue",
+      "score": 94,
+      "pcc": 1,
+      "note": "best of the year",
+      "counts": true
+    },
+    {
+      "id": "r-079",
+      "golferId": "g-4",
+      "date": "2026-04-21",
+      "courseId": "c-mill",
+      "teeId": "t-mill-yellow",
+      "score": 82,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-080",
+      "golferId": "g-4",
+      "date": "2026-04-29",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-forward",
+      "score": 97,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-081",
+      "golferId": "g-4",
+      "date": "2026-05-07",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-white",
+      "score": 87,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-082",
+      "golferId": "g-4",
+      "date": "2026-05-15",
+      "courseId": "c-links",
+      "teeId": "t-car-yellow",
+      "score": 93,
+      "pcc": 0,
+      "note": "windy",
+      "counts": true
+    },
+    {
+      "id": "r-083",
+      "golferId": "g-4",
+      "date": "2026-05-23",
+      "courseId": "c-mill",
+      "teeId": "t-mill-white",
+      "score": 90,
+      "pcc": 0,
+      "note": "society day",
+      "counts": true
+    },
+    {
+      "id": "r-084",
+      "golferId": "g-4",
+      "date": "2026-05-31",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-medal",
+      "score": 90,
+      "pcc": 0,
+      "note": "medal",
+      "counts": true
+    },
+    {
+      "id": "r-085",
+      "golferId": "g-4",
+      "date": "2026-06-08",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-yellow",
+      "score": 87,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-086",
+      "golferId": "g-4",
+      "date": "2026-06-16",
+      "courseId": "c-links",
+      "teeId": "t-car-white",
+      "score": 89,
+      "pcc": 0,
+      "note": "back nine fell apart",
+      "counts": true
+    },
+    {
+      "id": "r-087",
+      "golferId": "g-4",
+      "date": "2026-06-24",
+      "courseId": "c-heath",
+      "teeId": "t-high-white",
+      "score": 89,
+      "pcc": 0,
+      "note": "best of the year",
+      "counts": true
+    },
+    {
+      "id": "r-088",
+      "golferId": "g-4",
+      "date": "2026-07-02",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-championship",
+      "score": 95,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-089",
+      "golferId": "g-4",
+      "date": "2026-07-10",
+      "courseId": "c-brookvale",
+      "teeId": "t-brook-main",
+      "score": 88,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-090",
+      "golferId": "g-4",
+      "date": "2026-07-18",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-red",
+      "score": 91,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-091",
+      "golferId": "g-4",
+      "date": "2026-07-26",
+      "courseId": "c-heath",
+      "teeId": "t-high-blue",
+      "score": 94,
+      "pcc": 0,
+      "note": "windy",
+      "counts": true
+    },
+    {
+      "id": "r-092",
+      "golferId": "g-4",
+      "date": "2026-08-03",
+      "courseId": "c-mill",
+      "teeId": "t-mill-yellow",
+      "score": 83,
+      "pcc": 0,
+      "note": "society day",
+      "counts": true
+    },
+    {
+      "id": "r-093",
+      "golferId": "g-5",
+      "date": "2026-04-20",
+      "courseId": "c-links",
+      "teeId": "t-car-yellow",
+      "score": 101,
+      "pcc": 0,
+      "note": "society day",
+      "counts": true
+    },
+    {
+      "id": "r-094",
+      "golferId": "g-5",
+      "date": "2026-04-28",
+      "courseId": "c-mill",
+      "teeId": "t-mill-white",
+      "score": 100,
+      "pcc": 0,
+      "note": "medal",
+      "counts": true
+    },
+    {
+      "id": "r-095",
+      "golferId": "g-5",
+      "date": "2026-05-06",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-medal",
+      "score": 102,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-096",
+      "golferId": "g-5",
+      "date": "2026-05-14",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-yellow",
+      "score": 95,
+      "pcc": 0,
+      "note": "back nine fell apart",
+      "counts": true
+    },
+    {
+      "id": "r-097",
+      "golferId": "g-5",
+      "date": "2026-05-22",
+      "courseId": "c-links",
+      "teeId": "t-car-white",
+      "score": 93,
+      "pcc": 0,
+      "note": "best of the year",
+      "counts": true
+    },
+    {
+      "id": "r-098",
+      "golferId": "g-5",
+      "date": "2026-05-30",
+      "courseId": "c-heath",
+      "teeId": "t-high-white",
+      "score": 102,
+      "pcc": 1,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-099",
+      "golferId": "g-5",
+      "date": "2026-06-07",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-championship",
+      "score": 107,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-100",
+      "golferId": "g-5",
+      "date": "2026-06-15",
+      "courseId": "c-brookvale",
+      "teeId": "t-brook-main",
+      "score": 91,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-101",
+      "golferId": "g-5",
+      "date": "2026-06-23",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-red",
+      "score": 93,
+      "pcc": 0,
+      "note": "windy",
+      "counts": true
+    },
+    {
+      "id": "r-102",
+      "golferId": "g-5",
+      "date": "2026-07-01",
+      "courseId": "c-heath",
+      "teeId": "t-high-blue",
+      "score": 103,
+      "pcc": 0,
+      "note": "society day",
+      "counts": true
+    },
+    {
+      "id": "r-103",
+      "golferId": "g-5",
+      "date": "2026-07-09",
+      "courseId": "c-mill",
+      "teeId": "t-mill-yellow",
+      "score": 88,
+      "pcc": 0,
+      "note": "medal",
+      "counts": true
+    },
+    {
+      "id": "r-104",
+      "golferId": "g-5",
+      "date": "2026-07-17",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-forward",
+      "score": 95,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-105",
+      "golferId": "g-5",
+      "date": "2026-07-25",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-white",
+      "score": 98,
+      "pcc": 0,
+      "note": "back nine fell apart",
+      "counts": true
+    },
+    {
+      "id": "r-106",
+      "golferId": "g-5",
+      "date": "2026-08-02",
+      "courseId": "c-links",
+      "teeId": "t-car-yellow",
+      "score": 86,
+      "pcc": 0,
+      "note": "best of the year",
+      "counts": true
+    },
+    {
+      "id": "r-107",
+      "golferId": "g-6",
+      "date": "2026-07-08",
+      "courseId": "c-heath",
+      "teeId": "t-high-blue",
+      "score": 105,
+      "pcc": 0,
+      "note": "medal",
+      "counts": true
+    },
+    {
+      "id": "r-108",
+      "golferId": "g-6",
+      "date": "2026-07-16",
+      "courseId": "c-mill",
+      "teeId": "t-mill-yellow",
+      "score": 101,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-109",
+      "golferId": "g-6",
+      "date": "2026-07-24",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-forward",
+      "score": 96,
+      "pcc": 0,
+      "note": "back nine fell apart",
+      "counts": true
+    },
+    {
+      "id": "r-110",
+      "golferId": "g-6",
+      "date": "2026-08-01",
+      "courseId": "c-parkland",
+      "teeId": "t-ash-white",
+      "score": 93,
+      "pcc": 0,
+      "note": "best of the year",
+      "counts": true
+    },
+    {
+      "id": "r-111",
+      "golferId": "g-7",
+      "date": "2026-07-26",
+      "courseId": "c-heath",
+      "teeId": "t-high-white",
+      "score": 107,
+      "pcc": 0,
+      "note": "",
+      "counts": true
+    },
+    {
+      "id": "r-112",
+      "golferId": "g-7",
+      "date": "2026-08-03",
+      "courseId": "c-dunes",
+      "teeId": "t-dunes-championship",
+      "score": 103,
+      "pcc": 0,
+      "note": "back nine fell apart",
+      "counts": true
+    }
+  ],
+  "settings": {
+    "method": {
+      "name": "Rolling last 5",
+      "window": 5,
+      "use": 5,
+      "basis": "differential",
+      "multiplier": 1,
+      "adjustment": 0
+    },
+    "applyCaps": true,
+    "primary": "rolling"
+  },
+  "exportedAt": "2026-08-11T09:00:00.000Z"
+}

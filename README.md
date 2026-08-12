@@ -8,12 +8,16 @@ Most handicap apps will only ever show you the official figure. Plenty of golfer
 work it out that way — they take their last few cards and average them, usually in a
 spreadsheet. This app does both, from exactly the same rounds, and shows them side by side:
 
-- **Your own method** — by default the average of your **last 5 rounds**, and configurable
-  from there (see [Your own method](#your-own-method)). This is the figure the app leads
-  with.
+- **The league handicap** — by default the average of your **last 5 rounds**, and
+  configurable from there (see [The League Handicap](#the-league-handicap)). This is the
+  figure the app leads with, and the one the leaderboard is ranked on.
 - **The official World Handicap System index** — best 8 of the last 20, with the
   reduced-scores table and the soft/hard caps. Always calculated, never affected by
-  anything you change about your own method.
+  anything you change about the league rule.
+
+Add everyone you play with and the **Leaderboard** tab ranks the lot of you on the same
+rule, from the same rounds. **Share** turns any of it into a read-only link you can send —
+the data rides inside the link, so nothing is uploaded anywhere.
 
 Everything works offline and without an account. Google sign-in is optional and only exists
 to put the same rounds on your phone and your laptop.
@@ -22,21 +26,23 @@ to put the same rounds on your phone and your laptop.
 
 ## Contents
 
-- [Using it](#using-it)
-- [Your own method](#your-own-method)
-- [How the official index is worked out](#how-the-official-index-is-worked-out)
-- [Course handicap](#course-handicap)
+- [Using It](#using-it)
+- [The Leaderboard](#the-leaderboard)
+- [The League Handicap](#the-league-handicap)
+- [How the Official Index Is Worked Out](#how-the-official-index-is-worked-out)
+- [Course Handicap](#course-handicap)
+- [Sharing a Read-Only Link](#sharing-a-read-only-link)
 - [Backups](#backups)
-- [Sync setup](#sync-setup)
-- [What's in this repo](#whats-in-this-repo)
+- [Sync Setup](#sync-setup)
+- [What's in This Repo](#whats-in-this-repo)
 - [Development](#development)
-- [Scope and known limits](#scope-and-known-limits)
+- [Scope and Known Limits](#scope-and-known-limits)
 
 ---
 
-## Using it
+## Using It
 
-1. **Add a course.** *Rounds → Courses → Add course.* A course needs, for each set of tees,
+1. **Add a course.** *Courses → Add course* in the header. A course needs, for each set of tees,
    a **course rating**, a **slope rating** and a **par** — all three are printed on the
    scorecard. The rating is what a scratch golfer is expected to shoot (e.g. 69.4); the
    slope is how much harder it plays for everyone else (55–155, average 113). Add as many
@@ -47,22 +53,35 @@ to put the same rounds on your phone and your laptop.
    shows the actual arithmetic — which rounds were used, what they averaged to, and every
    step in between.
 
-Multiple golfers are supported: use **Golfers** in the header. Each golfer keeps their own
-rounds and their own handicap; courses are shared between everyone.
+The app has two tabs. **My handicap** is one golfer's page — the two figures, the trend
+chart, the course handicap and the full list of rounds. **Leaderboard** is everybody at
+once (see [The leaderboard](#the-leaderboard)).
 
-Under **Rounds**, the *Used in* column shows which rounds each method actually leaned on, so
+Multiple golfers are supported: use **Golfers** in the header. Each golfer keeps their own
+rounds and their own handicap. Courses and the league rule are shared between everyone,
+which is what makes the leaderboard a fair comparison.
+
+Under **Rounds**, the *Used in* column shows which rounds each figure actually leaned on, so
 it is always visible why a number moved. A round can be marked *don't count* when you edit
 it — useful for a practice round or a scramble — and the app says so on the front page
 rather than quietly leaving it out.
 
-### The score to enter
+### Trying It Out
+
+[`example-league.json`](example-league.json) in this repo is a ready-made league — 8 golfers
+of every standard, 112 rounds, 6 courses. Download it and restore it under *Back up →
+Restore from backup* to see a populated leaderboard without typing in a season of cards.
+*Clear everything*, in the same dialog, is the way back out. There is also a one-tap
+**example data** button in the empty state, which loads a single golfer's season.
+
+### The Score to Enter
 
 Enter the **adjusted gross score**: your gross score with each hole capped at *net double
 bogey* (double bogey plus any handicap strokes you get on that hole). That is what you would
 return to the club, and it is what the official calculation expects. The app takes one
 number per round rather than a full card, so this cap is yours to apply.
 
-### Conditions adjustment (PCC)
+### Conditions Adjustment (PCC)
 
 The Playing Conditions Calculation is a daily −1 to +3 adjustment that a golf association
 publishes when a course played harder or easier than normal. Almost always 0, which is the
@@ -70,10 +89,37 @@ default; set it only if your club has published one for that day.
 
 ---
 
-## Your own method
+## The Leaderboard
 
-*Rounds → My method.* Everything about the rolling calculation is a setting, so most club
-and society formulas can be reproduced exactly:
+The **Leaderboard** tab puts every golfer in one table, lowest handicap first:
+
+| Column | What it is |
+|---|---|
+| **#** | Position. Ties share a place and the next one skips, the way a leaderboard reads. |
+| **Golfer** | Select a name to open that golfer's own page. |
+| *The league rule's name* | Their league handicap — the figure the app leads with. |
+| **Official** | Their World Handicap System index. |
+| **Rounds** | How many of their rounds count towards the figures. |
+| **Best diff** | Their lowest score differential ever logged. |
+| **Change over 5** | How far their handicap has moved over their last 5 counting rounds. ▼ is improving. |
+| **Last round** | When they last played. |
+
+**Rank by** chooses which of the two figures decides the order — the same setting as *Show
+as primary* on the handicap tab, so one figure leads wherever you are looking. Both are
+always in the table.
+
+Every row goes through exactly the same calculation as that golfer's own page, so the two
+can never disagree. A golfer with no figure yet — fewer than 3 counting rounds gets no
+official index, and someone who has never played gets neither — sits at the foot with no
+position, rather than being ranked first for having no number. Rounds left out of the
+figures are counted up underneath the table, as they are on the front page.
+
+---
+
+## The League Handicap
+
+*League rule*, in the header. Everything about the rolling calculation is a setting, so most
+club and society formulas can be reproduced exactly:
 
 | Setting | What it does |
 |---|---|
@@ -92,10 +138,11 @@ Two examples:
   default.**
 - *Best 3 of the last 5, off par*: window 5, use 3, shots over par, ×1, +0.
 
-Whatever you set here, **the official figure is untouched.** They are two readings of the
-same rounds.
+It is **one rule for everybody in the app**, not a per-golfer setting — that is what lets
+the leaderboard compare like with like. Whatever you set here, **the official figure is
+untouched.** They are two readings of the same rounds.
 
-### Why the two numbers differ
+### Why the Two Numbers Differ
 
 The official index keeps only your **best 8 of 20** — it describes what you are capable of
 on a good day, so it is usually the *lower* of the two and moves slowly. A rolling average
@@ -104,7 +151,7 @@ they answer different questions.
 
 ---
 
-## How the official index is worked out
+## How the Official Index Is Worked Out
 
 **Score differential** for each round:
 
@@ -137,7 +184,7 @@ one — inventing a number there would be worse than saying so. The result is ca
 
 **Soft cap and hard cap.** Once 20 rounds exist, a rise is measured against the lowest index
 held in the previous 365 days: anything more than **3.0** above it counts half, and it can
-never sit more than **5.0** above it. These can be switched off in *My method* to see the
+never sit more than **5.0** above it. These can be switched off under *League rule* to see the
 uncapped figure, but that is not what a club would issue. Two caveats, both deliberate and
 both pinned by tests:
 
@@ -149,7 +196,7 @@ both pinned by tests:
 
 ---
 
-## Course handicap
+## Course Handicap
 
 Your index is portable; the **course handicap** is what it becomes on one course off one set
 of tees — the shots you actually take off on the day:
@@ -159,13 +206,43 @@ index × (slope ÷ 113) + (course rating − par)
 ```
 
 rounded to a whole number. It follows whichever figure you have set as primary, so switching
-between your method and the official one changes it.
+between the league handicap and the official one changes it.
+
+---
+
+## Sharing a Read-Only Link
+
+**Share** in the header builds a link that shows someone the handicaps you pick, with no
+sign-in and no way for them to change anything. Tick the golfers to include; pick more than
+one and the link opens on the leaderboard.
+
+The data rides **inside the link**, in the part after the `#` — which a browser never sends
+to any server. Nothing is uploaded, this app's Firebase project never sees it, and opening
+someone else's link cannot touch whatever they have saved in their own browser. A link
+carries the chosen golfers, their rounds, only the courses those rounds were played on, and
+the league rule the figures were worked out with. Nothing identifying travels: no email
+address, no account, not even a theme.
+
+A season of rounds for five golfers packs down to a link of about 2,300 characters. The
+dialog shows the length as you tick, and warns past 8,000 — some mail apps break links that
+long across two lines. Sharing fewer golfers is the fix.
+
+Two things worth knowing before you send one:
+
+- It is a **snapshot**, frozen as it looked when you built it. Later rounds don't appear;
+  send a fresh link when the numbers have moved.
+- It **can't be withdrawn**. Anyone who has the link can open it, so treat it like emailing
+  a spreadsheet.
+
+Whoever opens it gets a standing *Read-only view* bar naming the golfers and the date it was
+shared, with a link back to their own data.
 
 ---
 
 ## Backups
 
-**Download backup (JSON)** in the footer writes everything — golfers, courses, rounds,
+**Back up** in the header holds the three things you can do to the data as a whole.
+**Download backup (JSON)** writes everything — golfers, courses, rounds,
 settings — to a file. **Restore from backup** reads one back, replacing what is in the
 browser after a confirmation that names the counts.
 
@@ -173,7 +250,7 @@ This matters more than it does in most apps: with no account, clearing your brow
 the one thing that will lose your history. Take a backup now and then, or turn sync on.
 
 **Clear everything** wipes the rounds, courses and golfers after a confirmation naming the
-counts, with a *Download backup first* button in the same dialog. Your handicap method and
+counts, with a *Download backup first* button in the same dialog. The league rule and your
 theme survive it — clearing is for starting fresh with real rounds, not for undoing the
 settings you tuned. If you are signed in it says so, because it also clears the copy in your
 Google account and your other devices will then ask whether to follow suit. This is the way
@@ -185,7 +262,7 @@ isn't a plain `[A-Za-z0-9_-]` string is regenerated with every reference rewritt
 
 ---
 
-## Sync setup
+## Sync Setup
 
 Sync runs on the **`golfhandicap-14246`** Firebase project, on the free tier. The client
 config is already in `index.html`. Three things live in the Firebase console rather than in
@@ -204,7 +281,7 @@ this repo, and all three have to be right or sync fails:
 `firestore.rules` in this repo is a **checked-in copy** of what should be deployed. Nothing
 here deploys it; if the console rules change, change the file to match.
 
-### Checking the console side from a terminal
+### Checking the Console Side From a Terminal
 
 Both products answer unauthenticated probes, so you can tell whether they are set up without
 opening the console. Nothing here is a secret and nothing is written.
@@ -229,7 +306,7 @@ The Firebase config in `index.html` is a **public client config, not a secret** 
 in the page of every Firebase web app. Access is enforced by the security rules, not by
 hiding the key.
 
-### Pointing it at a different project
+### Pointing It at a Different Project
 
 Replace `FIREBASE_CONFIG` in the `<script type="module">` block at the foot of `index.html`,
 **and** change the `authDomain` in the CSP's `frame-src` at the top of the same file — the
@@ -238,7 +315,7 @@ network endpoint needs adding to `connect-src` for the same reason. Setting
 `FIREBASE_CONFIG` to `null` returns the app to fully-local: the button hides and nothing is
 ever sent anywhere.
 
-### Why sign-in doesn't use Firebase's popup
+### Why Sign-In Doesn't Use Firebase's Popup
 
 Sign-in goes through **Google Identity Services**: a popup straight to `accounts.google.com`
 returns an OAuth access token, and Firebase exchanges it for a session via
@@ -280,7 +357,7 @@ Two consequences worth knowing:
   the app's origin — exact match including port, so `http://localhost` and
   `http://localhost:8014` are different origins — or Google refuses with `origin_mismatch`.
 
-### How syncing behaves
+### How Syncing Behaves
 
 One Firestore document per user at `golfhandicap/{uid}`, holding `{ state, updatedAt }`.
 localStorage stays the source of truth; the cloud copy is a mirror, and the app works
@@ -305,16 +382,18 @@ To go back to fully-local, set `FIREBASE_CONFIG` to `null` again.
 
 ---
 
-## What's in this repo
+## What's in This Repo
 
 | File | What it is |
 |---|---|
 | `index.html` | The entire app — markup, styles, logic, sync. No build step, no dependencies, no CDN calls except the Firebase SDK when sync is enabled. |
-| `tests.html` | 76 tests pinning the pure handicap maths, the restore/repair rules and the sync decisions. Loads the real `index.html` in a hidden iframe and calls its functions directly. |
+| `tests.html` | 106 tests pinning the pure handicap maths, the leaderboard's order, the share codec, the restore/repair rules and the sync decisions. Loads the real `index.html` in a hidden iframe and calls its functions directly. |
 | `privacy.html` | Privacy policy. Exists because other people may sign in with their own Google accounts. |
 | `firestore.rules` | A checked-in copy of the security rules to deploy in the Firebase console. |
 | `favicon.ico` | The app's icon — the fallback a browser fetches from the site root on its own. |
 | `make_favicon.py` | Draws `favicon.ico` to match the inline SVG icon in `index.html`. |
+| `example-league.json` | A backup you can restore to try the app out: a league of 8 golfers, 112 rounds, 6 courses. |
+| `make_example_league.py` | Writes `example-league.json` from a fixed seed, so re-running it produces the identical file. |
 | `LICENSE` | MIT. |
 
 The icon is a flagstick on the green with a ball beside it, on the tile the whole app family
@@ -345,7 +424,8 @@ tests — they need `http://localhost` because `file://` iframes are blocked in 
 **Run `tests.html` and check it says "All N tests pass"** whenever you touch `round1`,
 `scoreDifferential`, `averageLowest`, `whsIndex`/`whsSelection`,
 `rollingIndex`/`rollingSelection`, `normalizeMethod`, `clampInt`/`clampNum`, `applyCaps`,
-`courseHandicap`, `indexHistory`, `pickUsed`, `syncDecision`, `buildDemo`, `sanitizeIds`
+`courseHandicap`, `indexHistory`, `pickUsed`, `rankLeague`, `changeOverRounds`,
+`syncDecision`, `buildDemo`, `encodeShare`/`decodeShare`, `buildSharePayload`, `sanitizeIds`
 or `normalizeState`.
 
 **It only runs on localhost, and enforces that itself.** The test code writes nothing, but
@@ -374,7 +454,7 @@ diff.
 
 ---
 
-## Scope and known limits
+## Scope and Known Limits
 
 - **18-hole rounds only.** The World Handicap System combines 9-hole scores in pairs into
   18-hole differentials, which interacts awkwardly with a "last N *games*" method — is half a
