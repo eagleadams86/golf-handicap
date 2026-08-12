@@ -37,6 +37,7 @@
   <code>indexHistory</code>, <code>pickUsed</code>, <code>rankLeague</code>,
   <code>changeOverRounds</code>, <code>syncDecision</code>, <code>buildDemo</code>,
   <code>encodeShare</code>/<code>decodeShare</code>/<code>buildSharePayload</code>,
+  <code>windowRounds</code>,
   <code>sanitizeIds</code> or <code>normalizeState</code>.
 </p>
 <div id="summary">Loading the app…</div>
@@ -510,6 +511,68 @@ async function onAppLoad() {
        a state this browser has never saved. */
     eq(W.buildSharePayload(shareState, ['g2']).golfers[0].name, 'Sam');
   });
+  /* ── how much history rides along ────────────────────────────────────── */
+  describe('windowRounds');
+  const wr = (gid, date, id) => ({ id: id || `${gid}-${date}`, golferId: gid, date });
+  const spread = [
+    wr('g1', '2026-01-01'), wr('g1', '2026-02-01'), wr('g1', '2026-03-01'),
+    wr('g2', '2026-02-15'), wr('g2', '2026-03-15'),
+  ];
+  it('keeps everything when there is no window', () =>
+    eq(W.windowRounds(spread, null).length, 5));
+  it('counts "the last N" PER GOLFER, not across the whole link', () => {
+    /* The point of the rule: two golfers at N=1 give two comparable records,
+       not one golfer's two most recent rounds. */
+    const kept = W.windowRounds(spread, { lastN: 1 });
+    eq(kept.map((r) => r.id), ['g1-2026-03-01', 'g2-2026-03-15']);
+  });
+  it('keeps the most RECENT N, not the first N', () =>
+    eq(W.windowRounds(spread, { lastN: 2 }).filter((r) => r.golferId === 'g1').map((r) => r.date),
+       ['2026-02-01', '2026-03-01']));
+  it('leaves a golfer with fewer rounds than N untouched', () =>
+    eq(W.windowRounds(spread, { lastN: 9 }).length, 5));
+  it('takes a date cutoff inclusively', () => {
+    const kept = W.windowRounds(spread, { from: '2026-02-15' });
+    eq(kept.map((r) => r.id), ['g2-2026-02-15', 'g1-2026-03-01', 'g2-2026-03-15'].sort(),
+       'the round played ON the cutoff date is inside the window:');
+  });
+  it('can leave nothing, rather than quietly falling back to everything', () =>
+    eq(W.windowRounds(spread, { from: '2030-01-01' }).length, 0));
+  it('gives the rounds back in the order it was handed them', () =>
+    eq(W.windowRounds(spread, { lastN: 5 }).map((r) => r.id), spread.map((r) => r.id)));
+  it('leaves the list it was given alone', () => {
+    W.windowRounds(spread, { lastN: 1 });
+    eq(spread.length, 5);
+  });
+
+  describe('buildSharePayload — the history window');
+  const winState = {
+    golfers: [{ id: 'g1', name: 'Dad' }],
+    courses: [
+      { id: 'c1', name: 'Old', tees: [{ id: 't1', name: 'Y', rating: 69.4, slope: 122, par: 71 }] },
+      { id: 'c2', name: 'New', tees: [{ id: 't2', name: 'W', rating: 72.6, slope: 134, par: 72 }] },
+    ],
+    rounds: [
+      { id: 'old', golferId: 'g1', date: '2024-05-01', courseId: 'c1', teeId: 't1', score: 92, pcc: 0, note: '', counts: true },
+      { id: 'new', golferId: 'g1', date: '2026-05-01', courseId: 'c2', teeId: 't2', score: 88, pcc: 0, note: '', counts: true },
+    ],
+    settings: { method: H.DEFAULT_METHOD, applyCaps: true, primary: 'rolling' },
+  };
+  it('drops the rounds outside the window', () =>
+    eq(W.buildSharePayload(winState, ['g1'], { from: '2026-01-01' }).rounds.map((r) => r.id), ['new']));
+  it('drops the courses only those rounds used — a trimmed link names fewer clubs', () =>
+    eq(W.buildSharePayload(winState, ['g1'], { from: '2026-01-01' }).courses.map((c) => c.id), ['c2']));
+  it('records the cutoff, so the recipient is told it is a window', () =>
+    eq(W.buildSharePayload(winState, ['g1'], { from: '2026-01-01' }).from, '2026-01-01'));
+  it('records the round count for a "last N" window', () =>
+    eq(W.buildSharePayload(winState, ['g1'], { lastN: 1 }).lastN, 1));
+  it('says nothing about a window when there isn\'t one', () => {
+    const p = W.buildSharePayload(winState, ['g1']);
+    ok(!('from' in p), 'no cutoff field');
+    ok(!('lastN' in p), 'no count field');
+    eq(p.rounds.length, 2);
+  });
+
   it('a shared payload survives normalizeState, which is the door it comes back in by', () => {
     const s = W.normalizeState(W.buildSharePayload(shareState, ['g1', 'g2']));
     eq(s.golfers.length, 2);

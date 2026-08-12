@@ -44,7 +44,14 @@ that emphasis.
   exactly what a link carries and what it must not: the chosen golfers, their rounds, only
   the courses those rounds used, and the settings (the figures are meaningless read under
   someone else's league rule). Nothing identifying, ever — no email, no uid, no theme; a
-  test pins the exact key list. `viewOnly` is decided before anything renders, `save()`
+  test pins the exact key list. **How much history rides along is `windowRounds()`**, pure
+  and pinned: `{ lastN }` counts PER GOLFER (a link for four people should carry four
+  comparable records, not one golfer's twenty), `{ from }` is an inclusive date cutoff, and
+  a window that leaves nothing leaves nothing rather than falling back to everything. A
+  trimmed payload carries `from`/`lastN` so the recipient's banner can say so — **both
+  handicaps are recalculated from what is in the link**, so a trimmed copy legitimately
+  disagrees with the sender's screen, and that has to stay visible. `viewOnly` is decided
+  before anything renders, `save()`
   returns early in it (a visitor very likely has their own rounds in that browser), the
   storage listener is muted, the rounds table's dates become text rather than editors, and
   the sync module is gated on `window.ghViewOnly` — signing in inside someone else's
@@ -278,7 +285,8 @@ that emphasis.
   `whsIndex`/`whsSelection`, `rollingIndex`/`rollingSelection`, `normalizeMethod`,
   `clampInt`/`clampNum`, `applyCaps`, `courseHandicap`, `indexHistory`, `pickUsed`,
   `syncDecision`, `buildDemo`, `rankLeague`, `changeOverRounds`,
-  `encodeShare`/`decodeShare`/`buildSharePayload`, `sanitizeIds` or `normalizeState`. It loads
+  `encodeShare`/`decodeShare`/`buildSharePayload`, `windowRounds`, `sanitizeIds` or
+  `normalizeState`. It loads
   the real `index.html` in a hidden iframe and calls the functions directly — no copies, no
   build step — so it needs `http://localhost` (`file://` iframes are blocked in some
   browsers). **It also refuses to run anywhere else, and that is load-bearing:** Pages

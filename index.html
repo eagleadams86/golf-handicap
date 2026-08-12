@@ -527,7 +527,29 @@ svg.chart { display: block; width: 100%; min-width: 320px; height: auto; }
 dialog {
   background: var(--surface); color: var(--text-primary); border: 1px solid var(--border-strong);
   border-radius: var(--radius); padding: var(--sp-7); max-width: 560px; width: calc(100% - var(--sp-8));
+  /* A tall dialog on a short laptop screen opens already scrolled past its own
+     heading — showModal() focuses the first control and drags it into view. Cap
+     the height so the scrolling happens inside a dialog that fits. Ported from
+     Team Dashboard and Sprint Velocity, which both carry this. vh, not dvh:
+     dvh resolves to 0 in some embedded engines. */
+  max-height: calc(100vh - var(--sp-8)); overflow: auto;
 }
+/* The share dialog carries more than any other — two choices, a link to copy
+   and two paragraphs about what a link is and isn't — and at 560px it opened
+   already scrolling. Given room, its two choices sit side by side, which is
+   worth more than the extra width alone: widening a single column only makes
+   the lines longer. Scoped to this dialog, as in Team Dashboard — the help
+   dialog is prose, and a wider measure makes prose harder to read, not easier. */
+@media (min-width: 760px) {
+  #shareDialog { max-width: 820px; }
+  /* No align-items: start — the two panels stretch to the taller of them, so
+     the pair reads as one row rather than two boxes of unrelated height. */
+  #shareDialog .share-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--sp-5); }
+}
+/* The count sits opposite the toggle: what is selected, and the one control
+   that changes it wholesale. */
+.checklist-head { display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--sp-4); margin-bottom: var(--sp-4); }
 dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 dialog h2 { margin: 0 0 var(--sp-5); font-size: var(--fs-lg); }
 .field { margin-bottom: var(--sp-5); }
@@ -945,13 +967,43 @@ footer a, .privacy-links a { color: var(--accent); }
     sign-in. The rounds travel <em>inside</em> the link itself — nothing is uploaded anywhere,
     and opening it doesn't touch whatever they have saved in their own browser.</p>
 
+  <div class="share-choices">
   <fieldset class="formpanel">
     <legend>Which Golfers</legend>
+    <div class="checklist-head">
+      <span class="hint" id="shareGolferCount" role="status"></span>
+      <button type="button" class="link" id="shareSelectAll">Select all</button>
+    </div>
     <div class="checklist" id="shareGolfers"></div>
     <p class="hint" style="margin:var(--sp-5) 0 0">Pick more than one and the link opens on the
       leaderboard. The courses their rounds were played on come along automatically — a score
       means nothing without the rating and slope it was worked out from.</p>
   </fieldset>
+
+  <fieldset class="formpanel">
+    <legend>How Many Rounds</legend>
+    <div class="field" style="margin-bottom:var(--sp-4)">
+      <label for="shareKeep">Include</label>
+      <select id="shareKeep">
+        <option value="all" selected>Every round</option>
+        <option value="n:20">Each golfer's last 20 rounds</option>
+        <option value="n:10">Each golfer's last 10 rounds</option>
+        <option value="m:12">The last 12 months</option>
+        <option value="m:6">The last 6 months</option>
+        <option value="custom">Rounds from a date I choose</option>
+      </select>
+    </div>
+    <div class="field" id="shareDateWrap" hidden style="margin-bottom:0">
+      <label for="shareDate">Include rounds played on or after</label>
+      <input type="date" id="shareDate">
+    </div>
+    <p class="hint" style="margin:var(--sp-5) 0 0">Nothing is deleted — this only decides how
+      much of your history rides in the link, which is what keeps a long one sendable.
+      <strong>A trimmed link shows trimmed figures:</strong> both handicaps are worked out from
+      the rounds inside it, so they can differ from the ones on your screen. Whoever opens it
+      is told which window they are looking at.</p>
+  </fieldset>
+  </div>
 
   <fieldset class="formpanel">
     <legend>Your Link</legend>
@@ -2784,19 +2836,48 @@ async function squeeze(bytes, Stream, format) {
   return new Uint8Array(await new Response(s.readable).arrayBuffer());
 }
 
+/* Which rounds a window keeps. Pure, and separate from the payload builder so
+   the trimming rules can be pinned on their own.
+
+   `win` is null for everything, { lastN } for each golfer's most recent N, or
+   { from: 'YYYY-MM-DD' } for a date cutoff. lastN counts PER GOLFER: a link
+   for four golfers should carry four comparable records, not twenty rounds
+   that all belong to whoever plays most. */
+function windowRounds(rounds, win) {
+  if (!win) return rounds.slice();
+  if (win.from) return rounds.filter((r) => r.date >= win.from);
+  const n = win.lastN;
+  if (!n) return rounds.slice();
+  const byGolfer = new Map();
+  rounds.forEach((r) => {
+    if (!byGolfer.has(r.golferId)) byGolfer.set(r.golferId, []);
+    byGolfer.get(r.golferId).push(r);
+  });
+  const keep = new Set();
+  byGolfer.forEach((list) => {
+    list.slice()
+      .sort((a, b) => (a.date === b.date ? String(a.id).localeCompare(String(b.id)) : a.date.localeCompare(b.date)))
+      .slice(-n)
+      .forEach((r) => keep.add(r.id));
+  });
+  /* Filtered rather than rebuilt from the map, so the rounds come back in the
+     order they were given in. */
+  return rounds.filter((r) => keep.has(r.id));
+}
+
 /* Pure: the state to share goes in, the payload comes out. Taking `src` as an
    argument rather than reading the global is what lets tests.html pin exactly
    what a link carries — and, just as importantly, what it doesn't. */
-function buildSharePayload(src, golferIds) {
+function buildSharePayload(src, golferIds, win) {
   const golfers = (src.golfers || []).filter((g) => golferIds.indexOf(g.id) !== -1);
   const keep = new Set(golfers.map((g) => g.id));
-  const rounds = (src.rounds || []).filter((r) => keep.has(r.golferId));
+  const rounds = windowRounds((src.rounds || []).filter((r) => keep.has(r.golferId)), win);
   /* Only the courses those rounds actually used. A course list is small, but
      sending the clubs someone plays that this link says nothing about is a
      detail that has no business travelling. */
   const used = new Set(rounds.map((r) => r.courseId));
   const courses = (src.courses || []).filter((c) => used.has(c.id));
-  return {
+  const payload = {
     v: 1,
     sharedAt: Date.now(),
     label: golfers.map((g) => g.name).join(', '),
@@ -2808,6 +2889,12 @@ function buildSharePayload(src, golferIds) {
     rounds,
     settings: src.settings,
   };
+  /* A trimmed link is only an honest one if the trim shows: without this the
+     figures would read as the golfer's whole record. The recipient's banner
+     says which window it is. */
+  if (win && win.from) payload.from = win.from;
+  if (win && win.lastN) payload.lastN = win.lastN;
+  return payload;
 }
 
 async function encodeShare(payload) {
@@ -2838,7 +2925,7 @@ async function decodeShare(token) {
 
 /* A link is the least trusted input this app has, so the codec is its own
    little boundary and tests.html pins the round trip. */
-window.GHShare = { encodeShare, decodeShare, buildSharePayload };
+window.GHShare = { encodeShare, decodeShare, buildSharePayload, windowRounds };
 
 /* ── Opening a shared link ──────────────────────────────────────────────── */
 
@@ -2848,7 +2935,7 @@ window.GHShare = { encodeShare, decodeShare, buildSharePayload };
 async function openSharedView() {
   try {
     const p = await decodeShare(shareToken);
-    shareMeta = { sharedAt: p.sharedAt, label: p.label };
+    shareMeta = { sharedAt: p.sharedAt, label: p.label, from: p.from, lastN: p.lastN };
     /* The same sanitising boundary a restored backup and a cloud copy cross:
        hostile ids replaced, settings normalised, nonsense clamped. */
     state = normalizeState(p);
@@ -2865,9 +2952,19 @@ function shareBanner() {
   const when = shareMeta && shareMeta.sharedAt
     ? new Date(shareMeta.sharedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
     : null;
+  /* A trimmed link is honest only if the trim shows: without this the figures
+     would read as the golfer's whole record, and both handicaps are worked out
+     from what is actually here. Both values came out of a link, so they are
+     checked rather than trusted. */
+  let window = '';
+  if (shareMeta && typeof shareMeta.from === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(shareMeta.from)) {
+    window = `Covers rounds from ${fmtDate(shareMeta.from)} onward, so the figures are worked out from those alone. `;
+  } else if (shareMeta && Number.isFinite(shareMeta.lastN) && shareMeta.lastN > 0) {
+    window = `Covers each golfer's last ${Math.floor(shareMeta.lastN)} rounds, so the figures are worked out from those alone. `;
+  }
   return '<div class="viewbar">'
     + '<strong>👁 Read-only view' + (shareMeta && shareMeta.label ? ' — ' + esc(shareMeta.label) : '') + '</strong>'
-    + '<span class="muted">Shared' + (when ? ' on ' + esc(when) : '') + '. '
+    + '<span class="muted">Shared' + (when ? ' on ' + esc(when) : '') + '. ' + esc(window)
     + 'Nothing you do here is saved, and your own rounds are untouched.</span>'
     + '<a class="mine" href="' + esc(location.pathname) + '">Open my own data</a>'
     + '</div>';
@@ -2898,14 +2995,60 @@ function openShare() {
       + `<span class="hint">${n ? `${n} round${n === 1 ? '' : 's'}` : 'no rounds'}</span></span></label>`;
   }).join('');
   document.getElementById('shareGolfers').querySelectorAll('input')
-    .forEach((i) => i.addEventListener('change', refreshShareLink));
+    .forEach((i) => i.addEventListener('change', () => { syncSelectAll(); refreshShareLink(); }));
+  syncSelectAll();
   refreshShareLink();
   shareDialog.showModal();
   shareDialog.scrollTop = 0;
 }
 
-const sharePicked = () => Array.from(document.getElementById('shareGolfers')
-  .querySelectorAll('input:checked')).map((i) => i.dataset.shareGolfer);
+const shareBoxes = () => Array.from(document.getElementById('shareGolfers').querySelectorAll('input'));
+const sharePicked = () => shareBoxes().filter((i) => i.checked).map((i) => i.dataset.shareGolfer);
+
+/* One button rather than an All/None pair: with everything ticked the only
+   useful thing it can do is clear the lot, so it says so. The count beside it
+   is what makes that readable at a glance with a dozen golfers on the list. */
+function syncSelectAll() {
+  const boxes = shareBoxes();
+  const picked = boxes.filter((i) => i.checked).length;
+  const all = boxes.length > 0 && picked === boxes.length;
+  const btn = document.getElementById('shareSelectAll');
+  btn.textContent = all ? 'Select none' : 'Select all';
+  btn.hidden = boxes.length < 2;          // nothing to select wholesale
+  document.getElementById('shareGolferCount').textContent =
+    `${picked} of ${boxes.length} selected`;
+}
+
+document.getElementById('shareSelectAll').addEventListener('click', () => {
+  const boxes = shareBoxes();
+  const turnOn = boxes.some((i) => !i.checked);
+  boxes.forEach((i) => { i.checked = turnOn; });
+  syncSelectAll();
+  refreshShareLink();
+});
+
+/* The window the picker describes, or null for everything. Read fresh each
+   time rather than kept in a variable, so the link can never disagree with
+   what the controls say. */
+function shareWindow() {
+  const keep = document.getElementById('shareKeep').value;
+  if (keep === 'all') return null;
+  if (keep.startsWith('n:')) return { lastN: Number(keep.slice(2)) };
+  if (keep.startsWith('m:')) return { from: monthsBefore(todayISO(), Number(keep.slice(2))) };
+  const typed = document.getElementById('shareDate').value;
+  return /^\d{4}-\d{2}-\d{2}$/.test(typed) ? { from: typed } : null;
+}
+
+/* Same calendar-day discipline as everywhere else: build the date from LOCAL
+   parts, anchored at noon, and clamp to the month's end so "12 months before
+   31 March" doesn't skid into March. */
+function monthsBefore(iso, months) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const target = new Date(y, m - 1 - months, 1, 12, 0, 0, 0);
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0, 12).getDate();
+  target.setDate(Math.min(d, lastDay));
+  return isoOf(target);
+}
 
 let shareSeq = 0;    // a slow encode must not overwrite the box after a later tick
 
@@ -2920,13 +3063,17 @@ async function refreshShareLink() {
   };
 
   const ids = sharePicked();
-  if (!ids.length) {
-    link.value = ''; meta.textContent = 'Pick at least one golfer.'; warn.textContent = '';
-    setBusy(true);
-    return;
-  }
+  const stop = (msg) => { link.value = ''; meta.textContent = msg; warn.textContent = ''; setBusy(true); };
+  if (!ids.length) return stop('Pick at least one golfer.');
 
-  const payload = buildSharePayload(state, ids);
+  const keep = document.getElementById('shareKeep').value;
+  const win = shareWindow();
+  /* A half-typed custom date must not quietly build a whole-history link —
+     that is the one case where "no window" means the opposite of what's
+     being asked for. */
+  if (keep === 'custom' && !win) return stop('Choose the date to include from.');
+
+  const payload = buildSharePayload(state, ids, win);
   const token = await encodeShare(payload);
   if (busy !== shareSeq) return;
 
@@ -2934,18 +3081,38 @@ async function refreshShareLink() {
   link.value = url;
   setBusy(false);
   const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
-  meta.textContent = `${plural(payload.golfers.length, 'golfer')}, ${plural(payload.rounds.length, 'round')}, `
+  const held = state.rounds.filter((r) => ids.indexOf(r.golferId) !== -1).length;
+  /* "18 of 112" rather than a bare count: when a link is too long, the number
+     that matters is how much was left behind. */
+  const rounds = win
+    ? `${payload.rounds.length.toLocaleString()} of ${plural(held, 'round')}`
+    : plural(payload.rounds.length, 'round');
+  meta.textContent = `${plural(payload.golfers.length, 'golfer')}, ${rounds}, `
     + `${plural(payload.courses.length, 'course')} · ${url.length.toLocaleString()} characters`;
 
   if (!payload.rounds.length) {
-    warn.textContent = 'None of the golfers you picked have any rounds, so the link would open on an empty table.';
+    /* Two different empties, and only the first has a fix in this dialog. */
+    warn.textContent = win
+      ? 'That window leaves no rounds at all, so the link would open on an empty table. Include more history, or pick a golfer who has played inside it.'
+      : 'None of the golfers you picked have any rounds, so the link would open on an empty table.';
   } else if (url.length > SHARE_WARN_AT) {
     warn.textContent = 'That’s a long link — some mail apps break links this size across two lines. '
-      + 'Sharing fewer golfers is the quickest way to shorten it.';
+      + 'Including fewer rounds is the quickest way to shorten it; sharing fewer golfers also helps.';
   } else {
     warn.textContent = '';
   }
 }
+
+document.getElementById('shareKeep').addEventListener('change', (e) => {
+  const custom = e.target.value === 'custom';
+  document.getElementById('shareDateWrap').hidden = !custom;
+  /* Opens on a year back rather than today, which would share nothing. */
+  if (custom && !document.getElementById('shareDate').value) {
+    document.getElementById('shareDate').value = monthsBefore(todayISO(), 12);
+  }
+  refreshShareLink();
+});
+document.getElementById('shareDate').addEventListener('input', refreshShareLink);
 
 document.getElementById('shareBtn').addEventListener('click', openShare);
 document.getElementById('shareClose').addEventListener('click', () => shareDialog.close());

@@ -213,8 +213,17 @@ between the league handicap and the official one changes it.
 ## Sharing a Read-Only Link
 
 **Share** in the header builds a link that shows someone the handicaps you pick, with no
-sign-in and no way for them to change anything. Tick the golfers to include; pick more than
-one and the link opens on the leaderboard.
+sign-in and no way for them to change anything. Tick the golfers to include — **Select all**
+takes the lot, and the count above the list says where you are — and pick more than one and
+the link opens on the leaderboard.
+
+**How many rounds** decides how much history rides along: every round, each golfer's last 20
+or 10, the last 12 or 6 months, or everything from a date you choose. "Last N" counts *per
+golfer*, so a link for four people carries four comparable records rather than twenty rounds
+belonging to whoever plays most. Nothing is deleted — this only trims the link. **A trimmed
+link shows trimmed figures:** both handicaps are worked out from the rounds inside it, so
+they can differ from the ones on your screen, and whoever opens it is told which window they
+are looking at.
 
 The data rides **inside the link**, in the part after the `#` — which a browser never sends
 to any server. Nothing is uploaded, this app's Firebase project never sees it, and opening
@@ -225,7 +234,8 @@ address, no account, not even a theme.
 
 A season of rounds for five golfers packs down to a link of about 2,300 characters. The
 dialog shows the length as you tick, and warns past 8,000 — some mail apps break links that
-long across two lines. Sharing fewer golfers is the fix.
+long across two lines. Trimming the history is the quickest fix; sharing fewer golfers also
+helps.
 
 Two things worth knowing before you send one:
 
@@ -387,7 +397,7 @@ To go back to fully-local, set `FIREBASE_CONFIG` to `null` again.
 | File | What it is |
 |---|---|
 | `index.html` | The entire app — markup, styles, logic, sync. No build step, no dependencies, no CDN calls except the Firebase SDK when sync is enabled. |
-| `tests.html` | 106 tests pinning the pure handicap maths, the leaderboard's order, the share codec, the restore/repair rules and the sync decisions. Loads the real `index.html` in a hidden iframe and calls its functions directly. |
+| `tests.html` | 119 tests pinning the pure handicap maths, the leaderboard's order, the share codec, the restore/repair rules and the sync decisions. Loads the real `index.html` in a hidden iframe and calls its functions directly. |
 | `privacy.html` | Privacy policy. Exists because other people may sign in with their own Google accounts. |
 | `firestore.rules` | A checked-in copy of the security rules to deploy in the Firebase console. |
 | `favicon.ico` | The app's icon — the fallback a browser fetches from the site root on its own. |
@@ -425,8 +435,8 @@ tests — they need `http://localhost` because `file://` iframes are blocked in 
 `scoreDifferential`, `averageLowest`, `whsIndex`/`whsSelection`,
 `rollingIndex`/`rollingSelection`, `normalizeMethod`, `clampInt`/`clampNum`, `applyCaps`,
 `courseHandicap`, `indexHistory`, `pickUsed`, `rankLeague`, `changeOverRounds`,
-`syncDecision`, `buildDemo`, `encodeShare`/`decodeShare`, `buildSharePayload`, `sanitizeIds`
-or `normalizeState`.
+`syncDecision`, `buildDemo`, `encodeShare`/`decodeShare`, `buildSharePayload`,
+`windowRounds`, `sanitizeIds` or `normalizeState`.
 
 **It only runs on localhost, and enforces that itself.** The test code writes nothing, but
 the iframe boots the real app — and GitHub Pages publishes `tests.html` next to it, at
