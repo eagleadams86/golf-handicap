@@ -1994,9 +1994,11 @@ function renderLeague() {
   const primary = state.settings.primary === 'whs' ? 'whs' : 'rolling';
   const method = normalizeMethod(state.settings.method);
   const rows = rankLeague(leagueRows(), primary);
-  /* Short enough to sit inside a sentence — the rule's own name is added
-     only where there is room for it. */
+  /* Two forms of the same name, because English needs both: "Ranked by THE
+     league handicap" and "has NO league handicap yet". One string doing both
+     jobs reads as "has no the league handicap". */
   const rankedName = primary === 'whs' ? 'the official index' : 'the league handicap';
+  const bareName = primary === 'whs' ? 'official index' : 'league handicap';
 
   document.getElementById('leaguePrimRoll').setAttribute('aria-pressed', String(primary !== 'whs'));
   document.getElementById('leaguePrimWhs').setAttribute('aria-pressed', String(primary === 'whs'));
@@ -2056,8 +2058,8 @@ function renderLeague() {
   const notes = [`Ranked by ${rankedName}${primary === 'whs' ? '' : ` (${method.name})`}, lowest first.`];
   const unranked = rows.filter((r) => r.rank == null).length;
   if (unranked) {
-    notes.push(`${plural(unranked, 'golfer')} ${unranked === 1 ? 'has' : 'have'} no ${rankedName} yet`
-      + `${primary === 'whs' ? ` (the official index needs ${WHS_MIN_ROUNDS} counting rounds)` : ''}, so they sit at the foot of the table.`);
+    notes.push(`${plural(unranked, 'golfer')} ${unranked === 1 ? 'has' : 'have'} no ${bareName} yet`
+      + `${primary === 'whs' ? ` (it is not issued below ${WHS_MIN_ROUNDS} counting rounds)` : ''}, so they sit at the foot of the table.`);
   }
   if (rows.length === 1) {
     notes.push('A leaderboard of one so far — add the people you play with with the Golfers button in the header. Courses and the league rule are shared by everyone, so their rounds slot straight in.');
