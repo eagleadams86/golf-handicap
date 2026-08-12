@@ -28,6 +28,7 @@ jobs:
           # Written next to node_modules so `import 'playwright'` resolves.
           cat > ci-run-tests.mjs <<'EOF'
           import { chromium } from 'playwright';
+          import { appendFileSync } from 'node:fs';
           const browser = await chromium.launch();
           const page = await browser.newPage();
           const errors = [];
@@ -39,9 +40,32 @@ jobs:
           const summary = await page.evaluate(() => document.getElementById('summary').textContent);
           const failedNames = await page.evaluate(() =>
             [...document.querySelectorAll('tr.fail, li.bad')].map((el) => el.textContent.trim()));
+          const groups = await page.evaluate(() =>
+            [...document.querySelectorAll('h2')].map((h) => ({
+              name: h.textContent.trim(),
+              tests: [...(h.nextElementSibling ? h.nextElementSibling.querySelectorAll('li') : [])]
+                .map((li) => ({ name: li.textContent.trim(), ok: li.className === 'ok' })),
+            })).filter((g) => g.tests.length));
           console.log(summary);
           for (const f of failedNames) console.log('FAIL:', f);
           for (const e of errors) console.log('PAGE ERROR:', e);
+          /* The scorecard goes on the run's own page, not just into the log.
+             The published tests.html can't run the suite (it would boot a real,
+             signed-in copy of the app), so it links here instead — and a link
+             promising "the full scorecard" has to land on one. */
+          if (process.env.GITHUB_STEP_SUMMARY) {
+            const green = /^All \d+ tests pass/.test(summary) && !errors.length;
+            let md = `## ${green ? '✅' : '❌'} ${summary}\n\n`;
+            for (const e of errors) md += `> **Page error:** \`${e}\`\n\n`;
+            for (const g of groups) {
+              const bad = g.tests.filter((t) => !t.ok).length;
+              md += `<details${bad ? ' open' : ''}><summary>${bad ? '❌' : '✅'} ${g.name}`
+                + ` — ${g.tests.length - bad}/${g.tests.length}</summary>\n\n`;
+              for (const t of g.tests) md += `- ${t.ok ? '✓' : '**✕**'} ${t.name}\n`;
+              md += `\n</details>\n\n`;
+            }
+            appendFileSync(process.env.GITHUB_STEP_SUMMARY, md);
+          }
           await browser.close();
           if (failedNames.length || errors.length || !/^All \d+ tests pass/.test(summary)) process.exit(1);
           EOF

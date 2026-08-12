@@ -303,7 +303,13 @@ that emphasis.
   distinguishes **a frame that never loaded the app** (no server running) from **an app that
   loaded and threw**: one is a setup problem, the other is a bug, and a single message for
   both sent a reader hunting through `index.html` for neither.
-  Don't put the iframe back in the markup. CI runs the same page
+  Don't put the iframe back in the markup. **Refusing to run is not the same as saying
+  nothing**: off localhost the page asks the GitHub API for the last `tests.yml` run on
+  `main` and shows whether it was green, when, and which commit, with a link to the run —
+  the question someone opens that page to ask is "is it passing?". The workflow writes the
+  full per-group scorecard to `$GITHUB_STEP_SUMMARY`, so that link lands on a scorecard
+  rather than a log. If the results markup in `tests.html` changes shape (`<h2>` + `<ol><li>`,
+  `li.ok` for a pass), the scrape in the workflow has to change with it. CI runs the same page
   headless on every push (`.github/workflows/tests.yml`) on `localhost:8014`, so the gate
   lets it through, and fails the build if the summary goes red. `window.__ghTestHooks` exists solely to hand it the `const` values, which aren't
   on `window`; function declarations it reaches directly. **When a rule in this file changes,
