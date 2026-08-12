@@ -171,7 +171,11 @@ that emphasis.
   `courseDialog` and backing out has to put the courses list back: it dismisses by clicking
   its own Cancel button, and its `cancel` event is intercepted so **Escape, Cancel and a
   click outside all take the same route**. A new dialog goes in the registration list at the
-  foot of the classic script, and a nested one needs the `onClose` treatment.
+  foot of the classic script, and a nested one needs the `onClose` treatment. **A dialog
+  whose `const` is declared further down registers beside its own wiring instead** — the
+  share dialog shipped un-dismissable for exactly that reason: adding it to the list would
+  have read it inside its temporal dead zone, so it was left out and then forgotten. Sprint
+  Velocity and Team Dashboard register theirs the same way, next to their share buttons.
 - **Deleting a course or a set of tees keeps the rounds that used it**, flagged as orphaned
   rather than deleted, after a confirmation that names the count. Losing history to a typo in
   the courses screen is the worse failure.

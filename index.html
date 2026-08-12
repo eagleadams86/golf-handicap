@@ -2949,6 +2949,11 @@ async function refreshShareLink() {
 
 document.getElementById('shareBtn').addEventListener('click', openShare);
 document.getElementById('shareClose').addEventListener('click', () => shareDialog.close());
+/* Registered here rather than in the list further up, because `shareDialog` is
+   declared in this block and would still be in its temporal dead zone up
+   there. Same as Sprint Velocity and Team Dashboard, which register theirs
+   beside their share buttons for the same reason. */
+closeOnBackdropClick(shareDialog);
 document.getElementById('shareCopyBtn').addEventListener('click', async () => {
   const url = document.getElementById('shareLink').value;
   if (!url) return;
