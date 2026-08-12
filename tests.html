@@ -320,6 +320,27 @@ async function onAppLoad() {
     const s = W.sanitizeIds({ golfers: [{ id: 'abc-123_X', name: 'X' }], courses: [], rounds: [] });
     eq(s.golfers[0].id, 'abc-123_X');
   });
+  /* Nothing crossing this boundary may hold `undefined`. localStorage drops such a
+     key silently, so a local copy looks perfect — but setDoc() walks the live object
+     and Firestore rejects the WHOLE document over one of them (invalid-argument).
+     That is how Sprint Velocity lost sync on 2026-08-12, off one new optional field
+     absent from every copy saved before it existed. Checked by key, not by value:
+     `x === undefined` passes whether the key is there or not. */
+  it('never produces an undefined value, which would stop cloud sync dead', () => {
+    const deepUndef = (v, path) => (v && typeof v === 'object')
+      ? Object.keys(v).flatMap(k => v[k] === undefined ? [path + '.' + k] : deepUndef(v[k], path + '.' + k))
+      : [];
+    /* The shape that produces one: entries saved before a field existed. */
+    const s = W.sanitizeIds({
+      golfers: [{ name: 'Me' }],
+      courses: [{ name: 'Course', tees: [{ name: 'White' }] }],
+      rounds: [{ date: '2026-01-01', score: 90 }],
+      settings: {},
+    });
+    eq(deepUndef(s, 'state').join(','), '');
+    eq(deepUndef(W.normalizeState(null), 'state').join(','), '',
+       'and neither does a state built from nothing');
+  });
 
   describe('normalizeState');
   it('turns junk into a usable state rather than throwing', () => {

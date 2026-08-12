@@ -3410,7 +3410,14 @@ function describeSyncError(e) {
   if (code.indexOf('unauthenticated') !== -1) return 'the sign-in has expired — sign out and back in';
   if (code.indexOf('unavailable') !== -1) return 'no connection to Firebase — it will catch up when you are back online';
   if (code.indexOf('resource-exhausted') !== -1) return 'the free Firebase quota for today is used up';
-  if (code.indexOf('invalid-argument') !== -1) return 'this data is too large for one Firestore document';
+  /* Firestore reports two unrelated things as invalid-argument: a document over the
+     1 MiB cap, and a value it can't store (an `undefined` anywhere in the object).
+     Saying "too large" for both sends someone deleting rounds over an app bug, so
+     the size wording waits for Firestore's own message to mention size. */
+  if (code.indexOf('invalid-argument') !== -1)
+    return /maximum allowed size|exceeds|too large|longer than|bytes/i.test(String((e && e.message) || ''))
+      ? 'this data is too large for one Firestore document'
+      : 'the cloud refused this copy — that is a fault in the app, not in your rounds. Nothing is lost; reloading the page usually clears it';
   return 'an unexpected error — see the browser console';
 }
 function setSyncError(e) {
@@ -3547,9 +3554,22 @@ async function startSync() {
   }, setSyncError);
 }
 
+/* The cloud copy goes through JSON, exactly as save() writes the local one, so the
+   two are the same bytes by construction rather than nearly so.
+
+   Not tidiness: setDoc() walks the LIVE object and Firestore rejects the whole
+   document if it finds a single `undefined` anywhere in it (invalid-argument), where
+   localStorage would simply drop that key and carry on. Sprint Velocity lost sync to
+   exactly that on 2026-08-12 — one new optional setting, absent from every copy saved
+   before it existed, written back as undefined by its id sanitiser — and the local
+   copy looked perfect throughout, which is what made it hard to see. sanitizeIds()
+   here can't produce one today (fix() always returns a string), so this is the guard
+   against the next optional field, not a fix for a fault in this file. */
+const forCloud = (s) => JSON.parse(JSON.stringify(s));
+
 async function pushNow() {
   if (!user) return;
-  await F.setDoc(docRef(), { state: window.ghGet(), updatedAt: localTs() || Date.now() });
+  await F.setDoc(docRef(), { state: forCloud(window.ghGet()), updatedAt: localTs() || Date.now() });
   clearSyncError();
 }
 

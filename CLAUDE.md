@@ -243,6 +243,20 @@ that emphasis.
   `<th scope="row">` holding a `.rowbtn`: a `<tr>` can't take focus, and giving it a button
   role would break the grid semantics that make the numeric columns readable. `tbody th`
   re-styles the row-header cells back to body text.
+- **`pushNow()` sends the state through JSON (`forCloud()`), exactly as `save()` writes the
+  local copy** — so the two are the same bytes by construction rather than nearly so. Don't
+  "simplify" it back to handing `state` straight to `setDoc()`: Firestore walks the live
+  object and rejects the **whole document** over a single `undefined` anywhere in it, where
+  localStorage silently drops that key and carries on. That asymmetry cost Sprint Velocity
+  its sync on 2026-08-12 (a new optional setting, absent from every copy saved before it
+  existed, written back as undefined by its sanitiser) with the local copy looking perfect
+  throughout. `sanitizeIds()` here can't produce one today — `fix()` always returns a string
+  — so the guard is against the next optional field. Pinned in tests.html by **key**, not by
+  value: `x === undefined` passes whether the key exists or not.
+- **`invalid-argument` does not mean "too big".** Firestore uses that one code for both an
+  oversized document and a value it can't store, so the "too large" wording waits until
+  Firestore's own message mentions size; otherwise it says the fault is in the app. A remedy
+  that has the user deleting rounds must never be the guess.
 - Sync is ported from PAPTrack/Sprint Velocity, including the two rules learned the hard way
   there. Both are load-bearing: the first-sign-in "which copy?" dialog, and — underneath it —
   **an empty copy never beats a copy with data in it**, whatever the timestamps say. Keep
