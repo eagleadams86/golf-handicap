@@ -63,8 +63,21 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'expected truthy'); }
    doesn't. */
 async function onAppLoad() {
   const W = this.contentWindow;
-  const H = W.__ghTestHooks;
-  if (!H) { fail('The app did not expose __ghTestHooks — is index.html loading correctly?'); return; }
+  const H = W && W.__ghTestHooks;
+  if (!H) {
+    /* Two very different faults, and the old single message blamed the app for
+       both. A frame that never got the app — the server is not running, so
+       index.html came back 404 — is a setup problem, and saying "the app did
+       not expose its hooks" sent the reader hunting through index.html for a
+       bug that was never there. Tell them apart by looking for something the
+       real page always has. */
+    let booted = false;
+    try { booted = !!(W.document && W.document.getElementById('handicapCard')); } catch (e) { /* cross-origin frame */ }
+    fail(booted
+      ? 'index.html loaded but exposed no __ghTestHooks — did something throw while it was starting up? Check the browser console.'
+      : 'The hidden frame never loaded index.html — is it being served? Run "python3 -m http.server 8014" in this folder and open http://localhost:8014/tests.html.');
+    return;
+  }
 
   /* ── round1 ──────────────────────────────────────────────────────────── */
   describe('round1');
@@ -592,9 +605,14 @@ async function onAppLoad() {
    publishes this file next to the app, so "somewhere else" is a page anyone
    can open.
 
-   '' covers file://, which has no host: the suite can't run there either way
-   (file:// iframes are blocked), so it falls through to the ordinary advice. */
-const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]', ''];
+   file:// is NOT in this list, and that is the point of leaving it out. It has
+   no hostname, so '' used to sit here "because the suite can't run there
+   anyway" — but that sent it down the iframe branch, where the frame silently
+   fails to load (browsers block file:// iframes) and the suite blamed the app:
+   "did not expose __ghTestHooks". Anything that isn't a local server now falls
+   through to the advice below, which is what someone opening the file off disk
+   actually needs to read. */
+const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
 
 if (LOCAL_HOSTS.includes(location.hostname)) {
   const frame = document.createElement('iframe');
@@ -607,18 +625,29 @@ if (LOCAL_HOSTS.includes(location.hostname)) {
   frame.src = 'index.html';           /* set before append: one load event, the real one */
   document.body.appendChild(frame);
 } else {
-  fail('Not run here — this page boots a live copy of the app.');
+  /* Two different reasons to be here, and they need different sentences: a
+     published copy (where booting the app would touch someone's real, signed-in
+     data) and a file:// copy off disk (where it simply cannot work, because
+     browsers block file:// iframes). Both end at the same instruction. */
+  const onDisk = location.protocol === 'file:';
+  fail(onDisk
+    ? 'Not run from a file — this page needs a local server.'
+    : 'Not run here — this page boots a live copy of the app.');
   const p = document.createElement('p');
   p.style.cssText = 'color:#aab2d0;line-height:1.7;max-width:70ch';
-  p.innerHTML =
-    'The suite loads the app in a hidden frame to test it. On <strong></strong> that frame ' +
-    'would be your real, signed-in copy, quietly starting a sync session where you can\'t ' +
-    'see it. It runs on <code>localhost</code> only, against a copy served from the repo ' +
-    'folder:<br><br><code>cd ~/claude-golf-handicap &amp;&amp; python3 -m http.server 8014' +
-    '</code><br>then open <code>http://localhost:8014/tests.html</code>.<br><br>' +
-    'Nothing has been changed by opening this page — <a href="index.html" ' +
-    'style="color:#8ab4ff">back to the app</a>.';
-  p.querySelector('strong').textContent = location.hostname;
+  p.innerHTML = (onDisk
+    ? 'The suite loads the app in a hidden frame to test it, and a browser blocks that frame '
+      + 'when the page is opened straight off disk — so the tests would have nothing to run '
+      + 'against. Serve the folder instead:'
+    : 'The suite loads the app in a hidden frame to test it. On <strong></strong> that frame '
+      + 'would be your real, signed-in copy, quietly starting a sync session where you can\'t '
+      + 'see it. It runs on <code>localhost</code> only, against a copy served from the repo '
+      + 'folder:')
+    + '<br><br><code>cd ~/claude-golf-handicap &amp;&amp; python3 -m http.server 8014'
+    + '</code><br>then open <code>http://localhost:8014/tests.html</code>.<br><br>'
+    + 'Nothing has been changed by opening this page — <a href="index.html" '
+    + 'style="color:#8ab4ff">back to the app</a>.';
+  if (!onDisk) p.querySelector('strong').textContent = location.hostname;
   document.getElementById('results').appendChild(p);
 }
 
