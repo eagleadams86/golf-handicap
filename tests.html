@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Golf Handicap — tests</title>
+<title>Golf Handicap — Tests</title>
 <style>
   body { font: 13px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
          background: #0a0e1a; color: #e7eaf6; margin: 0; padding: 24px; }
@@ -23,7 +23,7 @@
 </style>
 </head>
 <body>
-<h1>Golf Handicap — tests</h1>
+<h1>Golf Handicap — Tests</h1>
 <p class="lead">
   Pins the pure handicap maths in <code>index.html</code>. It loads the real app in a hidden
   iframe and calls its functions directly — no copies, no build step — so a test can never
@@ -34,7 +34,9 @@
   <code>averageLowest</code>, <code>whsIndex</code>/<code>whsSelection</code>,
   <code>rollingIndex</code>/<code>rollingSelection</code>, <code>normalizeMethod</code>,
   <code>clampInt</code>/<code>clampNum</code>, <code>applyCaps</code>, <code>courseHandicap</code>,
-  <code>indexHistory</code>, <code>pickUsed</code>, <code>syncDecision</code>, <code>buildDemo</code>,
+  <code>indexHistory</code>, <code>pickUsed</code>, <code>rankLeague</code>,
+  <code>changeOverRounds</code>, <code>syncDecision</code>, <code>buildDemo</code>,
+  <code>encodeShare</code>/<code>decodeShare</code>/<code>buildSharePayload</code>,
   <code>sanitizeIds</code> or <code>normalizeState</code>.
 </p>
 <div id="summary">Loading the app…</div>
@@ -54,7 +56,11 @@ function eq(a, b, msg) {
 }
 function ok(v, msg) { if (!v) throw new Error(msg || 'expected truthy'); }
 
-function onAppLoad() {
+/* Async because the share codec is: deflate-raw runs through a stream. Every
+   await happens up here, before the tests are defined, so run() stays
+   synchronous and a test body is still a plain function that either throws or
+   doesn't. */
+async function onAppLoad() {
   const W = this.contentWindow;
   const H = W.__ghTestHooks;
   if (!H) { fail('The app did not expose __ghTestHooks — is index.html loading correctly?'); return; }
@@ -369,6 +375,146 @@ function onAppLoad() {
     const d = W.buildDemo('g');
     const teeIds = d.course.tees.map((t) => t.id);
     ok(d.rounds.every((r) => r.courseId === d.course.id && teeIds.indexOf(r.teeId) !== -1));
+  });
+
+  /* ── the league table's order ────────────────────────────────────────── */
+  describe('rankLeague');
+  const L = (name, rolling, whs) => ({ id: name, name, rolling, whs });
+  it('puts the lowest handicap first', () => {
+    const r = W.rankLeague([L('High', 24, 22), L('Low', 4.2, 3.1), L('Mid', 12, 11)], 'rolling');
+    eq(r.map((x) => x.name), ['Low', 'Mid', 'High']);
+    eq(r.map((x) => x.rank), [1, 2, 3]);
+  });
+  it('ranks on whichever figure is primary', () => {
+    /* Deliberately disagreeing figures: whoever is first on one is last on the
+       other, so a test that passed by luck can't. */
+    const rows = [L('A', 10, 20), L('B', 20, 10)];
+    eq(W.rankLeague(rows, 'rolling').map((x) => x.name), ['A', 'B']);
+    eq(W.rankLeague(rows, 'whs').map((x) => x.name), ['B', 'A']);
+  });
+  it('sends a golfer with no figure to the foot, unranked — never to the top', () => {
+    const r = W.rankLeague([L('None', null, null), L('Player', 14, 12)], 'rolling');
+    eq(r.map((x) => x.name), ['Player', 'None']);
+    eq(r[1].rank, null, 'an absent handicap is not a rank:');
+  });
+  it('shares a rank between ties and then skips, as a leaderboard does', () => {
+    const r = W.rankLeague([L('A', 10, 1), L('B', 10, 2), L('C', 12, 3)], 'rolling');
+    eq(r.map((x) => x.rank), [1, 1, 3]);
+  });
+  it('breaks a tie by name, so the order does not wander between renders', () => {
+    const r = W.rankLeague([L('Zoe', 10, 1), L('Adam', 10, 2)], 'rolling');
+    eq(r.map((x) => x.name), ['Adam', 'Zoe']);
+  });
+  it('carries the ranked value on the row, so the table shows what it sorted on', () =>
+    eq(W.rankLeague([L('A', 10, 20)], 'whs')[0].value, 20));
+  it('leaves the list it was given alone', () => {
+    const rows = [L('B', 20, 1), L('A', 10, 2)];
+    W.rankLeague(rows, 'rolling');
+    eq(rows.map((x) => x.name), ['B', 'A']);
+  });
+
+  /* ── the trend figure, shared by the tile and the league column ───────── */
+  describe('changeOverRounds');
+  const hist = (vals) => vals.map((v) => ({ rolling: v, whs: v == null ? null : v + 1 }));
+  it('is the difference between now and five counting rounds ago', () =>
+    eq(W.changeOverRounds(hist([20, 19, 18, 17, 16, 15]), 'rolling', 5), -5));
+  it('reads the official column when that is primary', () =>
+    eq(W.changeOverRounds(hist([20, 19, 18, 17, 16, 15]), 'whs', 5), -5));
+  it('has nothing to say with too little history', () =>
+    eq(W.changeOverRounds(hist([20, 19, 18, 17, 16]), 'rolling', 5), null));
+  it('refuses rather than guessing when either end is missing', () =>
+    eq(W.changeOverRounds(hist([null, 19, 18, 17, 16, 15]), 'rolling', 5), null));
+  it('is positive when the handicap has risen', () =>
+    eq(W.changeOverRounds(hist([10, 11, 12, 13, 14, 15]), 'rolling', 5), 5));
+
+  /* ── share links ─────────────────────────────────────────────────────────
+     A link is the least trusted input this app has — it arrives from someone
+     else by definition — so the codec is pinned end to end. All the awaiting
+     happens here; the tests below only look at what came back. */
+  const S = W.GHShare;
+  const sharePayload = {
+    v: 1, sharedAt: 1754870400000, label: 'Dad', view: 'player',
+    golfers: [{ id: 'g1', name: 'Dad' }],
+    activeGolfer: 'g1',
+    courses: [{ id: 'c1', name: 'Ashfield Park', tees: [{ id: 't1', name: 'Yellow', rating: 69.4, slope: 122, par: 71 }] }],
+    rounds: [{ id: 'r1', golferId: 'g1', date: '2026-05-01', courseId: 'c1', teeId: 't1', score: 88, pcc: 0, note: '', counts: true }],
+    settings: { method: H.DEFAULT_METHOD, applyCaps: true, primary: 'rolling' },
+  };
+  const shareToken = await S.encodeShare(sharePayload);
+  const shareRoundTrip = await S.decodeShare(shareToken);
+  const plainToken = '0.' + btoa(JSON.stringify(sharePayload))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const plainRoundTrip = await S.decodeShare(plainToken);
+  const threw = async (fn) => { try { await fn(); return false; } catch (e) { return true; } };
+  const badMarker = await threw(() => S.decodeShare('9.notaformat'));
+  const truncated = await threw(() => S.decodeShare(plainToken.slice(0, 30)));
+  const notAPayload = await threw(() => S.decodeShare('0.' + btoa('{"v":1}')));
+
+  describe('share links — the codec round trip');
+  it('leads with a format marker', () => ok(/^\d+\./.test(shareToken), shareToken.slice(0, 12)));
+  it('a payload survives the round trip exactly', () => eq(shareRoundTrip, sharePayload));
+  it('the uncompressed "0." fallback decodes too', () => eq(plainRoundTrip, sharePayload));
+  it('an unknown format marker is rejected, not guessed at', () => ok(badMarker));
+  it('a truncated link throws rather than half-decoding', () => ok(truncated));
+  it('something that is not a share payload is refused', () => ok(notAPayload));
+  it('compresses — a link is short enough to send', () =>
+    ok(shareToken.length < plainToken.length, `deflate ${shareToken.length} vs plain ${plainToken.length}`));
+
+  /* ── what a link carries, and what it must not ───────────────────────── */
+  describe('buildSharePayload');
+  const shareState = {
+    golfers: [{ id: 'g1', name: 'Dad' }, { id: 'g2', name: 'Sam' }],
+    activeGolfer: 'g1',
+    courses: [
+      { id: 'c1', name: 'Ashfield Park', tees: [{ id: 't1', name: 'Yellow', rating: 69.4, slope: 122, par: 71 }] },
+      { id: 'c2', name: 'Carrick Links', tees: [{ id: 't2', name: 'White', rating: 72.6, slope: 134, par: 72 }] },
+    ],
+    rounds: [
+      { id: 'r1', golferId: 'g1', date: '2026-05-01', courseId: 'c1', teeId: 't1', score: 88, pcc: 0, note: '', counts: true },
+      { id: 'r2', golferId: 'g2', date: '2026-05-02', courseId: 'c2', teeId: 't2', score: 95, pcc: 0, note: '', counts: true },
+    ],
+    settings: { method: H.DEFAULT_METHOD, applyCaps: true, primary: 'whs' },
+  };
+  it('takes only the golfers that were picked', () => {
+    const p = W.buildSharePayload(shareState, ['g1']);
+    eq(p.golfers.map((g) => g.name), ['Dad']);
+    eq(p.rounds.map((r) => r.id), ['r1'], 'and only their rounds:');
+  });
+  it('brings the courses those rounds were played on, and no others', () => {
+    const p = W.buildSharePayload(shareState, ['g1']);
+    eq(p.courses.map((c) => c.id), ['c1'], 'the other golfer\'s course must not travel:');
+  });
+  it('carries the settings — they are what the figures were worked out with', () =>
+    eq(W.buildSharePayload(shareState, ['g1']).settings.primary, 'whs'));
+  it('opens on the league only when there is more than one golfer to compare', () => {
+    eq(W.buildSharePayload(shareState, ['g1']).view, 'player');
+    eq(W.buildSharePayload(shareState, ['g1', 'g2']).view, 'league');
+  });
+  it('names the golfers it holds', () =>
+    eq(W.buildSharePayload(shareState, ['g1', 'g2']).label, 'Dad, Sam'));
+  it('points the shared copy at a golfer that is in it', () =>
+    eq(W.buildSharePayload(shareState, ['g2']).activeGolfer, 'g2'));
+  it('is timestamped', () =>
+    ok(typeof W.buildSharePayload(shareState, ['g1']).sharedAt === 'number'));
+  it('carries nothing beyond these fields — no email, no account, no theme', () =>
+    eq(Object.keys(W.buildSharePayload(shareState, ['g1'])).sort(),
+       ['activeGolfer', 'courses', 'golfers', 'label', 'rounds', 'settings', 'sharedAt', 'v', 'view']));
+  it('sharing nobody shares nothing', () => {
+    const p = W.buildSharePayload(shareState, []);
+    eq(p.golfers, []);
+    eq(p.rounds, []);
+    eq(p.courses, []);
+  });
+  it('reads the state it is handed, not the app\'s own', () => {
+    /* The whole reason it takes an argument: the payload above was built from
+       a state this browser has never saved. */
+    eq(W.buildSharePayload(shareState, ['g2']).golfers[0].name, 'Sam');
+  });
+  it('a shared payload survives normalizeState, which is the door it comes back in by', () => {
+    const s = W.normalizeState(W.buildSharePayload(shareState, ['g1', 'g2']));
+    eq(s.golfers.length, 2);
+    eq(s.rounds.length, 2);
+    eq(s.courses.length, 2);
   });
 
   run();

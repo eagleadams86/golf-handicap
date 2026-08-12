@@ -23,7 +23,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://api.github.com https://accounts.google.com; frame-src https://accounts.google.com; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Golf Handicap — rolling handicap tracker</title>
-<meta name="description" content="Track your golf rounds and see your handicap two ways: your own rolling last-N-rounds method, and the official World Handicap System calculation. Works offline, no account required.">
+<meta name="description" content="Track your golf rounds and see your handicap two ways: a configurable league handicap over your last N rounds, and the official World Handicap System calculation. Compare every golfer on one leaderboard. Works offline, no account required.">
 <!-- The standard name is mobile-web-app-capable; Chrome warns that the apple-
      prefixed one is deprecated. Both stay: older iOS reads only the apple- one. -->
 <meta name="mobile-web-app-capable" content="yes">
@@ -44,12 +44,21 @@
 <script>
   // Apply the saved theme before first paint so there is no flash. Midnight is the
   // default for every app in this family; "slate" is the old name for Dark.
+  //
+  // The open tab is restored here for the same reason, not by the script at the
+  // foot of the page: that one runs after the first paint, so a saved League tab
+  // would show the handicap view and then jump. CSS keyed off data-tab does the
+  // switching; the foot script only has to keep aria-selected in step. With no
+  // script at all the attribute is never set and both panels show, which is the
+  // honest fallback.
   (function () {
     var t = localStorage.getItem('gh-theme');
     if (t === 'slate') t = 'dark';
     var valid = ['midnight', 'dark', 'light', 'sepia'];
     if (valid.indexOf(t) === -1) t = 'midnight';
     document.documentElement.setAttribute('data-theme', t);
+    var tab = localStorage.getItem('gh-tab');
+    document.documentElement.setAttribute('data-tab', tab === 'league' ? 'league' : 'player');
   })();
 </script>
 <style>
@@ -298,7 +307,6 @@ header {
   letter-spacing: var(--ls-tight);
   display: flex; align-items: center; gap: var(--sp-4);
 }
-.brand .sub { color: var(--text-muted); font-weight: var(--fw-medium); }
 /* Width and height are on the element as well as here, so the row is laid out at
    its final size before the icon arrives — the same final-width rule as the rest of
    this bar. `flex: none` because .brand is a flex row and an image would otherwise
@@ -339,8 +347,15 @@ button.link { background: none; border: none; color: var(--accent); padding: 0;
    controls — back up, restore, sign in — this way. At full size they towered
    over the 12px footnote underneath them. The pickers beside a header button are
    pinned to the same height so the row stays even. */
-.headbar button, footer .foot-row button { padding: 4px 9px; font-size: var(--fs-base); min-height: var(--chrome-h); }
+.headbar button { padding: 4px 9px; font-size: var(--fs-base); min-height: var(--chrome-h); }
 .headbar select { min-height: var(--chrome-h); padding: 4px 9px; }
+
+/* The sync button is the one control in the row whose label changes: it paints
+   as "☁️ Sign in to sync" (125px) and then, the moment Firebase reports who you
+   are, becomes "☁️ Charlie" (79px) — and every control to its left slid right
+   on every refresh. Pinning it to its widest state holds the row still. This is
+   Sprint Velocity's fix and, at this font size, its very number. */
+#syncBtn { min-width: 125px; }
 
 /* Help buttons need breathing room — an icon must never sit flush against the
    word it follows. Standing preference across every app in this family. */
@@ -406,6 +421,38 @@ th:has(.help-btn), td:has(.help-btn) { white-space: nowrap; }
 .seg button { border: none; border-radius: 0; background: var(--surface); padding: var(--sp-3) var(--sp-5); }
 .seg button + button { border-left: 1px solid var(--border-strong); }
 .seg button[aria-pressed="true"] { background: var(--btn-bg); color: var(--btn-text); font-weight: var(--fw-medium); }
+
+/* ── Tabs ───────────────────────────────────────────────────────────────────
+   Sprint Velocity's tab row, transcribed — SV is the design lead for shared
+   chrome across this family, so these are its metrics: a 12px gap, 8/14
+   padding, an unselected tab wearing the same surface and border as a button
+   (so it reads as something you can press, rather than only the one you are
+   already on looking clickable), and the selected one filled. SV names the two
+   fill tokens --unit-active-bg/--unit-active-txt; the pack defines those as
+   --btn-bg/--btn-text, which is what this app transcribes. A change here
+   belongs in Sprint Velocity and Team Dashboard too, or the three drift.
+
+   Which panel shows is driven by data-tab on <html>, set before first paint by
+   the boot script in <head>. No attribute (no script) shows both panels.
+─────────────────────────────────────────────────────────────────────────── */
+.tabs { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.tabs[hidden] { display: none; }
+.tab {
+  background: var(--surface-alt); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 8px 14px; cursor: pointer; color: var(--text-primary); font-weight: var(--fw-medium);
+}
+.tab:hover { border-color: var(--text-muted); }
+.tab[aria-selected="true"] { background: var(--btn-bg); border-color: var(--btn-bg);
+  color: var(--btn-text); font-weight: var(--fw-semibold); }
+.tab[aria-selected="true"]:hover { border-color: var(--btn-bg); }
+[data-tab="league"] #playerPanel, [data-tab="player"] #leaguePanel { display: none; }
+
+/* The golfer you are looking at, marked in the league table. The tint is the
+   fill; the word "you" beside the name is what actually carries it, since a
+   tint alone is not a distinction everyone can see. */
+tr.is-you th, tr.is-you td { background: var(--accent-bg); }
+td.rank, th.rank { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
 
 /* At-a-glance tiles. Column counts are spelled out rather than left to auto-fit,
    which at in-between widths dropped the fifth tile onto a row of its own with
@@ -492,6 +539,34 @@ dialog h2 { margin: 0 0 var(--sp-5); font-size: var(--fs-lg); }
 .checkline { display: flex; align-items: center; gap: var(--sp-4); }
 .checkline input { width: auto; min-height: 0; }
 
+/* ── Share dialog furniture, and the read-only bar ──────────────────────────
+   Team Dashboard's, transcribed — the share feature is its, so its furniture
+   comes with it rather than being re-invented a third time.
+─────────────────────────────────────────────────────────────────────────── */
+fieldset.formpanel { border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: var(--sp-5); margin: var(--sp-5) 0 0; background: var(--surface-alt); min-width: 0; }
+legend { font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: var(--ls-label);
+  color: var(--text-secondary); font-weight: var(--fw-bold); padding: 0 var(--sp-3); }
+/* overflow-x is spelled out because `overflow-y: auto` alone leaves the browser
+   free to reserve a horizontal scrollbar it never needs. */
+.checklist { display: grid; gap: 7px; max-height: 220px; overflow: hidden auto; }
+.checklist .checkline { font-size: var(--fs-md); min-height: 24px; }
+.checklist .checkline .hint { margin-left: var(--sp-3); }
+#shareLink { width: 100%; font-family: var(--font-mono); font-size: var(--fs-xs);
+  color: var(--text-secondary); }
+#shareMeta:empty { display: none; }
+
+/* A borrowed link must never read as your own data, so the bar stands above
+   the tabs on every view. The focus colour rather than amber: a shared view is
+   a different mode, not something needing attention. */
+.viewbar { display: flex; gap: 10px 14px; align-items: baseline; flex-wrap: wrap;
+  border: 1px solid var(--border-strong); border-left: 4px solid var(--focus-border);
+  border-radius: var(--radius); background: var(--surface-alt);
+  padding: 11px 14px; margin-bottom: var(--sp-6); font-size: var(--fs-base); }
+.viewbar strong { font-weight: var(--fw-bold); }
+.viewbar .muted { color: var(--text-secondary); }
+.viewbar .mine { margin-left: auto; color: var(--accent); }
+
 /* Live regions are emptied, never removed from the tree — an element toggled
    out with [hidden] announces nothing on the way back. .warn:empty collapses
    it visually instead. */
@@ -510,7 +585,6 @@ dialog h2 { margin: 0 0 var(--sp-5); font-size: var(--fs-lg); }
 
 footer { color: var(--text-muted); font-size: var(--fs-sm); margin-top: var(--sp-8); }
 footer a, .privacy-links a { color: var(--accent); }
-footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items: center; margin-bottom: var(--sp-5); }
 
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
@@ -523,10 +597,13 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
   .wrap { padding: 0 var(--sp-5) var(--sp-8); }
   .headbar { padding: 0 var(--sp-5); }
   .grid2 { grid-template-columns: 1fr; }
-  /* The strapline is the first thing to go when the row starts wrapping — the
-     app's name has to survive on one line, the description doesn't. Only the
-     strapline: the ⛳ is part of the name. */
-  .brand .sub { display: none; }
+  /* With the courses and method buttons up here the row wraps to four lines on
+     a phone, and a sticky bar that deep eats half the screen the moment you
+     scroll — on the one view (the rounds table) you scroll most. Below this
+     width it scrolls away with the page instead. The controls are one flick
+     back up, which is a better trade than losing half of what you came to
+     read. It stays sticky everywhere it fits on one or two lines. */
+  header { position: static; }
 }
 </style>
 </head>
@@ -538,10 +615,17 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
          favicon for a long time, and without it the header would keep showing
          whatever icon it cached the first time. Bump it on every reference (here,
          the <link> in <head>, and privacy.html's) when make_favicon.py is re-run. -->
-    <h1 class="brand"><img class="mark" src="favicon.ico?v=1" width="22" height="22" alt=""> Golf&nbsp;Handicap <span class="sub">· rolling and official, side by side</span></h1>
+    <h1 class="brand"><img class="mark" src="favicon.ico?v=1" width="22" height="22" alt=""> Golf&nbsp;Handicap</h1>
     <label class="sr-only" for="golferSel">Golfer</label>
     <select id="golferSel" title="Which golfer you're looking at" style="min-width:130px"><option>—————</option></select>
     <button id="golfersBtn" title="Add, rename or remove golfers">Golfers</button>
+    <!-- Courses and the method are settings for the whole app, shared by every
+         golfer — they sat under the Rounds card, which read as though they
+         belonged to the rounds on screen. Up here with the other things that
+         apply everywhere, and the Rounds card is left with the one button it is
+         actually asking you to press. -->
+    <button id="coursesBtn" title="Add or edit courses and their tees">Courses</button>
+    <button id="methodBtn" title="Change how the league handicap is worked out">League rule</button>
     <label class="sr-only" for="themeSel">Theme</label>
     <!-- Themes are listed alphabetically; midnight is the default but is not listed
          first. It carries `selected` so the picker never reads one theme while the
@@ -552,28 +636,50 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
       <option value="midnight" selected>✦ Midnight</option>
       <option value="sepia">📜 Sepia</option>
     </select>
+    <!-- Back up sits in the header, as it does in Team Dashboard and Sprint
+         Velocity: it belongs with the other things you do to the data as a
+         whole, not tucked under the changelog where it used to live. -->
+    <button id="dataBtn" title="Back up, restore or clear your data">Back up</button>
+    <button id="shareBtn" title="Create a read-only link to show someone these handicaps">Share</button>
     <button id="syncBtn" title="Sign in with Google to see the same data on all your devices">☁️ Sign in to sync</button>
   </div>
 </header>
 
 <div class="wrap">
 
+<!-- Filled once, when a share link is opened; empty and invisible otherwise. -->
+<div id="shareBar"></div>
+
 <main>
+  <!-- A tablist owes a screen reader two things: which panel each tab drives
+       (aria-controls), and one stop in the tab order rather than one per tab.
+       tabindex is roved in setTab() alongside aria-selected; the arrow keys are
+       wired at the foot of the page. Same pattern as Sprint Velocity and Team
+       Dashboard. The labels are written at their final size, like the header's:
+       nothing here is filled in by script. -->
+  <div class="tabs" role="tablist" aria-label="Views">
+    <button class="tab" role="tab" id="tab-player" aria-controls="playerPanel" data-tab="player" aria-selected="true"  tabindex="0">My handicap</button>
+    <button class="tab" role="tab" id="tab-league" aria-controls="leaguePanel" data-tab="league" aria-selected="false" tabindex="-1">Leaderboard</button>
+  </div>
+
+  <!-- The tabpanel role goes on an inner div, not on <main>: putting it on the
+       element IS its role, so it would silently replace the main landmark. -->
+  <div id="playerPanel" role="tabpanel" aria-labelledby="tab-player">
   <section class="card" id="handicapCard">
     <h2>
-      Current handicap
+      Current Handicap
       <button class="help-btn" type="button" data-help="handicap" aria-label="How the two handicaps are worked out">?</button>
       <span class="spacer"></span>
       <span class="label" id="primaryLabel">Show as primary</span>
       <span class="seg" role="group" aria-labelledby="primaryLabel">
-        <button type="button" id="primRoll" aria-pressed="true">My method</button>
+        <button type="button" id="primRoll" aria-pressed="true">League</button>
         <button type="button" id="primWhs" aria-pressed="false">Official</button>
       </span>
     </h2>
     <div class="figures">
       <div class="figure is-primary" id="figRoll">
         <div class="tag" id="tagRoll">Primary</div>
-        <div class="label"><span class="swatch roll" aria-hidden="true"></span><span id="rollName">Rolling last 5</span></div>
+        <div class="label"><span class="swatch roll" aria-hidden="true"></span><span id="rollName">League</span></div>
         <div class="big na" id="rollValue">—</div>
         <div class="sub" id="rollSub">Add some rounds to get started.</div>
       </div>
@@ -586,29 +692,29 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
     </div>
     <p class="warn" id="handicapWarn" role="status"></p>
     <details id="workingDetails">
-      <summary>How these are worked out</summary>
+      <summary>How These Are Worked Out</summary>
       <div class="work" id="working"></div>
     </details>
   </section>
 
   <section class="card" id="statsCard">
-    <h2>At a glance</h2>
+    <h2>At a Glance</h2>
     <div class="stats" id="stats"></div>
   </section>
 
   <section class="card" id="trendCard">
-    <h2>Handicap over time
+    <h2>Handicap Over Time
       <button class="help-btn" type="button" data-help="trend" aria-label="About the trend chart">?</button>
     </h2>
     <div class="chart-wrap" id="chartWrap"></div>
     <div class="legend">
-      <span><span class="swatch roll" aria-hidden="true"></span> <span id="legendRoll">Rolling last 5</span> — solid line, round points</span>
+      <span><span class="swatch roll" aria-hidden="true"></span> <span id="legendRoll">League</span> — solid line, round points</span>
       <span><span class="swatch whs" aria-hidden="true"></span> Official WHS — dashed line, square points</span>
     </div>
   </section>
 
   <section class="card" id="playingCard">
-    <h2>Course handicap
+    <h2>Course Handicap
       <button class="help-btn" type="button" data-help="coursehcp" aria-label="About the course handicap">?</button>
     </h2>
     <div class="grid2">
@@ -633,25 +739,35 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
       Rounds
       <span class="spacer"></span>
       <button class="primary" id="addRoundBtn">+ Add round</button>
-      <button id="coursesBtn">Courses</button>
-      <button id="methodBtn">My method</button>
     </h2>
     <div class="table-scroll" id="roundsTable"></div>
   </section>
+  </div><!-- /playerPanel -->
+
+  <div id="leaguePanel" role="tabpanel" aria-labelledby="tab-league">
+    <section class="card" id="leagueCard">
+      <h2>
+        Leaderboard
+        <button class="help-btn" type="button" data-help="league" aria-label="How the leaderboard is ordered">?</button>
+        <span class="spacer"></span>
+        <span class="label" id="leagueRankLabel">Rank by</span>
+        <span class="seg" role="group" aria-labelledby="leagueRankLabel">
+          <button type="button" id="leaguePrimRoll" aria-pressed="true">League</button>
+          <button type="button" id="leaguePrimWhs" aria-pressed="false">Official</button>
+        </span>
+      </h2>
+      <div class="table-scroll" id="leagueTable"></div>
+      <p class="warn" id="leagueWarn" role="status"></p>
+      <p class="hint" id="leagueNote"></p>
+    </section>
+  </div><!-- /leaguePanel -->
 </main>
 
 <footer>
-  <div class="foot-row">
-    <button id="exportBtn">⬇︎ Download backup (JSON)</button>
-    <button id="importBtn">⬆︎ Restore from backup</button>
-    <input type="file" id="importFile" accept="application/json,.json" class="sr-only" aria-hidden="true" tabindex="-1">
-    <span class="spacer"></span>
-    <button id="clearBtn" class="danger">Clear everything</button>
-  </div>
   <p id="privacyNote">🔒 Private — stored in this browser; sign in to sync your own devices. No account required to use the app.</p>
   <p class="privacy-links"><a href="privacy.html">Privacy</a></p>
   <details id="changelog">
-    <summary>Recent changes</summary>
+    <summary>Recent Changes</summary>
     <div id="changelogBody" class="hint">Loading…</div>
   </details>
 </footer>
@@ -662,7 +778,7 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
 <!-- ── Dialogs ───────────────────────────────────────────────────────────── -->
 <dialog id="roundDialog" aria-labelledby="roundTitle">
   <form method="dialog" id="roundForm">
-    <h2 id="roundTitle">Add round</h2>
+    <h2 id="roundTitle">Add Round</h2>
     <div class="grid2">
       <div class="field">
         <label for="f_date">Date played</label>
@@ -715,7 +831,7 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
 </dialog>
 
 <dialog id="courseDialog" aria-labelledby="courseDialogTitle">
-  <h2 id="courseDialogTitle">Courses and tees</h2>
+  <h2 id="courseDialogTitle">Courses and Tees</h2>
   <p class="hint">A course needs a <strong>rating</strong> and a <strong>slope</strong> for each set of tees — both are printed on the scorecard. The rating is the score a scratch golfer is expected to shoot; the slope (55–155, usually near 113) is how much harder it plays for everyone else.</p>
   <div id="courseList"></div>
   <div class="row-actions">
@@ -727,7 +843,7 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
 
 <dialog id="courseEditDialog" aria-labelledby="courseEditTitle">
   <form method="dialog" id="courseEditForm">
-    <h2 id="courseEditTitle">Add course</h2>
+    <h2 id="courseEditTitle">Add Course</h2>
     <div class="field">
       <label for="c_name">Course name</label>
       <input type="text" id="c_name" required maxlength="80" placeholder="Royal Ashdown Forest">
@@ -746,8 +862,8 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
 
 <dialog id="methodDialog" aria-labelledby="methodTitle">
   <form method="dialog" id="methodForm">
-    <h2 id="methodTitle">My own method</h2>
-    <p class="hint">This is the calculation the app shows first. The official World Handicap System figure is always worked out alongside it and never changes.</p>
+    <h2 id="methodTitle">The League Handicap</h2>
+    <p class="hint">The calculation the app shows first, and the one the leaderboard is ranked on. It applies to <strong>every golfer here</strong> — one rule, so the table compares like with like. The official World Handicap System figure is always worked out alongside it and never changes.</p>
     <div class="field">
       <label for="m_name">What to call it</label>
       <input type="text" id="m_name" maxlength="40" placeholder="Rolling last 5">
@@ -791,7 +907,7 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
       <button type="button" id="methodReset">Reset to last 5</button>
       <span class="spacer"></span>
       <button type="button" id="methodCancel">Cancel</button>
-      <button type="button" class="primary" id="methodSave">Save method</button>
+      <button type="button" class="primary" id="methodSave">Save rule</button>
     </div>
   </form>
 </dialog>
@@ -816,8 +932,77 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
      irreversible, it reaches every signed-in device, and the one thing that makes
      it safe — taking a backup first — needs to be a button you can actually press
      at the moment of hesitation, which a confirm() cannot hold. -->
+<!-- ── Back up, restore, clear ────────────────────────────────────────────────
+     The three things you can do to the data as a whole, in one place, reached
+     from the header — Team Dashboard's arrangement, which puts them beside the
+     sync button they are the alternative to. They were a row in the footer,
+     where "Clear everything" sat permanently one press away under the small
+     print. Full-size buttons here: in a dialog they are the action being asked
+     for, not chrome beside a footnote. -->
+<dialog id="shareDialog" aria-labelledby="shareDialogTitle">
+  <h2 id="shareDialogTitle">Share a Read-Only Link</h2>
+  <p>Anyone opening this link sees the handicaps you pick, with no way to change them and no
+    sign-in. The rounds travel <em>inside</em> the link itself — nothing is uploaded anywhere,
+    and opening it doesn't touch whatever they have saved in their own browser.</p>
+
+  <fieldset class="formpanel">
+    <legend>Which Golfers</legend>
+    <div class="checklist" id="shareGolfers"></div>
+    <p class="hint" style="margin:var(--sp-5) 0 0">Pick more than one and the link opens on the
+      leaderboard. The courses their rounds were played on come along automatically — a score
+      means nothing without the rating and slope it was worked out from.</p>
+  </fieldset>
+
+  <fieldset class="formpanel">
+    <legend>Your Link</legend>
+    <input type="text" id="shareLink" readonly aria-label="Read-only share link">
+    <p class="hint" id="shareMeta" role="status" style="margin:var(--sp-4) 0 0"></p>
+    <p class="warn" id="shareWarn" role="status"></p>
+    <div class="row-actions" style="justify-content:flex-start">
+      <button type="button" class="primary" id="shareCopyBtn">Copy link</button>
+      <button type="button" id="shareOpenBtn">Preview it</button>
+    </div>
+  </fieldset>
+
+  <p class="hint" style="margin-top:var(--sp-5)">This is a <strong>snapshot</strong>, frozen as
+    it looks right now — rounds logged later won't appear, so send a fresh link when the numbers
+    move. There is no way to withdraw one once sent, so treat it like emailing a spreadsheet.
+    The league rule rides along, because it is what these figures were worked out with;
+    nothing identifying does — no email, no account, not even your theme.</p>
+
+  <div class="row-actions">
+    <button type="button" class="primary" id="shareClose">Done</button>
+  </div>
+</dialog>
+
+<dialog id="dataDialog" aria-labelledby="dataDialogTitle">
+  <h2 id="dataDialogTitle">Back Up &amp; Restore</h2>
+  <p>One JSON file holding every golfer, course, round and setting — a copy you keep,
+    independent of this browser and of any Google account. With no account required to
+    use the app, clearing your browser data is the one thing that will lose your history.</p>
+  <div class="row-actions" style="justify-content:flex-start">
+    <button type="button" id="exportBtn">⬇︎ Download backup (JSON)</button>
+    <button type="button" id="importBtn">⬆︎ Restore from backup</button>
+    <input type="file" id="importFile" accept="application/json,.json" class="sr-only" aria-hidden="true" tabindex="-1">
+  </div>
+  <p class="hint" style="margin-top:var(--sp-5)">Restoring <strong>replaces everything in this
+    browser</strong>. You are shown what the file holds and asked to confirm first — and if you
+    are signed in, the restored copy becomes the one your other devices get.</p>
+  <details>
+    <summary>Start Again</summary>
+    <p class="hint" style="margin-top:var(--sp-5)">Deletes every round, course and golfer.
+      The league rule and your theme are kept.</p>
+    <div class="row-actions" style="justify-content:flex-start">
+      <button type="button" id="clearBtn" class="danger">Clear everything</button>
+    </div>
+  </details>
+  <div class="row-actions">
+    <button type="button" id="dataClose" class="primary">Done</button>
+  </div>
+</dialog>
+
 <dialog id="clearDialog" aria-labelledby="clearTitle">
-  <h2 id="clearTitle">Clear everything?</h2>
+  <h2 id="clearTitle">Clear Everything?</h2>
   <p id="clearBody"></p>
   <p class="warn" id="clearSyncWarn" role="status"></p>
   <div class="row-actions">
@@ -838,7 +1023,7 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
      two copies, so there is no safe default to dismiss into. Both buttons are
      reachable by keyboard, so it isn't a focus trap. -->
 <dialog id="syncChoiceDialog" aria-labelledby="syncChoiceTitle">
-  <h2 id="syncChoiceTitle">Which copy do you want to keep?</h2>
+  <h2 id="syncChoiceTitle">Which Copy Do You Want to Keep?</h2>
   <p id="syncChoiceBody"></p>
   <div class="row-actions">
     <button type="button" id="syncKeepDeviceBtn">Keep this device's</button>
@@ -852,7 +1037,7 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
 
    Two handicaps, always both calculated:
 
-   1. "My method" — a configurable rolling average. Defaults to the average of
+   1. The LEAGUE handicap — a configurable rolling average. Defaults to the average of
       the last 5 rounds, which is how a lot of people actually keep their own
       number. Everything about it is a setting: how many rounds to look at, how
       many of the best to keep, whether to use proper score differentials or
@@ -868,10 +1053,32 @@ footer .foot-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items
    disagree about the maths.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* ── Read-only share links ──────────────────────────────────────────────────
+   Decided before anything else renders: a '#share=…' fragment means this page
+   is showing someone else's snapshot, not this browser's data. `viewOnly`
+   takes away every edit surface and, through the guard in save(), makes it
+   impossible for anything a visitor does to reach what they have saved here —
+   which is very often another copy of their own rounds. The sync module is
+   gated separately, on window.ghViewOnly. Ported from Team Dashboard. */
+const SHARE_PREFIX = '#share=';
+const shareToken = location.hash.startsWith(SHARE_PREFIX)
+  ? location.hash.slice(SHARE_PREFIX.length) : null;
+const viewOnly = !!shareToken;
+let shareMeta = null;               // { sharedAt, label } once a link has been decoded
+window.ghViewOnly = viewOnly;
+
 const STORAGE_KEY = 'gh-state';
 const UPDATED_KEY = 'gh-updated';
 const THEME_KEY = 'gh-theme';
 const THEMES = ['midnight', 'dark', 'light', 'sepia'];
+/* Which view is open. Its own key, alongside the theme rather than inside the
+   saved data: it is where this browser is looking, not something about the
+   golfers, so it has no business travelling to another device. */
+const TAB_KEY = 'gh-tab';
+const TABS = ['player', 'league'];
+/* How far back the "change over N rounds" figure looks — the at-a-glance tile
+   and the league column are the same number, so it is written once. */
+const TREND_ROUNDS = 5;
 
 const DEFAULT_METHOD = {
   name: 'Rolling last 5',
@@ -1104,6 +1311,55 @@ function indexHistory(entries, method, useCaps) {
   return out;
 }
 
+/* How far the primary figure has moved over the last `back` counting rounds —
+   far enough back to mean something, close enough to still be about current
+   form. Pure, and shared by the at-a-glance tile and the league table's column,
+   so the two can never quote different numbers for the same golfer. Negative is
+   an improving handicap. */
+function changeOverRounds(history, primary, back) {
+  const key = primary === 'whs' ? 'whs' : 'rolling';
+  if (!history || history.length < back + 1) return null;
+  const now = history[history.length - 1][key];
+  const then = history[history.length - 1 - back][key];
+  if (now == null || then == null) return null;
+  return round1(now - then);
+}
+
+/* ── The league table's order ────────────────────────────────────────────────
+   Lowest handicap first, on whichever figure is set as primary. Three rules,
+   all pinned by tests:
+
+   - A golfer with no figure yet (fewer than 3 counting rounds gets no official
+     index at all, and someone with no rounds gets neither) sorts to the FOOT
+     and is given no rank rather than a made-up one. Ranking them 1st because
+     null sorts low would be the worst possible answer.
+   - A tie shares a rank, and the next golfer down skips — 1, 2, 2, 4, the way
+     a leaderboard reads.
+   - Ties break by name so the order is stable between renders rather than
+     following whatever order the golfers happen to sit in.
+─────────────────────────────────────────────────────────────────────────── */
+function rankLeague(rows, primary) {
+  const key = (r) => (primary === 'whs' ? r.whs : r.rolling);
+  const sorted = rows.slice().sort((a, b) => {
+    const av = key(a), bv = key(b);
+    if (av == null && bv == null) return String(a.name).localeCompare(String(b.name));
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (av !== bv) return av - bv;
+    return String(a.name).localeCompare(String(b.name));
+  });
+  let lastValue = null, lastRank = 0;
+  return sorted.map((r, i) => {
+    const v = key(r);
+    let rank = null;
+    if (v != null) {
+      rank = (lastRank && v === lastValue) ? lastRank : i + 1;
+      lastValue = v; lastRank = rank;
+    }
+    return Object.assign({}, r, { rank, value: v });
+  });
+}
+
 /* ── Ids from outside are not trusted ────────────────────────────────────────
    Ids arrive from the JSON restore and from the cloud document, and they are
    written into `data-id` attributes and <option value> in a dozen places. An id
@@ -1152,6 +1408,9 @@ function fmtDate(iso) {
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 function fmtIndex(v) { return v == null ? '—' : (v < 0 ? '+' + Math.abs(v).toFixed(1) : v.toFixed(1)); }
+/* A movement, read as one: down is an improving handicap. The arrow is never
+   the only cue — the number carries the size and "level" is spelled out. */
+function trendLabel(v) { return v == null ? '—' : (v === 0 ? 'level' : (v < 0 ? '▼ ' : '▲ ') + Math.abs(v).toFixed(1)); }
 
 function blankState() {
   const gid = uid();
@@ -1273,6 +1532,10 @@ function load() {
    cloudPush(), anything that changes data has to come through here or it will
    silently fail to sync. */
 function save() {
+  /* A shared link is someone else's data, and the visitor very likely has a
+     copy of their own in this browser. Nothing they do to a borrowed snapshot
+     may reach it — so the one write path stops here and only re-renders. */
+  if (viewOnly) { render(); return; }
   /* load() is guarded, so this is too: Safari's private mode and a full quota
      both throw here, and an unguarded throw would kill the click handler
      mid-save with nothing on screen to say so. The in-memory state is still
@@ -1294,12 +1557,14 @@ function courseById(id) { return state.courses.find((c) => c.id === id) || null;
 function teeOf(course, id) { return course ? (course.tees.find((t) => t.id === id) || null) : null; }
 function activeGolfer() { return state.golfers.find((g) => g.id === state.activeGolfer) || state.golfers[0]; }
 
-/* Rounds for the current golfer, oldest first, each carrying the two numbers the
-   methods work from: the score differential and the shots over par. A round
-   whose course was deleted keeps its place in the list but carries nulls, and is
-   shown as such rather than being silently dropped. */
-function golferEntries() {
-  const gid = state.activeGolfer;
+/* Rounds for one golfer — the one on screen unless another is named, which is
+   how the league table gets everyone's figures out of the same code — oldest
+   first, each carrying the two numbers the methods work from: the score
+   differential and the shots over par. A round whose course was deleted keeps
+   its place in the list but carries nulls, and is shown as such rather than
+   being silently dropped. */
+function golferEntries(golferId) {
+  const gid = golferId || state.activeGolfer;
   return state.rounds
     .filter((r) => r.golferId === gid)
     .slice()
@@ -1313,10 +1578,13 @@ function golferEntries() {
     });
 }
 
-/* THE chokepoint. Both figures, the rounds table's "counted" flags, the chart
-   and the working-out all come out of this one call, so they cannot drift apart. */
-function computeAll() {
-  const all = golferEntries();
+/* THE chokepoint. Both figures, the rounds table's "counted" flags, the chart,
+   the working-out and every row of the league table all come out of this one
+   call, so they cannot drift apart. Pass a golfer id to work out someone else's
+   numbers — the league calls it once per golfer; everything else lets it default
+   to the golfer on screen. */
+function computeAll(golferId) {
+  const all = golferEntries(golferId);
   const counted = all.filter((e) => e.round.counts && !e.orphan);
   const method = normalizeMethod(state.settings.method);
   const useCaps = state.settings.applyCaps !== false;
@@ -1386,6 +1654,7 @@ function render() {
   renderCourseHandicap(c);
   renderRounds(c);
   renderWorking(c);
+  renderLeague();
 }
 
 function renderGolfers() {
@@ -1396,8 +1665,13 @@ function renderGolfers() {
 
 function renderFigures(c) {
   const m = c.method;
-  document.getElementById('rollName').textContent = m.name;
-  document.getElementById('legendRoll').textContent = m.name;
+  /* The figure is "League" wherever it is named on the front page — the rule's
+     own name (Rolling last 5, or whatever has been typed) is what the sub-line
+     underneath, the league table's column heading, the "used in" pills and the
+     working-out all carry, so it is never lost, and never has to double as the
+     figure's title. */
+  document.getElementById('rollName').textContent = 'League';
+  document.getElementById('legendRoll').textContent = 'League';
 
   const rollVal = document.getElementById('rollValue');
   rollVal.textContent = fmtIndex(c.rolling.value);
@@ -1455,17 +1729,9 @@ function renderStats(c) {
   const best = diffs.length ? Math.min.apply(null, diffs) : null;
 
   /* Trend compares the primary figure now against what it was five counting
-     rounds ago — far enough back to mean something, close enough to still be
-     about current form. */
-  const hist = c.history;
-  const primary = state.settings.primary === 'whs' ? 'whs' : 'rolling';
-  let trend = null;
-  if (hist.length >= 6) {
-    const now = hist[hist.length - 1][primary];
-    const then = hist[hist.length - 6][primary];
-    if (now != null && then != null) trend = round1(now - then);
-  }
-  const trendText = trend == null ? '—' : (trend === 0 ? 'level' : (trend < 0 ? '▼ ' : '▲ ') + Math.abs(trend).toFixed(1));
+     rounds ago. The arithmetic lives in changeOverRounds() because the league
+     table shows the same number in a column of its own. */
+  const trend = changeOverRounds(c.history, state.settings.primary, TREND_ROUNDS);
 
   /* Order is load-bearing, not editorial: the fifth tile is the one that takes
      the whole width on a phone, and "Last round" is the only value here that is
@@ -1475,7 +1741,7 @@ function renderStats(c) {
     ['Rounds logged', String(c.all.length)],
     ['Counting towards handicap', String(entries.length)],
     ['Best differential', best == null ? '—' : best.toFixed(1)],
-    ['Change over 5 rounds', trendText],
+    [`Change over ${TREND_ROUNDS} rounds`, trendLabel(trend)],
     ['Last round', last ? `${last.round.score} on ${fmtDate(last.date)}` : '—'],
   ];
   document.getElementById('stats').innerHTML = tiles.map(([k, v]) =>
@@ -1585,6 +1851,12 @@ function renderCourseHandicap(c) {
 function renderRounds(c) {
   const box = document.getElementById('roundsTable');
   if (!c.all.length) {
+    /* A visitor gets the plain fact, not the two buttons that would start
+       building data in a copy that can never be saved. */
+    if (viewOnly) {
+      box.innerHTML = '<div class="empty"><p>No rounds were shared for this golfer.</p></div>';
+      return;
+    }
     box.innerHTML = `<div class="empty">
       <p>No rounds yet. Add a course first, then log a round — the two handicaps appear as soon as there is something to work from.</p>
       <button type="button" class="primary" id="firstCourseBtn">Add your first course</button>
@@ -1608,8 +1880,13 @@ function renderRounds(c) {
       if (!inRoll && !inWhs) flags.push('<span class="pill">not used</span>');
     }
     const dropped = e.orphan || !r.counts;
+    /* In a shared view the date is text: a control that opens an editor whose
+       Save can never save is worse than no control at all. */
+    const dateCell = viewOnly
+      ? esc(fmtDate(e.date))
+      : `<button type="button" class="rowbtn" data-round="${esc(r.id)}">${esc(fmtDate(e.date))}</button>`;
     return `<tr class="${dropped ? 'dropped' : ''}">
-      <th scope="row"><button type="button" class="rowbtn" data-round="${esc(r.id)}">${esc(fmtDate(e.date))}</button></th>
+      <th scope="row">${dateCell}</th>
       <td>${esc(e.course ? e.course.name : '—')}</td>
       <td>${esc(e.tee ? e.tee.name : '—')}</td>
       <td class="num">${esc(String(r.score))}</td>
@@ -1644,7 +1921,7 @@ function renderWorking(c) {
   const m = c.method;
   const lines = [];
 
-  lines.push(`${m.name.toUpperCase()}`);
+  lines.push(`LEAGUE HANDICAP — ${m.name.toUpperCase()}`);
   if (c.rolling.pick) {
     const p = c.rolling.pick;
     const basis = m.basis === 'overPar' ? 'shots over par' : 'differentials';
@@ -1682,6 +1959,110 @@ function renderWorking(c) {
     lines.push(`            (113 ÷ ${e.tee.slope}) × (${e.round.score} − ${e.tee.rating}${e.round.pcc ? ` − ${e.round.pcc}` : ''}) = ${e.diff.toFixed(1)}`);
   });
   el.textContent = lines.join('\n');
+}
+
+/* ── The league ─────────────────────────────────────────────────────────────
+   Everyone in the app, side by side, on the numbers the handicap card already
+   works out. Each row goes through the SAME computeAll() — once per golfer —
+   so the league can never disagree with what that golfer's own page says.
+
+   Courses and the handicap method are shared by everyone, which is what makes
+   this comparable at all: the method is one setting, so every column is the
+   same calculation applied to different rounds.
+─────────────────────────────────────────────────────────────────────────── */
+function leagueRows() {
+  return state.golfers.map((g) => {
+    const c = computeAll(g.id);
+    const diffs = c.counted.map((e) => e.diff).filter((d) => d != null);
+    const last = c.all.length ? c.all[c.all.length - 1] : null;
+    return {
+      id: g.id,
+      name: g.name,
+      rolling: c.rolling.value,
+      whs: c.whs.value,
+      rounds: c.all.length,
+      counted: c.counted.length,
+      excluded: c.all.length - c.counted.length,
+      best: diffs.length ? Math.min.apply(null, diffs) : null,
+      change: changeOverRounds(c.history, state.settings.primary, TREND_ROUNDS),
+      lastDate: last ? last.date : null,
+    };
+  });
+}
+
+function renderLeague() {
+  const primary = state.settings.primary === 'whs' ? 'whs' : 'rolling';
+  const method = normalizeMethod(state.settings.method);
+  const rows = rankLeague(leagueRows(), primary);
+  /* Short enough to sit inside a sentence — the rule's own name is added
+     only where there is room for it. */
+  const rankedName = primary === 'whs' ? 'the official index' : 'the league handicap';
+
+  document.getElementById('leaguePrimRoll').setAttribute('aria-pressed', String(primary !== 'whs'));
+  document.getElementById('leaguePrimWhs').setAttribute('aria-pressed', String(primary === 'whs'));
+
+  /* aria-sort on the column actually being ranked, so the order is not
+     something only a sighted reader can infer from the numbers. */
+  const sortedOn = (which) => (which === primary ? ' aria-sort="ascending"' : '');
+
+  const body = rows.map((r) => {
+    /* The tint marks the golfer whose page you would land on. The word "you"
+       only belongs on your own copy — in a shared view nobody in the table is
+       the person reading it. */
+    const open = r.id === state.activeGolfer;
+    return `<tr class="${open ? 'is-you' : ''}">
+      <td class="rank">${r.rank == null ? '—' : r.rank}</td>
+      <th scope="row"><button type="button" class="rowbtn" data-golfer="${esc(r.id)}" title="Show this golfer's handicap">${esc(r.name)}</button>${open && !viewOnly ? ' <span class="pill">you</span>' : ''}</th>
+      <td class="num">${fmtIndex(r.rolling)}</td>
+      <td class="num">${fmtIndex(r.whs)}</td>
+      <td class="num">${r.counted}</td>
+      <td class="num">${r.best == null ? '—' : r.best.toFixed(1)}</td>
+      <td class="num">${esc(trendLabel(r.change))}</td>
+      <td>${r.lastDate ? esc(fmtDate(r.lastDate)) : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('leagueTable').innerHTML = `<table>
+    <caption class="sr-only">Every golfer, ranked by ${esc(rankedName)}, lowest first. Select a name to open that golfer's handicap.</caption>
+    <thead><tr>
+      <th scope="col" class="rank">#</th>
+      <th scope="col">Golfer</th>
+      <th scope="col" class="num"${sortedOn('rolling')}>${esc(method.name)}</th>
+      <th scope="col" class="num"${sortedOn('whs')}>Official</th>
+      <th scope="col" class="num">Rounds</th>
+      <th scope="col" class="num">Best diff<button class="help-btn" type="button" data-help="diff" aria-label="What is a score differential?">?</button></th>
+      <th scope="col" class="num">Change over ${TREND_ROUNDS}</th>
+      <th scope="col">Last round</th>
+    </tr></thead><tbody>${body}</tbody></table>`;
+
+  /* A clickable row needs a real control in it, as in the rounds table. */
+  document.getElementById('leagueTable').querySelectorAll('.rowbtn').forEach((b) => {
+    b.addEventListener('click', () => {
+      state.activeGolfer = b.dataset.golfer;
+      save();
+      setTab('player');
+    });
+  });
+
+  /* Exclusions are never silent here either: a round left out of a figure is
+     named on the league page as well as on the golfer's own. */
+  const excluded = rows.reduce((n, r) => n + r.excluded, 0);
+  const affected = rows.filter((r) => r.excluded).length;
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  document.getElementById('leagueWarn').textContent = excluded
+    ? `${plural(excluded, 'round')} across ${plural(affected, 'golfer')} ${excluded === 1 ? 'is' : 'are'} left out of these figures — the course was deleted, or the round is marked “don't count”.`
+    : '';
+
+  const notes = [`Ranked by ${rankedName}${primary === 'whs' ? '' : ` (${method.name})`}, lowest first.`];
+  const unranked = rows.filter((r) => r.rank == null).length;
+  if (unranked) {
+    notes.push(`${plural(unranked, 'golfer')} ${unranked === 1 ? 'has' : 'have'} no ${rankedName} yet`
+      + `${primary === 'whs' ? ` (the official index needs ${WHS_MIN_ROUNDS} counting rounds)` : ''}, so they sit at the foot of the table.`);
+  }
+  if (rows.length === 1) {
+    notes.push('A leaderboard of one so far — add the people you play with with the Golfers button in the header. Courses and the league rule are shared by everyone, so their rounds slot straight in.');
+  }
+  document.getElementById('leagueNote').textContent = notes.join(' ');
 }
 
 /* ── Dismissing a dialog ────────────────────────────────────────────────── */
@@ -1735,7 +2116,7 @@ function openRound(id) {
   }
   editingRound = id ? state.rounds.find((r) => r.id === id) || null : null;
   const r = editingRound;
-  document.getElementById('roundTitle').textContent = r ? 'Edit round' : 'Add round';
+  document.getElementById('roundTitle').textContent = r ? 'Edit Round' : 'Add Round';
   document.getElementById('f_date').value = r ? r.date : todayISO();
   document.getElementById('f_score').value = r ? r.score : '';
   fillCourseSelects(document.getElementById('f_course'), document.getElementById('f_tee'), r ? r.courseId : lastUsed('courseId'), r ? r.teeId : lastUsed('teeId'));
@@ -1858,7 +2239,7 @@ function teeRowHtml(t) {
 
 function openCourseEdit(id) {
   editingCourse = id ? courseById(id) : null;
-  document.getElementById('courseEditTitle').textContent = editingCourse ? 'Edit course' : 'Add course';
+  document.getElementById('courseEditTitle').textContent = editingCourse ? 'Edit Course' : 'Add Course';
   document.getElementById('c_name').value = editingCourse ? editingCourse.name : '';
   const rows = document.getElementById('teeRows');
   rows.innerHTML = (editingCourse ? editingCourse.tees : [null]).map(teeRowHtml).join('');
@@ -2093,10 +2474,54 @@ document.getElementById('golferSel').addEventListener('change', (e) => {
   save();
 });
 
+/* ── Tabs ───────────────────────────────────────────────────────────────────
+   The attribute on <html> is what actually switches the view (the CSS keys off
+   it), so it is set in one place here and pre-set before first paint by the
+   boot script in <head>. Everything else this does is keeping the tablist
+   honest for a screen reader: one stop in the tab order, on the selected tab.
+─────────────────────────────────────────────────────────────────────────── */
+function setTab(name) {
+  const t = TABS.indexOf(name) === -1 ? TABS[0] : name;
+  document.documentElement.setAttribute('data-tab', t);
+  /* Where this browser is looking, in its own key beside the theme — never in
+     the saved data, so it is not pushed at the user's other devices. Guarded
+     like save() is: Safari's private mode throws on a write, and losing the
+     remembered tab is not worth taking the click handler down with it. */
+  try { localStorage.setItem(TAB_KEY, t); } catch (e) { /* the tab just won't be remembered */ }
+  document.querySelectorAll('.tab').forEach((b) => {
+    const on = b.dataset.tab === t;
+    b.setAttribute('aria-selected', String(on));
+    b.tabIndex = on ? 0 : -1;
+  });
+}
+
+document.querySelectorAll('.tab').forEach((tab) => {
+  tab.addEventListener('click', () => setTab(tab.dataset.tab));
+  /* Arrow keys move along the tabs and switch as they go, which is what a
+     tablist is expected to do once only one of its tabs is in the tab order.
+     Sprint Velocity's handler, ported. */
+  tab.addEventListener('keydown', (e) => {
+    const step = { ArrowLeft: -1, ArrowRight: 1, Home: 'first', End: 'last' }[e.key];
+    if (step === undefined) return;
+    e.preventDefault();
+    const list = Array.from(document.querySelectorAll('.tab'));
+    const i = list.indexOf(tab);
+    const next = step === 'first' ? list[0]
+      : step === 'last' ? list[list.length - 1]
+      : list[(i + step + list.length) % list.length];
+    if (next) { next.focus(); next.click(); }
+  });
+});
+
 /* ── Primary toggle, theme, help ────────────────────────────────────────── */
 
 document.getElementById('primRoll').addEventListener('click', () => { state.settings.primary = 'rolling'; save(); });
 document.getElementById('primWhs').addEventListener('click', () => { state.settings.primary = 'whs'; save(); });
+/* The league's "Rank by" is the same setting as the handicap card's "Show as
+   primary", deliberately: one figure leads, wherever you are looking. Both
+   pairs are re-read from state on every render, so they can't drift apart. */
+document.getElementById('leaguePrimRoll').addEventListener('click', () => { state.settings.primary = 'rolling'; save(); });
+document.getElementById('leaguePrimWhs').addEventListener('click', () => { state.settings.primary = 'whs'; save(); });
 
 const themeSel = document.getElementById('themeSel');
 themeSel.value = document.documentElement.getAttribute('data-theme') || 'midnight';
@@ -2107,22 +2532,26 @@ themeSel.addEventListener('change', () => {
 });
 
 const HELP = {
-  handicap: ['The two handicaps', `<p><strong>Your method</strong> is whatever you have set under “My method” — by default, the average of your last 5 rounds' score differentials. It reacts quickly to how you are playing right now.</p>
+  handicap: ['The Two Handicaps', `<p>The <strong>league handicap</strong> is whatever you have set under “League rule” — by default, the average of your last 5 rounds' score differentials. It reacts quickly to how you are playing right now, and it is the figure the leaderboard is ranked on. One rule applies to everyone in the app, which is what makes that table a fair comparison.</p>
     <p><strong>Official</strong> is the World Handicap System index: the average of your best 8 score differentials from your last 20 rounds. With fewer than 20 rounds it uses a smaller set from a fixed table (and below 3 rounds it will not produce a number at all). Because it keeps only your best rounds, it describes your potential rather than your average day — which is why it is usually the lower of the two.</p>
-    <p>Both are calculated from exactly the same rounds. Nothing you change about your own method affects the official figure.</p>`],
-  diff: ['Score differential', `<p>A score differential turns a score on one course into a number you can compare with a score on any other course:</p>
+    <p>Both are calculated from exactly the same rounds. Nothing you change about the league rule affects the official figure.</p>`],
+  diff: ['Score Differential', `<p>A score differential turns a score on one course into a number you can compare with a score on any other course:</p>
     <p><code>(113 ÷ slope rating) × (your score − course rating − conditions adjustment)</code></p>
     <p>The <strong>course rating</strong> is what a scratch golfer is expected to shoot. The <strong>slope rating</strong> is how much harder the course plays for everyone else; 113 is average, so the fraction is 1 on an average course.</p>`],
-  caps: ['Soft cap and hard cap', `<p>Once you have 20 rounds, the official system limits how fast your index can rise. Compared with the lowest index you have held in the past 365 days:</p>
+  caps: ['Soft Cap and Hard Cap', `<p>Once you have 20 rounds, the official system limits how fast your index can rise. Compared with the lowest index you have held in the past 365 days:</p>
     <ul><li>anything more than <strong>3.0</strong> strokes above it counts only half (the soft cap);</li>
     <li>it can never sit more than <strong>5.0</strong> strokes above it (the hard cap).</li></ul>
     <p>This stops a bad patch from inflating a handicap that you could still play to. Turning it off here shows the uncapped figure instead — useful for checking the arithmetic, but it is not what your club would issue.</p>
     <p>The app takes “lowest index of the past year” from the history you have entered, so it can only be as accurate as that history.</p>`],
-  trend: ['The trend chart', `<p>One point per counting round, showing what each handicap would have been at that moment. The solid line with round points is your own method; the dashed line with square points is the official index.</p>
-    <p>Your own method moves further and faster because it looks at fewer rounds. That is not an error — it is the difference between the two.</p>`],
-  coursehcp: ['Course handicap', `<p>Your handicap index is portable. The course handicap is what it becomes on one particular course off one particular set of tees — the actual number of shots you take off on the day:</p>
+  trend: ['The Trend Chart', `<p>One point per counting round, showing what each handicap would have been at that moment. The solid line with round points is the league handicap; the dashed line with square points is the official index.</p>
+    <p>The league handicap moves further and faster because it looks at fewer rounds. That is not an error — it is the difference between the two.</p>`],
+  league: ['The Leaderboard', `<p>Everyone you have added under <strong>Golfers</strong>, ordered by handicap — lowest first, since a lower handicap is the better golfer. Every row is worked out exactly as that golfer's own page works it out, from the rounds you have logged for them.</p>
+    <p><strong>Rank by</strong> chooses which of the two figures decides the order. It is the same choice as “Show as primary” on the handicap tab — one figure leads wherever you are looking. Both figures are shown in the table either way.</p>
+    <p>A golfer with no figure yet sits at the foot with no rank rather than being ranked first: the official index isn't issued below 3 counting rounds, and someone with no rounds has nothing to compare. <strong>Change over ${TREND_ROUNDS}</strong> is how far that golfer's handicap has moved over their last ${TREND_ROUNDS} counting rounds — ▼ is improving.</p>
+    <p>Courses and the league rule are shared by everyone in the app, which is what makes the comparison fair: the same calculation, applied to different rounds.</p>`],
+  coursehcp: ['Course Handicap', `<p>Your handicap index is portable. The course handicap is what it becomes on one particular course off one particular set of tees — the actual number of shots you take off on the day:</p>
     <p><code>index × (slope ÷ 113) + (course rating − par)</code>, rounded to a whole number.</p>
-    <p>It follows whichever figure you have set as primary, so switching between your method and the official one changes it.</p>`],
+    <p>It follows whichever figure you have set as primary, so switching between the league handicap and the official one changes it.</p>`],
 };
 
 const helpDialog = document.getElementById('helpDialog');
@@ -2157,6 +2586,9 @@ function downloadBackup() {
   toast('Backup downloaded');
 }
 document.getElementById('exportBtn').addEventListener('click', downloadBackup);
+const dataDialog = document.getElementById('dataDialog');
+document.getElementById('dataBtn').addEventListener('click', () => dataDialog.showModal());
+document.getElementById('dataClose').addEventListener('click', () => dataDialog.close());
 
 document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
 document.getElementById('importFile').addEventListener('change', (e) => {
@@ -2187,10 +2619,14 @@ document.getElementById('importFile').addEventListener('change', (e) => {
 const clearDialog = document.getElementById('clearDialog');
 
 document.getElementById('clearBtn').addEventListener('click', () => {
+  /* Closed first rather than stacked: a confirmation is the whole screen's
+     business, and backing out of it should not drop you into the dialog you
+     started from as though nothing had been asked. */
+  dataDialog.close();
   const g = state.golfers.length, r = state.rounds.length, c = state.courses.length;
   document.getElementById('clearBody').textContent =
     `This deletes ${r} round${r === 1 ? '' : 's'}, ${c} course${c === 1 ? '' : 's'} and `
-    + `${g} golfer${g === 1 ? '' : 's'}. Your handicap method and theme are kept. `
+    + `${g} golfer${g === 1 ? '' : 's'}. The league rule and your theme are kept. `
     + `There is no undo — a backup file is the only way to get any of it back.`;
   /* Said plainly, because "clear this device" and "clear every device I own" are
      very different acts and the button looks identical either way. */
@@ -2208,7 +2644,7 @@ document.getElementById('clearCancel').addEventListener('click', () => clearDial
    picking which copy of your rounds survives has to be a choice, not something
    you can click past by accident. `courseEditDialog` dismisses through its own
    Cancel button so it can never drift from what Cancel does. */
-[roundDialog, courseDialog, methodDialog, golferDialog, clearDialog, helpDialog]
+[roundDialog, courseDialog, methodDialog, golferDialog, dataDialog, clearDialog, helpDialog]
   .forEach((dlg) => closeOnBackdropClick(dlg));
 closeOnBackdropClick(courseEditDialog, () => document.getElementById('courseEditCancel').click());
 document.getElementById('clearConfirm').addEventListener('click', () => {
@@ -2304,6 +2740,241 @@ document.getElementById('changelog').addEventListener('toggle', function () {
     .catch(() => { body.textContent = 'Could not load the change list.'; });
 });
 
+/* ── Read-only share links ──────────────────────────────────────────────────
+   The whole payload rides in the URL fragment. Everything after '#' is never
+   sent to a server, so the figures reach the recipient without GitHub Pages,
+   Firebase or anyone else seeing them — no account, no network, no rules.
+
+   Format: '#share=<marker>.<base64url>', marker 1 being deflate-raw and 0
+   plain JSON (CompressionStream is missing on older Safari, and an
+   uncompressed link can be read by hand when something looks wrong).
+
+   The payload is a trimmed copy, never `state` itself: the chosen golfers,
+   their rounds, only the courses those rounds were played on, and the
+   settings — which have to travel, because the rolling method is what the
+   figures were worked out with, and a viewer reading them under their own
+   method would be reading different numbers under the same name. Nothing
+   identifying goes in: no email, no sync uid, no theme.
+
+   Ported from Team Dashboard, which took it from Sprint Velocity.
+─────────────────────────────────────────────────────────────────────────── */
+
+const SHARE_FORMAT = 1;
+/* Long URLs survive browsers fine but not always the trip through a mail
+   client, so the warning sits well below any hard limit rather than at it. */
+const SHARE_WARN_AT = 8000;
+
+const b64urlEncode = (bytes) => {
+  let s = '';
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+
+const b64urlDecode = (str) => {
+  const b = atob(str.replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(b, (c) => c.charCodeAt(0));
+};
+
+async function squeeze(bytes, Stream, format) {
+  const s = new Stream(format);
+  const w = s.writable.getWriter();
+  w.write(bytes); w.close();
+  return new Uint8Array(await new Response(s.readable).arrayBuffer());
+}
+
+/* Pure: the state to share goes in, the payload comes out. Taking `src` as an
+   argument rather than reading the global is what lets tests.html pin exactly
+   what a link carries — and, just as importantly, what it doesn't. */
+function buildSharePayload(src, golferIds) {
+  const golfers = (src.golfers || []).filter((g) => golferIds.indexOf(g.id) !== -1);
+  const keep = new Set(golfers.map((g) => g.id));
+  const rounds = (src.rounds || []).filter((r) => keep.has(r.golferId));
+  /* Only the courses those rounds actually used. A course list is small, but
+     sending the clubs someone plays that this link says nothing about is a
+     detail that has no business travelling. */
+  const used = new Set(rounds.map((r) => r.courseId));
+  const courses = (src.courses || []).filter((c) => used.has(c.id));
+  return {
+    v: 1,
+    sharedAt: Date.now(),
+    label: golfers.map((g) => g.name).join(', '),
+    /* More than one golfer is a league; one is that golfer's own page. */
+    view: golfers.length > 1 ? 'league' : 'player',
+    golfers,
+    activeGolfer: golfers.length ? golfers[0].id : null,
+    courses,
+    rounds,
+    settings: src.settings,
+  };
+}
+
+async function encodeShare(payload) {
+  const json = new TextEncoder().encode(JSON.stringify(payload));
+  if (typeof CompressionStream !== 'function') return '0.' + b64urlEncode(json);
+  const packed = await squeeze(json, CompressionStream, 'deflate-raw');
+  return SHARE_FORMAT + '.' + b64urlEncode(packed);
+}
+
+async function decodeShare(token) {
+  const dot = token.indexOf('.');
+  if (dot < 1) throw new Error('no format marker');
+  const marker = token.slice(0, dot);
+  const bytes = b64urlDecode(token.slice(dot + 1));
+  let json;
+  if (marker === '0') {
+    json = new TextDecoder().decode(bytes);
+  } else if (marker === String(SHARE_FORMAT)) {
+    if (typeof DecompressionStream !== 'function') throw new Error('no DecompressionStream');
+    json = new TextDecoder().decode(await squeeze(bytes, DecompressionStream, 'deflate-raw'));
+  } else {
+    throw new Error('unknown format ' + marker);
+  }
+  const p = JSON.parse(json);
+  if (!p || !Array.isArray(p.golfers) || !p.golfers.length) throw new Error('not a share payload');
+  return p;
+}
+
+/* A link is the least trusted input this app has, so the codec is its own
+   little boundary and tests.html pins the round trip. */
+window.GHShare = { encodeShare, decodeShare, buildSharePayload };
+
+/* ── Opening a shared link ──────────────────────────────────────────────── */
+
+/* Deliberately never falls back to the visitor's own rounds on failure:
+   showing their handicap under a "shared view" banner would be worse than an
+   error message. */
+async function openSharedView() {
+  try {
+    const p = await decodeShare(shareToken);
+    shareMeta = { sharedAt: p.sharedAt, label: p.label };
+    /* The same sanitising boundary a restored backup and a cloud copy cross:
+       hostile ids replaced, settings normalised, nonsense clamped. */
+    state = normalizeState(p);
+    document.getElementById('shareBar').innerHTML = shareBanner();
+    setTab(p.view === 'league' ? 'league' : 'player');
+    render();
+  } catch (e) {
+    console.warn('share link could not be read', e);
+    renderShareError();
+  }
+}
+
+function shareBanner() {
+  const when = shareMeta && shareMeta.sharedAt
+    ? new Date(shareMeta.sharedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+    : null;
+  return '<div class="viewbar">'
+    + '<strong>👁 Read-only view' + (shareMeta && shareMeta.label ? ' — ' + esc(shareMeta.label) : '') + '</strong>'
+    + '<span class="muted">Shared' + (when ? ' on ' + esc(when) : '') + '. '
+    + 'Nothing you do here is saved, and your own rounds are untouched.</span>'
+    + '<a class="mine" href="' + esc(location.pathname) + '">Open my own data</a>'
+    + '</div>';
+}
+
+function renderShareError() {
+  setTab('player');
+  document.querySelector('.tabs').hidden = true;
+  document.getElementById('playerPanel').innerHTML =
+    '<section class="card"><div class="empty">'
+    + '<h2>This Shared Link Couldn’t Be Opened</h2>'
+    + '<p>It looks incomplete — these links are long, and mail apps sometimes cut them in half '
+    + 'or wrap them across two lines. Ask whoever sent it for a fresh copy, and paste the whole '
+    + 'thing in one go.</p>'
+    + '<a class="link" href="' + esc(location.pathname) + '">Open my own data</a>'
+    + '</div></section>';
+}
+
+/* ── Creating a link ────────────────────────────────────────────────────── */
+
+const shareDialog = document.getElementById('shareDialog');
+
+function openShare() {
+  document.getElementById('shareGolfers').innerHTML = state.golfers.map((g) => {
+    const n = state.rounds.filter((r) => r.golferId === g.id).length;
+    return `<label class="checkline"><input type="checkbox" data-share-golfer="${esc(g.id)}"`
+      + `${g.id === state.activeGolfer ? ' checked' : ''}><span>${esc(g.name)}`
+      + `<span class="hint">${n ? `${n} round${n === 1 ? '' : 's'}` : 'no rounds'}</span></span></label>`;
+  }).join('');
+  document.getElementById('shareGolfers').querySelectorAll('input')
+    .forEach((i) => i.addEventListener('change', refreshShareLink));
+  refreshShareLink();
+  shareDialog.showModal();
+  shareDialog.scrollTop = 0;
+}
+
+const sharePicked = () => Array.from(document.getElementById('shareGolfers')
+  .querySelectorAll('input:checked')).map((i) => i.dataset.shareGolfer);
+
+let shareSeq = 0;    // a slow encode must not overwrite the box after a later tick
+
+async function refreshShareLink() {
+  const link = document.getElementById('shareLink');
+  const meta = document.getElementById('shareMeta');
+  const warn = document.getElementById('shareWarn');
+  const busy = ++shareSeq;
+  const setBusy = (on) => {
+    document.getElementById('shareCopyBtn').disabled = on;
+    document.getElementById('shareOpenBtn').disabled = on;
+  };
+
+  const ids = sharePicked();
+  if (!ids.length) {
+    link.value = ''; meta.textContent = 'Pick at least one golfer.'; warn.textContent = '';
+    setBusy(true);
+    return;
+  }
+
+  const payload = buildSharePayload(state, ids);
+  const token = await encodeShare(payload);
+  if (busy !== shareSeq) return;
+
+  const url = location.origin + location.pathname + SHARE_PREFIX + token;
+  link.value = url;
+  setBusy(false);
+  const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  meta.textContent = `${plural(payload.golfers.length, 'golfer')}, ${plural(payload.rounds.length, 'round')}, `
+    + `${plural(payload.courses.length, 'course')} · ${url.length.toLocaleString()} characters`;
+
+  if (!payload.rounds.length) {
+    warn.textContent = 'None of the golfers you picked have any rounds, so the link would open on an empty table.';
+  } else if (url.length > SHARE_WARN_AT) {
+    warn.textContent = 'That’s a long link — some mail apps break links this size across two lines. '
+      + 'Sharing fewer golfers is the quickest way to shorten it.';
+  } else {
+    warn.textContent = '';
+  }
+}
+
+document.getElementById('shareBtn').addEventListener('click', openShare);
+document.getElementById('shareClose').addEventListener('click', () => shareDialog.close());
+document.getElementById('shareCopyBtn').addEventListener('click', async () => {
+  const url = document.getElementById('shareLink').value;
+  if (!url) return;
+  try {
+    await navigator.clipboard.writeText(url);
+    toast('Link copied — paste it into an email or a message');
+  } catch (e) {
+    /* Clipboard access is refused on insecure origins and in some mobile
+       browsers; selecting the text is the honest fallback. */
+    document.getElementById('shareLink').select();
+    toast('Press ⌘C / Ctrl+C to copy the selected link');
+  }
+});
+document.getElementById('shareOpenBtn').addEventListener('click', () => {
+  const url = document.getElementById('shareLink').value;
+  if (url) window.open(url, '_blank', 'noopener');
+});
+
+/* Pasting a share link into a tab that already has the app open changes only
+   the fragment, which a browser handles without reloading — so the page would
+   sit there looking broken. Reload instead, and let the normal boot path run. */
+window.addEventListener('hashchange', () => {
+  const nowShared = location.hash.startsWith(SHARE_PREFIX);
+  if (nowShared !== viewOnly || (nowShared && location.hash.slice(SHARE_PREFIX.length) !== shareToken)) {
+    location.reload();
+  }
+});
+
 /* ── Hooks for the sync module and tests.html ───────────────────────────── */
 
 window.ghGet = () => state;
@@ -2323,6 +2994,10 @@ window.ghCount = () => state.rounds.length;
    write the same bytes back and bounce another event. (The storage event only
    fires in OTHER tabs, so this cannot loop.) */
 window.addEventListener('storage', (e) => {
+  /* …but not into a shared view: this tab is showing someone else's snapshot,
+     and another tab's save is this browser's own data, which would silently
+     replace it. */
+  if (viewOnly) return;
   if (e.key !== STORAGE_KEY || !e.newValue) return;
   try { state = normalizeState(JSON.parse(e.newValue)); } catch { return; }
   render();
@@ -2333,8 +3008,31 @@ window.addEventListener('storage', (e) => {
    `const` values, which are not. */
 window.__ghTestHooks = { DEFAULT_METHOD, WHS_TABLE, WHS_MIN_ROUNDS, WHS_MAX_INDEX, SOFT_CAP_AT, HARD_CAP_AT };
 
-load();
-render();
+/* ── Boot ───────────────────────────────────────────────────────────────── */
+
+if (viewOnly) {
+  /* Everything that edits, backs up, shares or signs in belongs to whoever owns
+     the rounds, not to a visitor. The theme picker and the golfer picker stay:
+     one is the visitor's own preference in its own key, the other is how they
+     move around the copy they were sent. syncBtn is hidden from here rather
+     than left to the sync module, which is deferred — a visitor should not see
+     a sign-in button appear and then vanish. */
+  ['golfersBtn', 'dataBtn', 'shareBtn', 'syncBtn', 'addRoundBtn', 'coursesBtn', 'methodBtn']
+    .forEach((id) => { document.getElementById(id).hidden = true; });
+  document.getElementById('privacyNote').textContent = 'This is a read-only copy someone shared '
+    + 'with you. It was read out of the link itself — nothing was uploaded or downloaded, and '
+    + 'nothing you already had saved in this browser has been touched.';
+  /* Decoding is asynchronous, so hold a neutral line rather than the empty
+     state's "add your first course" — and never this browser's own rounds. */
+  document.getElementById('roundsTable').innerHTML = '<p class="hint">Opening shared view…</p>';
+  openSharedView();
+} else {
+  load();
+  /* The boot script in <head> has already painted the right panel; this only
+     brings aria-selected and the tab order into line with it. */
+  setTab(document.documentElement.getAttribute('data-tab'));
+  render();
+}
 </script>
 
 <script type="module">
@@ -2430,7 +3128,11 @@ let inTestHarness = false;
 try { inTestHarness = !!(window.frameElement && window.frameElement.hasAttribute('data-gh-tests')); }
 catch (e) { /* cross-origin parent — not the harness */ }
 
-if (FIREBASE_CONFIG && !inTestHarness) {
+/* A shared link is somebody else's snapshot: signing in there would start a
+   session that could push their rounds into the visitor's own document. The
+   classic script hides the button; this is what makes sure nothing behind it
+   ever runs. */
+if (FIREBASE_CONFIG && !inTestHarness && !window.ghViewOnly) {
   init().catch((e) => { console.warn('Sync unavailable:', e); btn.hidden = true; });
 } else {
   btn.hidden = true;

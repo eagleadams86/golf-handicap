@@ -1,13 +1,57 @@
 # Golf Handicap — rules for Claude sessions
 
-A golf handicap tracker that shows two figures side by side: a configurable rolling method
-(default: the average of the last 5 rounds) and the official World Handicap System index.
-Deployed via GitHub Pages: https://eagleadams86.github.io/golf-handicap/
+A golf handicap tracker that shows two figures side by side: a configurable rolling method —
+**the league handicap** (default: the average of the last 5 rounds) — and the official World
+Handicap System index. Deployed via GitHub Pages:
+https://eagleadams86.github.io/golf-handicap/
 
 Built for a friend's dad, who has always worked his handicap out from his last 5 cards in
 Excel. **The rolling method is the point of the app, not a novelty** — it is what the page
 leads with, and the official figure is the one shown alongside for reference. Don't reverse
 that emphasis.
+
+- **The rolling figure is called the LEAGUE handicap on screen**, and its settings dialog is
+  reached from the header button **League rule**. It used to be "My method" everywhere; the
+  rename is deliberate and total (2026-08-11) — the rule is one setting shared by every
+  golfer in the app, which is exactly what makes the leaderboard a fair comparison, so
+  naming it after the owner was wrong. The rule's *own* name (`method.name`, auto-generated
+  as "Rolling last 5" or typed by the user) is a different string and still appears: as the
+  sub-line under the figure, the leaderboard's column heading, the "used in" pills and the
+  working-out heading. The front figure is titled "League"; don't put `method.name` back
+  there.
+- **Two tabs: My handicap and Leaderboard.** The panel on screen is driven by `data-tab` on
+  `<html>`, set by the boot script in `<head>` **before first paint** — a tab restored by
+  the script at the foot of the page would paint the handicap view and then jump. CSS does
+  the switching; `setTab()` only keeps `aria-selected` and the roving tabindex in step. The
+  tab is remembered in its own localStorage key (`gh-tab`), beside the theme and never in
+  the saved data — it is where this browser is looking, not something about the golfers.
+  With no script at all the attribute is never set and both panels show, which is the
+  honest fallback. The tablist is Sprint Velocity's, arrow keys included.
+- **On screen it is the "Leaderboard"; in the code it is `league`** (`#leaguePanel`,
+  `renderLeague`, `rankLeague`). That is not drift: the view ranks the *league handicap*, so
+  the code is named after the figure and the tab after what it shows.
+- **`rankLeague()` is pure and pinned by tests.** Three rules that must not be "tidied": a
+  golfer with no figure sorts to the FOOT with **no rank** (null sorting low would rank a
+  golfer with no rounds first, the worst possible answer); ties share a rank and the next
+  one skips (1, 2, 2, 4); and ties break by name so the order doesn't wander between
+  renders.
+- **`changeOverRounds()` is the one place the "change over 5 rounds" figure is worked out**,
+  shared by the at-a-glance tile and the leaderboard's column. Two copies of that
+  subtraction is how the same golfer ends up with two different trends on two screens.
+- **Read-only share links are Team Dashboard's feature, ported.** `#share=<marker>.<b64url>`,
+  marker 1 = deflate-raw and 0 = plain JSON. The payload is a *trimmed copy* built by the
+  pure `buildSharePayload(state, ids)` — it takes the state as an ARGUMENT so tests can pin
+  exactly what a link carries and what it must not: the chosen golfers, their rounds, only
+  the courses those rounds used, and the settings (the figures are meaningless read under
+  someone else's league rule). Nothing identifying, ever — no email, no uid, no theme; a
+  test pins the exact key list. `viewOnly` is decided before anything renders, `save()`
+  returns early in it (a visitor very likely has their own rounds in that browser), the
+  storage listener is muted, the rounds table's dates become text rather than editors, and
+  the sync module is gated on `window.ghViewOnly` — signing in inside someone else's
+  snapshot would push their rounds into the visitor's own document.
+- **Headings are Title Case**, here and in every app in this family (`Current Handicap`,
+  `Back Up & Restore`, `How These Are Worked Out`). Body copy, buttons, table column headers
+  and field labels are unaffected.
 
 - The whole app is **one file — `index.html`** — everything inline, no build step, no server,
   works via `file://`. Keep it that way: no npm, no bundler, no CDN calls beyond the Firebase
@@ -71,11 +115,13 @@ that emphasis.
 - **Buttons are Sprint Velocity's `.btn`, transcribed.** SV is the design lead for shared
   chrome across this family, so the metrics here are its verbatim: 15px text, `7px 12px`
   padding, `--control-h: 38.5px`, hover to `--text-muted`, and a primary that is filled but
-  *not* bolded. Two sizes only: `--chrome-h: 30px` for **utilities that sit beside small
-  print** — the header row and the footer's backup/restore/clear row, which are the same
-  three controls SV renders as `.btn.small` — and `--control-h` for the actions the page is
-  actually asking for. At full size the footer row towered over the 12px footnote beneath
-  it. The pickers sitting beside a header button are pinned to the same height, because a
+  *not* bolded. Two sizes only: `--chrome-h: 30px` for the **header row**, whose
+  controls are utilities rather than the action the page is asking for (the same size SV
+  gives the very same three: back up, share, sign in), and `--control-h` for everything in
+  the page body and the dialogs. Backup/restore/clear used to be a footer row at chrome
+  size, for the same "beside small print" reason; they are a header button and a dialog
+  now, and inside a dialog they are full-size because there they ARE the action being asked
+  for. The pickers sitting beside a header button are pinned to the same height, because a
   native `<select>` ignores line-height and would otherwise sit shorter. Full-size buttons
   deliberately run a size above the 13px body text. `.link` and `.rowbtn`
   take the body size back: they sit inside sentences and tables, not on their own.
@@ -149,9 +195,11 @@ that emphasis.
   `<h1>` at 17px/700 whose `margin: 0 auto 0 0` is what pushes the controls right. The
   horizontal 16px gutter lives on `.wrap`/`.headbar`, **not on `<body>`** — the bar runs
   edge to edge behind it. The control labels are `.sr-only` with a `title` on each control,
-  as in both siblings; don't put visible captions back. `.brand .sub` is the strapline and
-  is the one thing dropped on a narrow screen — the mark is part of the name, so the selector
-  has to stay specific.
+  as in both siblings; don't put visible captions back. The strapline is **gone** (2026-08-11): with the courses and league-rule
+  buttons moved up here the row had no room for it, and the media query that used to drop it
+  on a narrow screen went with it. Below 560px the bar is deliberately **not sticky** — seven
+  controls wrap to four lines on a phone, and a sticky bar that deep eats half the screen on
+  the one view you scroll most.
 - **The mark is the app's own icon, drawn, not an emoji.** A flagstick on the green with a
   ball beside it, on the family tile Money Map, PAPTrack, Sprint Predictability and Flow
   Metrics all wear: midnight page, soft disc in the corner, one accent gradient. It replaced
@@ -213,12 +261,20 @@ that emphasis.
 - **The CSP meta tag is the only place a policy can be declared** (GitHub Pages can't set
   headers). Any new network endpoint must be added to `connect-src`, and the Firebase
   `authDomain` to `frame-src`, or it is silently blocked.
+- **`example-league.json` is a checked-in fixture, not data** — a backup anyone can restore
+  to see a populated leaderboard (8 golfers, 112 rounds, 6 courses). `make_example_league.py`
+  writes it from a fixed seed, so re-running produces the identical file; regenerate it
+  rather than hand-editing, and keep the awkward cases it deliberately holds — a
+  near-scratch player with negative differentials, golfers either side of 20 rounds, one on
+  4 (the reduced-scores table), one on 2 (no official index at all), one who has never
+  played, and two rounds marked "don't count".
 - **README.md is the index** — keep it current whenever the app meaningfully changes.
 - **`tests.html` pins the pure functions — open it on a local server and check
   "All N tests pass"** whenever you touch `round1`, `scoreDifferential`, `averageLowest`,
   `whsIndex`/`whsSelection`, `rollingIndex`/`rollingSelection`, `normalizeMethod`,
   `clampInt`/`clampNum`, `applyCaps`, `courseHandicap`, `indexHistory`, `pickUsed`,
-  `syncDecision`, `buildDemo`, `sanitizeIds` or `normalizeState`. It loads
+  `syncDecision`, `buildDemo`, `rankLeague`, `changeOverRounds`,
+  `encodeShare`/`decodeShare`/`buildSharePayload`, `sanitizeIds` or `normalizeState`. It loads
   the real `index.html` in a hidden iframe and calls the functions directly — no copies, no
   build step — so it needs `http://localhost` (`file://` iframes are blocked in some
   browsers). **It also refuses to run anywhere else, and that is load-bearing:** Pages
