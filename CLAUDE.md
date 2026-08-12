@@ -295,7 +295,15 @@ that emphasis.
   invisible frame. Two guards, both needed: the iframe carries `data-gh-tests`, which the
   sync module checks before `init()`, and the gate at the foot of `tests.html` never creates
   the iframe at all off localhost (booting the app IS the side effect, so the check can't
-  live in the load handler). Don't put the iframe back in the markup. CI runs the same page
+  live in the load handler). **`file://` is deliberately NOT in `LOCAL_HOSTS`**: it has no
+  hostname, and `''` used to sit in that list on the reasoning that the suite couldn't run
+  there anyway — but that sent it down the iframe branch, where the frame silently fails to
+  load and the suite blamed the app ("did not expose `__ghTestHooks`"). Opening the file off
+  disk now gets the advice that fixes it. For the same reason the missing-hooks message
+  distinguishes **a frame that never loaded the app** (no server running) from **an app that
+  loaded and threw**: one is a setup problem, the other is a bug, and a single message for
+  both sent a reader hunting through `index.html` for neither.
+  Don't put the iframe back in the markup. CI runs the same page
   headless on every push (`.github/workflows/tests.yml`) on `localhost:8014`, so the gate
   lets it through, and fails the build if the summary goes red. `window.__ghTestHooks` exists solely to hand it the `const` values, which aren't
   on `window`; function declarations it reaches directly. **When a rule in this file changes,
