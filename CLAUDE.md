@@ -167,6 +167,17 @@ that emphasis.
   asking to lose the method they just configured. It goes through `save()` like everything
   else, so it reaches the cloud copy, and `window.ghSignedIn()` is what lets the dialog say
   so — the classic script can't see the module-scoped `user`.
+- **The toast is a POPOVER (`popover="manual"`), and that is the only way it can be seen
+  while a dialog is open.** A modal `<dialog>` sits in the browser's TOP LAYER, which paints
+  above every z-index in the ordinary document, so a toast fired from an open dialog was
+  drawn under it and under its backdrop — invisible, indistinguishable from a button that
+  does nothing. The share dialog's "Copy link" is the case that has to work: copying leaves
+  the dialog open, so the toast is the only thing that says it happened. **Anything else
+  that has to appear over a dialog needs the same treatment** — a bigger z-index cannot
+  reach the top layer. Sprint Velocity's CLAUDE.md carries the fuller note (it is the design
+  lead for this chrome, and the fix is mirrored in all four web apps); the short version is
+  that `toast()` raises the popover before writing the text, forces a reflow so the fade
+  still runs, and drops out of the top layer once it has faded.
 - **Every dialog closes on a click outside it, except one.** `closeOnBackdropClick()` is
   Sprint Velocity's and Team Dashboard's helper, ported: it hit-tests against the dialog's
   *box* rather than `e.target === dialog` (a click on the dialog's own padding is still

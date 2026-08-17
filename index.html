@@ -596,11 +596,18 @@ legend { font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: var
 .warn:empty { display: none; }
 .err-text { color: var(--err); }
 
+/* The toast is a POPOVER, so that it can be seen over an open modal dialog —
+   the reasoning is on toast() itself. The inset/margin/overflow lines undo the
+   UA's own [popover] rules, which would otherwise park it in the middle of the
+   screen; its border is its own and stays. The z-index still matters on a
+   browser with no popover support, where this is the plain fixed element it has
+   always been. */
 #toast {
-  position: fixed; left: 50%; bottom: var(--sp-7); transform: translateX(-50%);
+  position: fixed; left: 50%; right: auto; top: auto; bottom: var(--sp-7);
+  margin: 0; transform: translateX(-50%);
   background: var(--surface-alt); border: 1px solid var(--border-strong);
   color: var(--text-primary); padding: var(--sp-4) var(--sp-6);
-  border-radius: var(--radius-pill); font-size: var(--fs-sm);
+  border-radius: var(--radius-pill); font-size: var(--fs-sm); overflow: visible;
   opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 50; max-width: 90vw; text-align: center;
 }
 #toast.show { opacity: 1; }
@@ -795,7 +802,7 @@ footer a, .privacy-links a { color: var(--accent); }
 </footer>
 
 </div>
-<div id="toast" role="status" aria-live="polite"></div>
+<div id="toast" popover="manual" role="status" aria-live="polite"></div>
 
 <!-- ── Dialogs ───────────────────────────────────────────────────────────── -->
 <dialog id="roundDialog" aria-labelledby="roundTitle">
@@ -2756,13 +2763,50 @@ function loadDemo() {
 
 /* ── Toast ──────────────────────────────────────────────────────────────── */
 
-let toastTimer = null;
+/* A modal <dialog> is promoted to the browser's TOP LAYER, which paints above
+   every z-index in the ordinary document — so a toast fired while a dialog was
+   open was drawn UNDER it, and under its backdrop, which reads as no feedback
+   at all. The share dialog's "Copy link" is the case that has to work: it
+   copies and deliberately leaves the dialog open, so the toast is the only
+   thing that says anything happened.
+   A popover is the one way to put something that ISN'T a dialog into the top
+   layer, and the layer is ordered by when things joined it, so a toast raised
+   after a dialog opened sits above it. `manual` because nothing else should
+   dismiss it and Escape belongs to the dialog underneath. On a browser with no
+   popover support the attribute is inert, no UA rules apply to it, and the
+   toast is exactly the fixed element it has always been. */
+const TOAST_POPOVER = 'popover' in HTMLElement.prototype;
+let toastTimer = null, toastHideTimer = null, toastRaised = false;
+
+function raiseToast(el) {
+  if (!TOAST_POPOVER || toastRaised) return;
+  /* A failure here costs the top layer, never the toast. */
+  try { el.showPopover(); toastRaised = true; } catch (e) {}
+}
+function dropToast(el) {
+  if (!toastRaised) return;
+  try { el.hidePopover(); } finally { toastRaised = false; }
+}
+
 function toast(msg) {
   const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+  clearTimeout(toastHideTimer);
+  /* Raised BEFORE the text is written: a popover is display:none until it is
+     shown, and a live region announces a change it was there for. */
+  raiseToast(el);
+  el.textContent = msg;
+  /* That display flip means the opacity:0 starting state is never painted, so
+     the fade would be skipped entirely; reading a layout property in between
+     settles it and the transition runs. */
+  void el.offsetWidth;
+  el.classList.add('show');
+  toastTimer = setTimeout(() => {
+    el.classList.remove('show');
+    /* Leaves the top layer once it has faded, so a spent toast is never parked
+       above whatever opens next. Matches the .2s opacity transition. */
+    toastHideTimer = setTimeout(() => dropToast(el), 250);
+  }, 3200);
 }
 window.toast = toast;
 
