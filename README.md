@@ -396,7 +396,8 @@ To go back to fully-local, set `FIREBASE_CONFIG` to `null` again.
 
 | File | What it is |
 |---|---|
-| `index.html` | The entire app — markup, styles, logic, sync. No build step, no dependencies, no CDN calls except the Firebase SDK when sync is enabled. |
+| `index.html` | The app — markup, styles, logic, sync. No build step, no dependencies, no CDN calls except the Firebase SDK when sync is enabled. |
+| `theme.css` | The shared palette, copied from the private theme pack. Linked by `index.html` and `privacy.html`; it has to sit beside them. |
 | `tests.html` | 119 tests pinning the pure handicap maths, the leaderboard's order, the share codec, the restore/repair rules and the sync decisions. Loads the real `index.html` in a hidden iframe and calls its functions directly. |
 | `privacy.html` | Privacy policy. Exists because other people may sign in with their own Google accounts. |
 | `firestore.rules` | A checked-in copy of the security rules to deploy in the Firebase console. |
@@ -414,7 +415,7 @@ every `favicon.ico` reference — browsers hold on to an icon for a long time.
 
 The palette is **transcribed inline** from [`claude-theme-pack`](https://github.com/eagleadams86/claude-theme-pack)
 (private), the source of truth for every app in this family. It is inlined rather than
-linked so the app still works opened straight off disk via `file://`. Four themes — Midnight
+linked as `theme.css` so every app in the family reads the same file. Four themes — Midnight
 (default), Dark, Light, Sepia — listed alphabetically in the picker. Never retune a colour
 here: change the pack's `tokens.json`, run its contrast gate, rebuild, re-transcribe.
 

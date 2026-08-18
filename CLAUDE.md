@@ -60,8 +60,15 @@ that emphasis.
   `Back Up & Restore`, `How These Are Worked Out`). Body copy, buttons, table column headers
   and field labels are unaffected.
 
-- The whole app is **one file — `index.html`** — everything inline, no build step, no server,
-  works via `file://`. Keep it that way: no npm, no bundler, no CDN calls beyond the Firebase
+- The app is **`index.html` plus `theme.css`** — no build step, no server, no npm, no bundler,
+  no CDN calls beyond the Firebase
+  SDK. **It was one self-contained file until 2026-08-18**, when the palette moved from an
+  inline transcription to the theme pack's generated `theme.css`, linked. That was the
+  user's explicit call, made against the trade-off: every web app now reads the same bytes
+  and cannot drift, at the cost of `index.html` no longer standing alone — **`theme.css`
+  has to travel with it**, and opening the HTML off disk without it leaves the page
+  unstyled. Don't re-inline the palette to "restore" the single file; the alignment is the
+  point. Everything ELSE stays inline: no second script, no second stylesheet.
   SDK that optional sync loads.
 - No account is ever required. The only exception is an **optional** Google sign-in for
   cross-device sync, backed by the `golfhandicap-14246` Firebase project (auth + one
@@ -100,9 +107,15 @@ that emphasis.
 - **The official calculation must never be affected by the rolling-method settings.** That
   independence is the app's whole claim; it is stated in the UI and in the README, and a
   test pins it indirectly (`whsIndex` takes only differentials).
-- The palette is **transcribed inline** from `~/claude-theme-pack` (private repo
-  eagleadams86/claude-theme-pack), the source of truth for all apps — inlined rather than
-  linked so `file://` works. Four themes (Midnight default, Dark, Light, Sepia), listed
+- The palette is **`theme.css`, linked** — copied byte-for-byte from `~/claude-theme-pack`
+  (private repo eagleadams86/claude-theme-pack), the source of truth for all apps. It was
+  transcribed inline until 2026-08-18 so `file://` would work; linking replaced that so the
+  file cannot drift from the pack or from the other apps. `privacy.html` links the same
+  file — **its CSP needed `style-src 'self'` added**, which it did not have, and a linked
+  stylesheet is silently blocked without it. `tests.html` uses no tokens and links nothing.
+  The app's own additions (`--c-roll`/`--c-whs` chart colours, `--chrome-h`, `--control-h`,
+  `--page-w`) stay in the inline `<style>` AFTER the link, which is what lets them win.
+  Four themes (Midnight default, Dark, Light, Sepia), listed
   **alphabetically** in the picker, unknown/missing saved values falling back to midnight
   (`slate` → `dark`). Never retune a colour here: change the pack's `tokens.json`, run its
   `check_contrast.py` gate, rebuild, re-transcribe, and keep the other apps in step (drift
