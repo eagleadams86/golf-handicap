@@ -7,8 +7,8 @@
      opened via file://). 'unsafe-inline' is unavoidable: the app is inline script
      and style by design, with no build step to generate hashes. The real value is
      the host allowlists — script only from this page and Firebase's CDN, network
-     calls only to the Firebase endpoints sync actually uses plus the GitHub API
-     (changelog), frames only from Google's sign-in.
+     calls only to the Firebase endpoints sync actually uses, frames only from
+     Google's sign-in.
      form-action is 'self' rather than 'none' because the dialogs submit
      with method="dialog", which some browsers have historically checked against
      form-action.
@@ -20,7 +20,7 @@
      foot of the file). firebaseapp.com and apis.google.com are deliberately NOT
      here: they served Firebase's hosted popup, which this app no longer uses —
      the same as Team Dashboard and Sprint Velocity. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://api.github.com https://accounts.google.com; frame-src https://accounts.google.com; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Golf Handicap — rolling handicap tracker</title>
 <meta name="description" content="Track your golf rounds and see your handicap two ways: a configurable league handicap over your last N rounds, and the official World Handicap System calculation. Compare every golfer on one leaderboard. Works offline, no account required.">
@@ -525,7 +525,7 @@ footer a, .privacy-links a { color: var(--accent); }
     </select>
     <!-- Back up sits in the header, as it does in Team Dashboard and Sprint
          Velocity: it belongs with the other things you do to the data as a
-         whole, not tucked under the changelog where it used to live. -->
+         whole, not tucked away at the foot of the page where it used to live. -->
     <button id="dataBtn" title="Back up, restore or clear your data">Back up</button>
     <button id="shareBtn" title="Create a read-only link to show someone these handicaps">Share</button>
     <button id="syncBtn" title="Sign in with Google to see the same data on all your devices">☁️ Sign in to sync</button>
@@ -654,10 +654,11 @@ footer a, .privacy-links a { color: var(--accent); }
   <p id="privacyNote">🔒 Private — stored in this browser; sign in to sync your own devices. No account required to use the app.</p>
   <p class="privacy-links"><a href="privacy.html">Privacy</a> &middot;
     <a href="https://github.com/eagleadams86/golf-handicap" target="_blank" rel="noopener noreferrer">How it works</a></p>
-  <details id="changelog">
-    <summary>Recent Changes</summary>
-    <div id="changelogBody" class="hint">Loading…</div>
-  </details>
+  <!-- Authorship line, mirroring the sibling apps. Its own element, not part of
+       #privacyNote, whose textContent the sync code rewrites. -->
+  <p class="privacy-links">&copy; 2026 Charles Adams — an independent personal project,
+    <a href="https://github.com/eagleadams86/golf-handicap/blob/main/LICENSE"
+       target="_blank" rel="noopener noreferrer">MIT licensed</a>.</p>
 </footer>
 
 </div>
@@ -2667,34 +2668,6 @@ function toast(msg) {
   }, 3200);
 }
 window.toast = toast;
-
-/* ── Recent changes ─────────────────────────────────────────────────────────
-   Fetched on first expand, not on load, so it costs nothing for the common
-   case. Only renders an <a> when the API's html_url really is a GitHub https
-   link — a hostile URL from the API must not be able to become a javascript:
-   href. (Same guard as the lottery calculator and Sprint Velocity.)
-─────────────────────────────────────────────────────────────────────────── */
-let changelogLoaded = false;
-document.getElementById('changelog').addEventListener('toggle', function () {
-  if (!this.open || changelogLoaded) return;
-  changelogLoaded = true;
-  const body = document.getElementById('changelogBody');
-  fetch('https://api.github.com/repos/eagleadams86/golf-handicap/commits?path=index.html&per_page=10')
-    .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-    .then((list) => {
-      if (!Array.isArray(list) || !list.length) { body.textContent = 'No changes found.'; return; }
-      body.innerHTML = '<ul>' + list.map((c) => {
-        const subject = esc(String((c.commit && c.commit.message) || '').split('\n')[0]);
-        const when = c.commit && c.commit.author ? esc(new Date(c.commit.author.date).toLocaleDateString()) : '';
-        const url = String(c.html_url || '');
-        const label = /^https:\/\/github\.com\//.test(url)
-          ? `<a href="${esc(url)}" rel="noopener noreferrer">${subject}</a>`
-          : `<span>${subject}</span>`;
-        return `<li>${label} <span class="hint">${when}</span></li>`;
-      }).join('') + '</ul>';
-    })
-    .catch(() => { body.textContent = 'Could not load the change list.'; });
-});
 
 /* ── Read-only share links ──────────────────────────────────────────────────
    The whole payload rides in the URL fragment. Everything after '#' is never

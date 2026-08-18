@@ -360,7 +360,6 @@ that emphasis.
   differentials, which interacts awkwardly with a "last N games" method. The data model
   carries what a 9-hole feature would need, so it wouldn't be a migration — but don't add it
   without deciding first what a 9-hole round means to the rolling method.
-- Write commit subject lines in plain English a non-developer can read. **They are
-  user-facing**: the "Recent changes" box at the foot of the page fetches the last 10 commits
-  touching `index.html` from the GitHub API and lists the subject lines verbatim. Write them
-  for a reader, not for a diff.
+- Write commit subject lines in plain English a non-developer can read. The "Recent
+  changes" box that made them user-facing was removed 2026-08-18, across the whole app
+  family, and the GitHub API went out of the CSP with it — the habit stands anyway.

@@ -459,9 +459,8 @@ summary goes red or the page throws — same workflow as the rest of the app fam
 and explanation reads from it, so no two parts of the screen can disagree about the maths.
 If you add a new figure, take it from there.
 
-Commit subject lines are **user-facing** — the page lists its last 10 commits in the
-"Recent changes" section at the foot. Write them in plain English for a reader, not for a
-diff.
+Commit subject lines are written in plain English for a reader, not for a diff. (The
+"Recent changes" section that listed them in the app was removed in August 2026.)
 
 ---
 
