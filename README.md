@@ -399,7 +399,7 @@ To go back to fully-local, set `FIREBASE_CONFIG` to `null` again.
 | `index.html` | The app — markup, styles, logic, sync. No build step, no dependencies, no CDN calls except the Firebase SDK when sync is enabled. |
 | `theme.css` | The shared palette, copied from the private theme pack. Linked by `index.html` and `privacy.html`; it has to sit beside them. |
 | `tests.html` | 119 tests pinning the pure handicap maths, the leaderboard's order, the share codec, the restore/repair rules and the sync decisions. Loads the real `index.html` in a hidden iframe and calls its functions directly. |
-| `privacy.html` | Privacy policy. Exists because other people may sign in with their own Google accounts. |
+| `privacy.html` | Privacy policy. Exists because other people may sign in with their own Google accounts. Linked from the app's footer, beside a **How it works** link back to this README on GitHub. |
 | `firestore.rules` | A checked-in copy of the security rules to deploy in the Firebase console. |
 | `favicon.ico` | The app's icon — the fallback a browser fetches from the site root on its own. |
 | `make_favicon.py` | Draws `favicon.ico` to match the inline SVG icon in `index.html`. |
