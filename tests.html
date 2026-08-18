@@ -259,6 +259,12 @@ async function onAppLoad() {
   describe('daysBefore');
   it('steps back a year across a leap day', () => eq(W.daysBefore('2026-01-01', 365), '2025-01-01'));
 
+  describe('monthsBefore');
+  it('clamps to the shorter month’s end', () => eq(W.monthsBefore('2026-03-31', 1), '2026-02-28'));
+  it('clamps to the 29th in a leap year', () => eq(W.monthsBefore('2024-03-31', 1), '2024-02-29'));
+  it('lands on the same day a year back when it exists', () => eq(W.monthsBefore('2026-03-31', 12), '2025-03-31'));
+  it('rolls back across a year boundary', () => eq(W.monthsBefore('2026-01-15', 3), '2025-10-15'));
+
   /* ── which rounds get the credit ─────────────────────────────────────── */
   describe('pickUsed');
   it('credits a tied value to the most recent round, once each', () => {

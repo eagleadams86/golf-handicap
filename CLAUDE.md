@@ -295,8 +295,9 @@ that emphasis.
 - **`firestore.rules` is a checked-in copy of what is deployed in the console.** Nothing here
   deploys it. If the console rules change, change this file to match.
 - **The CSP meta tag is the only place a policy can be declared** (GitHub Pages can't set
-  headers). Any new network endpoint must be added to `connect-src`, and the Firebase
-  `authDomain` to `frame-src`, or it is silently blocked.
+  headers). Any new network endpoint must be added to `connect-src` or it is silently
+  blocked. `frame-src` needs only `accounts.google.com` — GIS sign-in never loads the
+  Firebase `authDomain`, even if the project is repointed.
 - **`example-league.json` is a checked-in fixture, not data** — a backup anyone can restore
   to see a populated leaderboard (8 golfers, 112 rounds, 6 courses). `make_example_league.py`
   writes it from a fixed seed, so re-running produces the identical file; regenerate it

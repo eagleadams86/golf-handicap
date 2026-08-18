@@ -8,8 +8,8 @@
      and style by design, with no build step to generate hashes. The real value is
      the host allowlists — script only from this page and Firebase's CDN, network
      calls only to the Firebase endpoints sync actually uses plus the GitHub API
-     (changelog), frames only from Google's sign-in and this app's Firebase auth
-     helper. form-action is 'self' rather than 'none' because the dialogs submit
+     (changelog), frames only from Google's sign-in.
+     form-action is 'self' rather than 'none' because the dialogs submit
      with method="dialog", which some browsers have historically checked against
      form-action.
      NOTE: any new network endpoint must be added to connect-src or it is blocked.
@@ -1731,7 +1731,6 @@ function renderGolfers() {
 }
 
 function renderFigures(c) {
-  const m = c.method;
   /* The figure is "League" wherever it is named on the front page — the rule's
      own name (Rolling last 5, or whatever has been typed) is what the sub-line
      underneath, the league table's column heading, the "used in" pills and the
@@ -1902,7 +1901,7 @@ function renderCourseHandicap(c) {
   const sub = document.getElementById('chSub');
   if (!tee) {
     el.textContent = '—'; el.classList.add('na');
-    sub.textContent = state.courses.length ? 'Pick a course and tee.' : 'Add a course first — the Courses button is under Rounds.';
+    sub.textContent = state.courses.length ? 'Pick a course and tee.' : 'Add a course first — the Courses button is in the header.';
     return;
   }
   const ch = courseHandicap(index, tee.slope, tee.rating, tee.par);
@@ -2492,7 +2491,7 @@ function renderGolferList() {
   box.innerHTML = `<div class="table-scroll"><table>
     <caption class="sr-only">Golfers. Select a name to rename that golfer; Remove deletes them and their rounds.</caption>
     <thead><tr>
-      <th scope="col">Name</th><th scope="col" class="num">Rounds</th><th scope="col"></th>
+      <th scope="col">Name</th><th scope="col" class="num">Rounds</th><th scope="col"><span class="sr-only">Remove</span></th>
     </tr></thead><tbody>` + state.golfers.map((g) => {
     const n = state.rounds.filter((r) => r.golferId === g.id).length;
     return `<tr>
@@ -2597,7 +2596,7 @@ themeSel.value = document.documentElement.getAttribute('data-theme') || 'midnigh
 themeSel.addEventListener('change', () => {
   const t = THEMES.indexOf(themeSel.value) === -1 ? 'midnight' : themeSel.value;
   document.documentElement.setAttribute('data-theme', t);
-  localStorage.setItem(THEME_KEY, t);
+  try { localStorage.setItem(THEME_KEY, t); } catch (e) { /* the theme just won't be remembered */ }
 });
 
 const HELP = {
@@ -3008,15 +3007,15 @@ function shareBanner() {
      would read as the golfer's whole record, and both handicaps are worked out
      from what is actually here. Both values came out of a link, so they are
      checked rather than trusted. */
-  let window = '';
+  let windowNote = '';
   if (shareMeta && typeof shareMeta.from === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(shareMeta.from)) {
-    window = `Covers rounds from ${fmtDate(shareMeta.from)} onward, so the figures are worked out from those alone. `;
+    windowNote = `Covers rounds from ${fmtDate(shareMeta.from)} onward, so the figures are worked out from those alone. `;
   } else if (shareMeta && Number.isFinite(shareMeta.lastN) && shareMeta.lastN > 0) {
-    window = `Covers each golfer's last ${Math.floor(shareMeta.lastN)} rounds, so the figures are worked out from those alone. `;
+    windowNote = `Covers each golfer's last ${Math.floor(shareMeta.lastN)} rounds, so the figures are worked out from those alone. `;
   }
   return '<div class="viewbar">'
     + '<strong>👁 Read-only view' + (shareMeta && shareMeta.label ? ' — ' + esc(shareMeta.label) : '') + '</strong>'
-    + '<span class="muted">Shared' + (when ? ' on ' + esc(when) : '') + '. ' + esc(window)
+    + '<span class="muted">Shared' + (when ? ' on ' + esc(when) : '') + '. ' + esc(windowNote)
     + 'Nothing you do here is saved, and your own rounds are untouched.</span>'
     + '<a class="mine" href="' + esc(location.pathname) + '">Open my own data</a>'
     + '</div>';
@@ -3206,8 +3205,16 @@ window.addEventListener('hashchange', () => {
 window.ghGet = () => state;
 window.ghAdopt = (incoming, updatedAt) => {
   state = normalizeState(incoming);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  localStorage.setItem(UPDATED_KEY, String(updatedAt || Date.now()));
+  /* Guarded like save(): private mode or a full quota throws here, and this
+     runs inside the sync module's onSnapshot callback, where an uncaught throw
+     would skip render() and leave the screen behind the state. The in-memory
+     copy is still good — render it and carry on. */
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(UPDATED_KEY, String(updatedAt || Date.now()));
+  } catch (e) {
+    console.warn('Could not write saved data', e);
+  }
   render();
 };
 window.ghCount = () => state.rounds.length;
@@ -3291,9 +3298,9 @@ if (viewOnly) {
    project, not a secret — it ships in the page of every Firebase web app, and
    access is enforced by firestore.rules rather than by hiding this key.
    Set it to null to force fully-local mode (the button hides and nothing is
-   ever sent anywhere). If it is ever pointed at a different project, the new
-   authDomain must also go into frame-src in the Content-Security-Policy at the
-   top of this file, or sign-in is silently blocked. */
+   ever sent anywhere). Repointing it at a different project needs no CSP
+   change: sign-in goes through Google Identity Services, so frame-src needs
+   only accounts.google.com — nothing ever loads the authDomain. */
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBgBhAMUmXvq1vXb4KdSDALC2kNqsFZmxU",
   authDomain: "golfhandicap-14246.firebaseapp.com",
@@ -3522,7 +3529,10 @@ const docRef = () => F.doc(db, COLLECTION, user.uid);
    this the choice sticks here and nowhere else, and a third device holding an
    in-between timestamp would push its copy back up and resurrect exactly what
    was rejected. */
-const touchLocal = () => localStorage.setItem('gh-updated', String(Date.now()));
+const touchLocal = () => {
+  try { localStorage.setItem('gh-updated', String(Date.now())); }
+  catch (e) { /* storage blocked — the choice still holds for this session */ }
+};
 
 function chooseSyncSource(localCount, remoteCount, remoteUpdatedAt) {
   return new Promise((resolve) => {
@@ -3578,7 +3588,8 @@ async function startSync() {
   } else {
     await pushNow();
   }
-  localStorage.setItem('gh-sync-uid', user.uid);
+  try { localStorage.setItem('gh-sync-uid', user.uid); }
+  catch (e) { /* storage blocked — the next sign-in just asks again */ }
 
   /* The error callback is not optional: a listener that errors is dropped by
      Firestore and never fires again, so without it another device's updates
