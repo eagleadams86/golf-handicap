@@ -2,7 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self'; connect-src https://api.github.com; frame-src 'self'; base-uri 'none'; form-action 'none'">
+<!-- Every page on the shared origin ships a CSP (the family security rule) —
+     this one is published on GitHub Pages beside the app, so it is as much a
+     page on the origin as index.html is. connect-src 'self' is for reading
+     index.html and sw.js as text (the paths that halt the app cannot all be
+     run live), api.github.com for the CI-scorecard line, and frame-src 'self'
+     for the harness iframe, whose content is then governed by index.html's own
+     CSP rather than this one. `style-src 'self'` is what lets theme.css load,
+     so this page wears the same palette as the app. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self' https://api.github.com; frame-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Golf Handicap — Tests</title>
 <style>
@@ -619,6 +627,193 @@ async function onAppLoad() {
     eq(s.golfers.length, 2);
     eq(s.rounds.length, 2);
     eq(s.courses.length, 2);
+  });
+
+  /* ── the offline worker, and the copy from the future ────────────────────
+     All the awaiting for both groups happens here, before a single it() is
+     defined, so the test bodies below stay synchronous like every other one in
+     this file. */
+  const [swRes, killRes, appRes] = await Promise.all(
+    [fetch('sw.js'), fetch('sw-kill.js'), fetch('index.html')]);
+  const SW_SRC = swRes.ok ? await swRes.text() : '';
+  const KILL_SRC = killRes.ok ? await killRes.text() : '';
+  const APP_SRC = appRes.ok ? await appRes.text() : '';
+  const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const SW = strip(SW_SRC), KILL = strip(KILL_SRC);
+  const shellList = (SW_SRC.match(/const SHELL = \[([\s\S]*?)\]/) || [null, ''])[1];
+  const shell = [...shellList.matchAll(/'([^']+)'/g)].map((x) => x[1]).sort();
+  /* The future-link check can run live — decodeShare touches no storage. */
+  const futureLink = await S.encodeShare(Object.assign({}, sharePayload, { v: H.SHARE_PAYLOAD_V + 1 }));
+  let futureErr = null;
+  try { await S.decodeShare(futureLink); } catch (e) { futureErr = e; }
+  const currentLink = await S.decodeShare(await S.encodeShare(sharePayload));
+
+  /* ── the offline shell ───────────────────────────────────────────────── */
+  describe('sw.js — the offline shell');
+
+  /* Read as TEXT rather than exercised as a live worker, and that is the point
+     rather than a shortcut: registration is frame-guarded, so this suite never
+     installs one — a suite that did would be testing whatever that worker had
+     cached instead of the files on disk. What is worth asserting is the SHAPE
+     of the thing: Cache Storage is origin-wide, shared with the sibling apps,
+     so "nothing private is ever cached" is the promise holding this up. */
+  it('sw.js and its kill switch both exist', () => {
+    ok(SW_SRC, 'sw.js is missing');
+    ok(KILL_SRC, 'sw-kill.js is missing — the escape hatch has to exist BEFORE it is needed');
+  });
+  /* Exact equality, not "contains". A new entry has to be added here too, which
+     is the moment to ask whether the file is genuinely public. */
+  it('caches only files that are already public in this repo', () =>
+    eq(shell, ['./', 'favicon.ico', 'privacy.html', 'theme.css']));
+  it('never caches the rounds, the suite, or the example league', () => {
+    const banned = [/\.json$/, /^tests\.html$/, /\.py$/, /CLAUDE/i, /README/i, /example/i];
+    for (const entry of shell)
+      for (const pat of banned)
+        ok(!pat.test(entry), `"${entry}" must never be cached`);
+  });
+  it('touches nothing cross-origin, and has no eval', () => {
+    ok(!/https?:\/\//.test(SW), 'sw.js names an off-origin URL in executable code');
+    /* A worker on Pages runs with NO CSP at all, so these are not merely untidy. */
+    ok(!SW.includes('eval(') && !SW.includes('importScripts(') && !SW.includes('new Function('),
+       'sw.js must have no eval, importScripts or new Function');
+  });
+  it('deletes only its own caches — the origin is shared', () => {
+    ok(/startsWith\(PREFIX\)/.test(SW), 'activate must guard caches.delete with the prefix');
+    ok(/const PREFIX = 'gh-shell-';/.test(SW_SRC), 'and the prefix must be this app’s');
+  });
+  it('is network-first, so cached code needs a network that actually failed', () => {
+    ok(/Promise\.race/.test(SW) && /cache\.match/.test(SW), 'expected the network-first race');
+    ok(!/caches\.match\(req\)\s*\.then\(\s*\(?r\)?\s*=>\s*r\s*\|\|/.test(SW),
+       'this looks cache-first — the whole design rests on network-first');
+    ok(/!res\.ok && cached/.test(SW),
+       'a same-origin error reply with a cached copy in hand must serve the cache');
+  });
+  it('can repair its cache without a new worker version', () => {
+    /* install fires ONCE per script version, so an evicted cache would never be
+       rebuilt if install were the only thing that filled it. */
+    ok(/addEventListener\(\s*'message'/.test(SW) && /'shell-check'/.test(SW),
+       'the worker must accept a shell-check message');
+    ok(/if \(reg\.active\) reg\.active\.postMessage\(\{ type: 'shell-check' \}\)/.test(APP_SRC),
+       'and the page must ask for one on load');
+    ok(!/addAll/.test(SW), 'addAll rejects the whole precache on a single 404, silently');
+  });
+  it('accepts only its own signal, and reads nothing out of it', () => {
+    /* postMessage is reachable from any page on the shared origin. */
+    ok(/e\.data\.type !== 'shell-check'\) return;/.test(SW),
+       'the message handler must reject anything but shell-check');
+    ok(!/e\.data\.(url|urls|path|cache|key)/.test(SW),
+       'and must never take a URL or cache name out of a message');
+  });
+  it('keys the cache on the path, which the favicon’s ?v=1 needs', () => {
+    ok(/favicon\.ico\?v=1/.test(APP_SRC), 'the cache-buster has gone — recheck this test');
+    ok(/let p = url\.pathname;/.test(SW_SRC) && /SHELL_PATHS\.has\(p\)/.test(SW_SRC),
+       'shellKey must match on the path alone, or the buster misses the cached file');
+  });
+  it('the kill switch stays a pure uninstaller', () => {
+    ok(/unregister\(\)/.test(KILL), 'sw-kill.js must unregister itself');
+    ok(!/addEventListener\(\s*'fetch'/.test(KILL), 'and intercept nothing — inert is the point');
+    ok(!/cache\.put|addAll/.test(KILL), 'and never cache anything');
+    ok(/startsWith\('gh-shell-'\)/.test(KILL), 'and clear only this app’s caches');
+  });
+  it('the page declares worker-src and guards registration three ways', () => {
+    const csp = (APP_SRC.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/) || [])[1] || '';
+    ok(/worker-src 'self'/.test(csp),
+       "the CSP must spell out worker-src 'self', not lean on the fallback chain");
+    ok(!/worker-src[^;]*https?:/.test(csp), 'and admit no off-origin host there');
+    ok(/window\.top !== window\.self/.test(APP_SRC),
+       'registration must skip frames, or this suite would install a worker on itself');
+    ok(/if \(window\.ghViewOnly\) return;/.test(APP_SRC),
+       'a shared view — or a page halted on newer data — must install nothing');
+    ok(/window\.addEventListener\('load', function \(\) \{/.test(APP_SRC),
+       'and wait for load rather than compete with first paint');
+  });
+
+  /* ── the copy from the future ────────────────────────────────────────── */
+  describe('data written by a newer build');
+
+  /* The braces to the worker's belt. normalizeState() rebuilds from the keys it
+     knows and drops the rest — right for a damaged backup, silently destructive
+     for a copy from a newer build. The halt itself is pinned as source rather
+     than run: it draws a card over the whole frame and THROWS, which would take
+     the rest of the suite with it. */
+  it('a blank state is stamped with the format this build understands', () =>
+    eq(W.blankState().version, H.SCHEMA));
+  it('normalizeState always stamps this build’s number, never the incoming one', () =>
+    eq(W.normalizeState({ version: 99, golfers: [{ id: 'g1', name: 'A' }] }).version, H.SCHEMA));
+  it('and drops what it does not know — which is why the guard has to exist', () => {
+    const out = W.normalizeState({ version: 1, golfers: [{ id: 'g1', name: 'A' }], fromTheFuture: 1 });
+    ok(!('fromTheFuture' in out), 'an unknown field does not survive the boundary');
+  });
+  it('the halt fires above the current version and not at or below it', () => {
+    const halts = (v) => Number(v || 1) > H.SCHEMA;
+    ok(!halts(H.SCHEMA), 'must not halt on data this build wrote');
+    ok(!halts(H.SCHEMA - 1), 'must not halt on older data — the boundary handles that');
+    ok(!halts(undefined), 'data with no version at all is old, not new');
+    ok(halts(H.SCHEMA + 1), 'must halt on data from a newer build');
+  });
+  it('the halt refuses to write and takes the sync module down with it', () => {
+    ok(/viewOnly = true;\n  window\.ghViewOnly = true;/.test(APP_SRC),
+       'haltForNewerData must set viewOnly and its window mirror');
+    ok(/let viewOnly = !!shareToken;/.test(APP_SRC),
+       'viewOnly must stay assignable — the halt reuses it as the no-write flag');
+    ok(/if \(viewOnly\) \{ render\(\); return; \}/.test(APP_SRC),
+       'save() must still be a no-op under viewOnly');
+    ok(/!inTestHarness && !window\.ghViewOnly/.test(APP_SRC),
+       'the sync module must still refuse to start under ghViewOnly');
+  });
+  it('the boot check runs above the first listener, and outside load()', () => {
+    const guardAt = APP_SRC.indexOf('haltForNewerData(peek.version)');
+    const firstListener = APP_SRC.indexOf('addEventListener', APP_SRC.indexOf('function haltForNewerData'));
+    const loadAt = APP_SRC.indexOf('function load() {');
+    ok(guardAt > -1, 'the boot check must call haltForNewerData');
+    ok(guardAt < loadAt, 'and must not live inside load(), whose catch returns a blank state');
+    /* The first listener after the halt's own Reload button. A throw below that
+       point would leave handlers attached to a halted app. */
+    const afterHalt = APP_SRC.indexOf('addEventListener', APP_SRC.indexOf('btn.addEventListener') + 20);
+    ok(guardAt < afterHalt || afterHalt === -1, 'the check must run before any handler is attached');
+    ok(firstListener > -1, 'sanity: the app does attach listeners');
+  });
+  it('ghAdopt stores the newer copy verbatim, then halts instead of adopting', () => {
+    const at = APP_SRC.indexOf('window.ghAdopt =');
+    const body = APP_SRC.slice(at, APP_SRC.indexOf('window.ghCount'));
+    const guard = body.search(/\(\(incoming && incoming\.version\) \|\| 1\) > SCHEMA/);
+    const store = body.indexOf('JSON.stringify(incoming)');
+    const halt = body.indexOf('haltForNewerData(incoming.version)');
+    const norm = body.indexOf('state = normalizeState(incoming)');
+    ok(guard > -1, 'ghAdopt must refuse a version newer than this build');
+    ok(store > guard && halt > store,
+       'the newer copy must be stored VERBATIM before the halt — normalising would lose its fields');
+    ok(norm > -1 && halt < norm, 'and the halt must fire before normalizeState sees it');
+  });
+  it('another tab running a newer build is refused too', () => {
+    /* Two tabs can be on different builds — one from the offline cache, one
+       fetched fresh — so the newer copy arrives from next door as easily as
+       from the cloud. Nothing is written: that tab already holds the newest. */
+    const at = APP_SRC.indexOf("addEventListener('storage'");
+    const body = APP_SRC.slice(at, at + 1400);
+    ok(/Number\(incoming\.version \|\| 1\) > SCHEMA/.test(body),
+       'the storage listener must check the version it was handed');
+    ok(body.indexOf('haltForNewerData') < body.indexOf('state = normalizeState(incoming)'),
+       'and halt before normalizeState strips it');
+  });
+  it('restoring a backup from a newer build is refused, without halting', () => {
+    const at = APP_SRC.indexOf('JSON.parse(String(reader.result))');
+    const body = APP_SRC.slice(at, at + 1600);
+    const refuse = body.search(/Number\(parsed && parsed\.version \|\| 1\) > SCHEMA/);
+    const norm = body.indexOf('normalizeState(parsed)');
+    ok(refuse > -1, 'the restore handler must refuse a newer backup');
+    ok(norm > -1 && refuse < norm, 'before normalizeState strips what makes it newer');
+    ok(!/haltForNewerData/.test(body), 'and must not stop the app the user is using');
+  });
+  it('a share link from a newer build is refused, and marked as such', () => {
+    ok(futureErr, 'decodeShare must refuse a payload version it does not know');
+    ok(futureErr && futureErr.newerVersion,
+       'and mark it, so the card can say the link is fine and this copy is behind');
+  });
+  it('an ordinary share link still opens', () => {
+    eq(currentLink.golfers.length, sharePayload.golfers.length);
+    eq(W.buildSharePayload(shareState, ['g1']).v, H.SHARE_PAYLOAD_V,
+       'and the builder stamps the version the decoder checks for');
   });
 
   run();

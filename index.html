@@ -20,7 +20,7 @@
      foot of the file). firebaseapp.com and apis.google.com are deliberately NOT
      here: they served Firebase's hosted popup, which this app no longer uses —
      the same as Team Dashboard and Sprint Velocity. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://accounts.google.com; worker-src 'self'; frame-src https://accounts.google.com; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Golf Handicap — rolling handicap tracker</title>
 <meta name="description" content="Track your golf rounds and see your handicap two ways: a configurable league handicap over your last N rounds, and the official World Handicap System calculation. Compare every golfer on one leaderboard. Works offline, no account required.">
@@ -982,12 +982,39 @@ footer a, .privacy-links a { color: var(--accent); }
 const SHARE_PREFIX = '#share=';
 const shareToken = location.hash.startsWith(SHARE_PREFIX)
   ? location.hash.slice(SHARE_PREFIX.length) : null;
-const viewOnly = !!shareToken;
+/* `let`, not `const`: haltForNewerData() sets it. Reusing this flag rather than
+   inventing a second one is deliberate — save() is the app's single write path
+   and already stops on it, and a second flag would have to be remembered by
+   every write path added from here on. */
+let viewOnly = !!shareToken;
 let shareMeta = null;               // { sharedAt, label } once a link has been decoded
 window.ghViewOnly = viewOnly;
 
 const STORAGE_KEY = 'gh-state';
 const UPDATED_KEY = 'gh-updated';
+
+/* ── The data format number, and what makes stale code safe ─────────────────
+   It rides into localStorage, the cloud document and every backup file as
+   `version`, and the four boundaries below refuse a copy carrying a HIGHER one.
+
+   The reason is normalizeState(): it REBUILDS the state from the keys it knows
+   and silently drops the rest. That is exactly right for a damaged backup and
+   exactly wrong for a copy written by a NEWER build — an older tab would strip
+   the fields it has never heard of, render what was left, and push the stripped
+   copy back to the cloud on the next save, losing another device's rounds with
+   nothing on screen to say so. There is nothing to migrate towards, so refusing
+   to open it is the only safe answer.
+
+   This became reachable the day the service worker landed: offline you can be
+   running yesterday's cached code while sync hands you a document today's build
+   wrote on another device. Network-first caching makes that narrow; this makes
+   it safe.
+
+   BUMP IT whenever a saved field is added, renamed, or given a new meaning —
+   and teach normalizeState() the field in the SAME commit, or the boundary will
+   strip the very field the bump exists to protect. Nothing that stays on this
+   device (theme, which tab is open) needs a bump. */
+const SCHEMA = 1;
 const THEME_KEY = 'gh-theme';
 const THEMES = ['midnight', 'dark', 'light', 'sepia'];
 /* Which view is open. Its own key, alongside the theme rather than inside the
@@ -998,6 +1025,105 @@ const TABS = ['player', 'league'];
 /* How far back the "change over N rounds" figure looks — the at-a-glance tile
    and the league column are the same number, so it is written once. */
 const TREND_ROUNDS = 5;
+
+/* ── The copy-from-the-future check ─────────────────────────────────────────
+   Run here, at the top level and a long way above the first event listener,
+   because the halt works by throwing: everything after it in this script block
+   is skipped, so an app stopped this early has no handler attached to it at
+   all. It cannot sit any earlier either — SCHEMA is a `const` declared just
+   above, and reading it sooner is a temporal-dead-zone error.
+
+   Deliberately not inside load(), whose catch returns a blank state: that is
+   the right answer to corrupt JSON and a catastrophic one here, because a blank
+   state the app then saves overwrites the good copy with nothing.
+
+   Skipped in a shared view, which neither reads nor writes this device's own
+   saved copy — someone should still be able to open a friend's link on a device
+   whose own data has moved ahead. */
+if (!viewOnly) {
+  let peek = null;
+  try { peek = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); }
+  catch (e) { peek = null; }   // unparseable is load()'s problem, not this one
+  if (peek && typeof peek === 'object' && Number(peek.version || 1) > SCHEMA)
+    haltForNewerData(peek.version);
+}
+
+/* Stop the app dead, with the saved copy untouched, and say why.
+   Called only for data written by a newer build: from the check above, from
+   ghAdopt() when sync hands one over mid-session, and from the storage listener
+   when another tab of this browser writes one. It does three things, in a
+   deliberate order:
+
+   1. Sets viewOnly (and its window mirror), which is the EXISTING, tested
+      chokepoint — save() is already a no-op under it and the sync module
+      already refuses to start.
+   2. Draws the message with textContent, never innerHTML. The number came out
+      of storage or a cloud document, and data is data, not markup.
+   3. THROWS, so nothing after it initialises. Silence is the point: a
+      half-booted app with handlers attached is one stray click from a save. */
+function haltForNewerData(found) {
+  viewOnly = true;
+  window.ghViewOnly = true;
+  const wrap = document.createElement('div');
+  wrap.setAttribute('style', 'position:fixed;inset:0;z-index:99999;display:flex;'
+    + 'align-items:center;justify-content:center;padding:24px;'
+    + 'background:var(--bg,#0a0e1a);color:var(--text-primary,#e7eaf6);'
+    + 'font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif');
+  const card = document.createElement('div');
+  card.setAttribute('style', 'max-width:34em;border:1px solid var(--border,#262f4a);'
+    + 'border-radius:12px;padding:24px 26px;background:var(--surface,#121829)');
+  const h = document.createElement('h1');
+  h.setAttribute('style', 'margin:0 0 12px;font-size:20px');
+  h.textContent = 'This Data Was Saved by a Newer Version';
+  const p1 = document.createElement('p');
+  p1.setAttribute('style', 'margin:0 0 12px');
+  p1.textContent = 'Your saved data uses format ' + String(found)
+    + ', and the copy of the app running here only understands ' + String(SCHEMA)
+    + '. Opening it with this older code would quietly drop the parts it doesn\u2019t '
+    + 'know about, so it has stopped instead.';
+  const p2 = document.createElement('p');
+  p2.setAttribute('style', 'margin:0 0 12px');
+  p2.textContent = 'Nothing has been changed or deleted \u2014 your rounds and courses '
+    + 'are exactly as you left them. This usually means another device saved '
+    + 'after an update, and this one is still running the older version from '
+    + 'its offline cache.';
+  const p3 = document.createElement('p');
+  p3.setAttribute('style', 'margin:0 0 18px;color:var(--text-secondary,#aab2d0)');
+  p3.textContent = 'Connect to the internet and reload to get the current version.';
+  const btn = document.createElement('button');
+  btn.setAttribute('style', 'font:inherit;font-weight:600;padding:9px 18px;'
+    + 'border:0;border-radius:8px;cursor:pointer;'
+    + 'background:var(--btn-bg,#e7eaf6);color:var(--btn-text,#0a0e1a)');
+  btn.textContent = 'Reload';
+  /* A plain reload can be answered by the service worker out of the same stale
+     cache that caused the halt, and location.reload(true) does not help — the
+     force-reload argument is non-standard and ignored. So unregister first,
+     then reload; the page registers a fresh worker on the next successful load.
+     Only `gh-shell-` caches are cleared: the origin is shared with the sibling
+     apps, and their caches are not ours to delete. */
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = 'Reloading\u2026';
+    try {
+      if (navigator.serviceWorker) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) await reg.unregister();
+      }
+      if (window.caches) {
+        const keys = await caches.keys();
+        await Promise.all(keys.filter((k) => k.startsWith('gh-shell-'))
+          .map((k) => caches.delete(k)));
+      }
+    } catch (e) { /* nothing to clear, or storage refused — reload anyway */ }
+    location.reload();
+  });
+  card.append(h, p1, p2, p3, btn);
+  wrap.appendChild(card);
+  const attach = () => document.body.appendChild(wrap);
+  if (document.body) attach();
+  else document.addEventListener('DOMContentLoaded', attach, { once: true });
+  throw new Error('gh: saved data version ' + found + ' is newer than this build (' + SCHEMA + ')');
+}
 
 const DEFAULT_METHOD = {
   name: 'Rolling last 5',
@@ -1334,7 +1460,9 @@ function trendLabel(v) { return v == null ? '—' : (v === 0 ? 'level' : (v < 0 
 function blankState() {
   const gid = uid();
   return {
-    version: 1,
+    /* Stamped on every saved copy so a newer build knows what wrote it — and so
+       an older one can refuse it rather than quietly strip it. See SCHEMA. */
+    version: SCHEMA,
     golfers: [{ id: gid, name: 'Me' }],
     activeGolfer: gid,
     courses: [],
@@ -1350,7 +1478,11 @@ function blankState() {
 function normalizeState(raw) {
   const s = (raw && typeof raw === 'object') ? raw : {};
   const out = {
-    version: 1,
+    /* Always this build's number, never the incoming one: whatever comes out of
+       here has been rebuilt from the keys THIS build knows, so claiming a
+       version it isn't would be a lie the next device acts on. Anything newer
+       is refused before it ever reaches this function. */
+    version: SCHEMA,
     golfers: [],
     activeGolfer: null,
     courses: [],
@@ -2519,6 +2651,16 @@ document.getElementById('importFile').addEventListener('change', (e) => {
     let parsed;
     try { parsed = JSON.parse(String(reader.result)); }
     catch { toast('That file isn’t a valid backup'); e.target.value = ''; return; }
+    /* Written by a newer build. Refused rather than halted: unlike the boot,
+       sync and other-tab paths, nothing has arrived yet and what is on screen
+       is still good — so the file is turned away and the app carries on. It has
+       to come before normalizeState(), which would strip what makes it newer
+       and leave an ordinary-looking backup to restore. */
+    if (Number(parsed && parsed.version || 1) > SCHEMA) {
+      toast('This backup was saved by a newer version of the app — reload to update, then restore it');
+      e.target.value = '';
+      return;
+    }
     const incoming = normalizeState(parsed);
     if (!confirm(`Restore ${incoming.rounds.length} round${incoming.rounds.length === 1 ? '' : 's'} and ${incoming.courses.length} course${incoming.courses.length === 1 ? '' : 's'} for ${incoming.golfers.length} golfer${incoming.golfers.length === 1 ? '' : 's'}?\n\nThis replaces everything currently in this browser.`)) { e.target.value = ''; return; }
     state = incoming;
@@ -2689,6 +2831,14 @@ window.toast = toast;
 ─────────────────────────────────────────────────────────────────────────── */
 
 const SHARE_FORMAT = 1;
+
+/* The PAYLOAD version, and a different thing from SHARE_FORMAT above: that
+   marker says how the bytes are packed, this says what shape is inside them.
+   Deliberately separate from SCHEMA — a visitor needs no data version — but a
+   link from a newer build should say so rather than render as a view quietly
+   missing whatever that build added. Nothing is stored and nothing halts: a
+   link is a borrowed read. */
+const SHARE_PAYLOAD_V = 1;
 /* Long URLs survive browsers fine but not always the trip through a mail
    client, so the warning sits well below any hard limit rather than at it. */
 const SHARE_WARN_AT = 8000;
@@ -2753,7 +2903,7 @@ function buildSharePayload(src, golferIds, win) {
   const used = new Set(rounds.map((r) => r.courseId));
   const courses = (src.courses || []).filter((c) => used.has(c.id));
   const payload = {
-    v: 1,
+    v: SHARE_PAYLOAD_V,
     sharedAt: Date.now(),
     label: golfers.map((g) => g.name).join(', '),
     /* More than one golfer is a league; one is that golfer's own page. */
@@ -2795,6 +2945,14 @@ async function decodeShare(token) {
   }
   const p = JSON.parse(json);
   if (!p || !Array.isArray(p.golfers) || !p.golfers.length) throw new Error('not a share payload');
+  /* Made by a newer build than this one. Marked, so the error card can say the
+     link is fine and this copy is behind — "it looks incomplete" would send the
+     visitor chasing a link that arrived perfectly intact. */
+  if (Number(p.v || 1) > SHARE_PAYLOAD_V) {
+    const err = new Error('share payload v' + p.v + ' is newer than this build');
+    err.newerVersion = true;
+    throw err;
+  }
   return p;
 }
 
@@ -2819,7 +2977,7 @@ async function openSharedView() {
     render();
   } catch (e) {
     console.warn('share link could not be read', e);
-    renderShareError();
+    renderShareError(e && e.newerVersion ? 'newer' : 'broken');
   }
 }
 
@@ -2845,11 +3003,20 @@ function shareBanner() {
     + '</div>';
 }
 
-function renderShareError() {
+/* `reason` is 'broken' (the usual case: a link cut in half by a mail client) or
+   'newer' (the link is intact, this copy of the app is behind). The advice is
+   opposite in each case, so telling them apart is worth the branch. */
+function renderShareError(reason) {
   setTab('player');
   document.querySelector('.tabs').hidden = true;
-  document.getElementById('playerPanel').innerHTML =
-    '<section class="card"><div class="empty">'
+  document.getElementById('playerPanel').innerHTML = reason === 'newer'
+    ? '<section class="card"><div class="empty">'
+    + '<h2>This Link Was Made by a Newer Version</h2>'
+    + '<p>The link is fine — this copy of the app is behind, so it can’t read everything in '
+    + 'it. Reload the page to pick up the current version, then open the link again.</p>'
+    + '<a class="link" href="' + esc(location.pathname) + '">Open my own data</a>'
+    + '</div></section>'
+    : '<section class="card"><div class="empty">'
     + '<h2>This Shared Link Couldn’t Be Opened</h2>'
     + '<p>It looks incomplete — these links are long, and mail apps sometimes cut them in half '
     + 'or wrap them across two lines. Ask whoever sent it for a fresh copy, and paste the whole '
@@ -3028,6 +3195,22 @@ window.addEventListener('hashchange', () => {
 
 window.ghGet = () => state;
 window.ghAdopt = (incoming, updatedAt) => {
+  /* The copy-from-the-future check, live edition. The boot check only guards the
+     load, but onSnapshot can hand a page running yesterday's cached code a
+     document today's build wrote on another device, mid-session — the case the
+     offline cache makes likely rather than theoretical.
+
+     Stored VERBATIM first, before normalizeState() can strip what makes it
+     newer: it is the newest copy there is, and the fresh build reads
+     localStorage on its next load. Then the halt, which throws, so nothing
+     below ever adopts. */
+  if (Number((incoming && incoming.version) || 1) > SCHEMA) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(incoming));
+      localStorage.setItem(UPDATED_KEY, String(updatedAt || Date.now()));
+    } catch (e) { console.warn('Could not write saved data', e); }
+    haltForNewerData(incoming.version);
+  }
   state = normalizeState(incoming);
   /* Guarded like save(): private mode or a full quota throws here, and this
      runs inside the sync module's onSnapshot callback, where an uncaught throw
@@ -3056,14 +3239,26 @@ window.addEventListener('storage', (e) => {
      replace it. */
   if (viewOnly) return;
   if (e.key !== STORAGE_KEY || !e.newValue) return;
-  try { state = normalizeState(JSON.parse(e.newValue)); } catch { return; }
+  let incoming;
+  try { incoming = JSON.parse(e.newValue); } catch { return; }
+  /* Two tabs can be running different builds — one served from the offline
+     cache, one fetched fresh after an update — so the newer copy can arrive
+     from next door as easily as from the cloud. Nothing is written here: the
+     tab that wrote it already holds the newest copy. */
+  if (incoming && typeof incoming === 'object' && Number(incoming.version || 1) > SCHEMA)
+    haltForNewerData(incoming.version);
+  state = normalizeState(incoming);
   render();
 });
 
 /* tests.html reaches the pure functions directly — they are all plain function
    declarations, so they are already on window. This hook exists only for the
    `const` values, which are not. */
-window.__ghTestHooks = { DEFAULT_METHOD, WHS_TABLE, WHS_MIN_ROUNDS, WHS_MAX_INDEX, SOFT_CAP_AT, HARD_CAP_AT };
+window.__ghTestHooks = { DEFAULT_METHOD, WHS_TABLE, WHS_MIN_ROUNDS, WHS_MAX_INDEX, SOFT_CAP_AT, HARD_CAP_AT,
+  /* Both declared above this line, which is the only reason they can be read
+     here: a `const` referenced before its declaration is a temporal-dead-zone
+     error that would take the whole app down at boot. */
+  SCHEMA, SHARE_PAYLOAD_V };
 
 /* ── Boot ───────────────────────────────────────────────────────────────── */
 
@@ -3496,5 +3691,55 @@ document.addEventListener('visibilitychange', () => {
 });
 addEventListener('pagehide', flushPending);
 </script>
+<!-- ── Offline ────────────────────────────────────────────────────────────────
+     Registering sw.js is the whole of the offline feature on this side; the
+     strategy, the allowlist and the reasoning all live in sw.js, which is worth
+     reading before changing anything here.
+
+     Three guards, each earning its place:
+
+     • NOT IN A FRAME. tests.html boots the app in a hidden iframe, and a suite
+       run has no business installing a resident worker — nor picking up one
+       another run left behind, which is how a green suite starts lying about
+       which code it tested. Same reason the sync module checks for the harness.
+
+     • NOT IN A SHARED VIEW. A share link opens somebody else's browser. Caching
+       public files there would be harmless but it is still installing a resident
+       process on a stranger's machine to no benefit — a borrowed read should
+       leave nothing behind. The same flag is set by haltForNewerData(), so a
+       page that stopped on data from a newer build does not install a worker
+       either: this block is a script of its own, so the halt's throw never
+       reaches it, and window.ghViewOnly is what stops it.
+
+     • AFTER LOAD. Registration competes with the app's own first paint
+       otherwise, and offline is worth nothing on the visit where you are online
+       anyway.
+
+     No `updatefound` prompt, deliberately. Under network-first there is nothing
+     to prompt about: the page you are reading came off the network, so it is
+     already current, and the worker only ever matters on a visit where the
+     network failed. -->
+<script>
+(function () {
+  if (!('serviceWorker' in navigator)) return;
+  if (window.top !== window.self) return;
+  if (window.ghViewOnly) return;
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js', { scope: './' })
+      .then(function () { return navigator.serviceWorker.ready; })
+      .then(function (reg) {
+        /* Ask the worker to repair any missing shell file. The install event
+           that first filled the cache fires ONCE per script version, so if the
+           cache is later evicted nothing would ever rebuild it — offline would
+           quietly rot to "whatever the last visit happened to request". This
+           runs while we are demonstrably online, which is the only time the
+           repair can work. */
+        if (reg.active) reg.active.postMessage({ type: 'shell-check' });
+      })
+      .catch(function (e) { console.warn('Offline unavailable:', e); });
+  });
+})();
+</script>
+
 </body>
 </html>

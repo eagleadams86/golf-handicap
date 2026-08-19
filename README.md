@@ -272,6 +272,34 @@ isn't a plain `[A-Za-z0-9_-]` string is regenerated with every reference rewritt
 
 ---
 
+## Working Offline
+
+The app keeps a copy of itself on your device, so it opens with no network at all — handy
+at a course with no signal. Your rounds were always local, so once the page loads everything
+works: logging a round, the leaderboard, the charts, backups. Sync is the one thing that
+can't — it needs the network by definition, and picks up again on its own when you're back.
+
+What's kept is only the app's own public files — the page, the stylesheet and the icon, the
+same files anyone can read on GitHub. **Nothing of yours is ever put there**, which matters
+more than it sounds: every one of these apps shares a single browser origin, so that cache
+is not private to this app.
+
+The network is always tried **first**, and the stored copy is used only when it genuinely
+doesn't answer (or takes more than five seconds). So you can't be left running an old
+version while you're online — and if a device does end up behind, the version check below
+stops it misreading anything.
+
+**If one device is behind** — every saved copy carries the data format the app that wrote it
+understood. A copy written by a *newer* version than the one you're running won't be opened:
+you get a card saying so, nothing is changed or deleted, and reloading picks up the current
+version. A backup file from a newer version is refused the same way — without stopping the
+app you're using — and a share link from one tells the reader the link is fine and their
+copy is behind.
+
+`sw-kill.js` sits in the repo unused, as an escape hatch: copying it over `sw.js` and
+pushing makes every installed copy uninstall itself and go back to being an ordinary
+online-only page.
+
 ## Sync Setup
 
 Sync runs on the **`golfhandicap-14246`** Firebase project, on the free tier. The client
@@ -398,7 +426,9 @@ To go back to fully-local, set `FIREBASE_CONFIG` to `null` again.
 |---|---|
 | `index.html` | The app — markup, styles, logic, sync. No build step, no dependencies, no CDN calls except the Firebase SDK when sync is enabled. |
 | `theme.css` | The shared palette, copied from the private theme pack. Linked by `index.html` and `privacy.html`; it has to sit beside them. |
-| `tests.html` | 119 tests pinning the pure handicap maths, the leaderboard's order, the share codec, the restore/repair rules and the sync decisions. Loads the real `index.html` in a hidden iframe and calls its functions directly. |
+| `sw.js` | Service worker: keeps the app's own public files on your device so it opens offline. |
+| `sw-kill.js` | The escape hatch — copy it over `sw.js` and push to uninstall every installed worker. |
+| `tests.html` | 146 tests pinning the pure handicap maths, the leaderboard's order, the share codec, the restore/repair rules, the offline shell and the sync decisions. Loads the real `index.html` in a hidden iframe and calls its functions directly. |
 | `privacy.html` | Privacy policy. Exists because other people may sign in with their own Google accounts. Linked from the app's footer, beside a **How it works** link back to this README on GitHub. |
 | `firestore.rules` | A checked-in copy of the security rules to deploy in the Firebase console. |
 | `favicon.ico` | The app's icon — the fallback a browser fetches from the site root on its own. |
@@ -413,9 +443,9 @@ keeps `favicon.ico` and the page's inline SVG the same picture, rather than leav
 nobody can review in a diff. Re-run it with `python3 make_favicon.py`, then bump the `?v=` on
 every `favicon.ico` reference — browsers hold on to an icon for a long time.
 
-The palette is **transcribed inline** from [`claude-theme-pack`](https://github.com/eagleadams86/claude-theme-pack)
-(private), the source of truth for every app in this family. It is inlined rather than
-linked as `theme.css` so every app in the family reads the same file. Four themes — Midnight
+The palette comes from [`claude-theme-pack`](https://github.com/eagleadams86/claude-theme-pack)
+(private), the source of truth for every app in this family, and is **linked** as
+`theme.css` rather than inlined, so a pack change reaches the app by replacing one file. Four themes — Midnight
 (default), Dark, Light, Sepia — listed alphabetically in the picker. Never retune a colour
 here: change the pack's `tokens.json`, run its contrast gate, rebuild, re-transcribe.
 
