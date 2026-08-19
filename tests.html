@@ -8,9 +8,10 @@
      index.html and sw.js as text (the paths that halt the app cannot all be
      run live), api.github.com for the CI-scorecard line, and frame-src 'self'
      for the harness iframe, whose content is then governed by index.html's own
-     CSP rather than this one. `style-src 'self'` is what lets theme.css load,
-     so this page wears the same palette as the app. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self' https://api.github.com; frame-src 'self'; base-uri 'none'; form-action 'none'">
+     CSP rather than this one. This page links no stylesheet and uses no theme
+     tokens — its hard-coded midnight colours are deliberate, so a broken
+     theme.css can never take the test results down with it. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self'; connect-src 'self' https://api.github.com; frame-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Golf Handicap — Tests</title>
 <style>
@@ -265,7 +266,11 @@ async function onAppLoad() {
   });
 
   describe('daysBefore');
-  it('steps back a year across a leap day', () => eq(W.daysBefore('2026-01-01', 365), '2025-01-01'));
+  it('steps back a plain year exactly', () => eq(W.daysBefore('2026-01-01', 365), '2025-01-01'));
+  /* 2027-03-02 → 2028-03-01 is 365 days because 2028-02-29 sits inside the
+     span, so 365 days back is NOT the anniversary. That is the behaviour the
+     low-index lookback wants: a fixed day count, not a calendar year. */
+  it('steps back a year across a leap day', () => eq(W.daysBefore('2028-03-01', 365), '2027-03-02'));
 
   describe('monthsBefore');
   it('clamps to the shorter month’s end', () => eq(W.monthsBefore('2026-03-31', 1), '2026-02-28'));

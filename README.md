@@ -33,6 +33,7 @@ to put the same rounds on your phone and your laptop.
 - [Course Handicap](#course-handicap)
 - [Sharing a Read-Only Link](#sharing-a-read-only-link)
 - [Backups](#backups)
+- [Working Offline](#working-offline)
 - [Sync Setup](#sync-setup)
 - [What's in This Repo](#whats-in-this-repo)
 - [Development](#development)
@@ -346,10 +347,11 @@ hiding the key.
 
 ### Pointing It at a Different Project
 
-Replace `FIREBASE_CONFIG` in the `<script type="module">` block at the foot of `index.html`,
-**and** change the `authDomain` in the CSP's `frame-src` at the top of the same file — the
-sign-in popup is an iframe from that host, so it is blocked without it. Any other new
-network endpoint needs adding to `connect-src` for the same reason. Setting
+Replace `FIREBASE_CONFIG` in the `<script type="module">` block at the foot of `index.html`.
+No CSP change is needed: sign-in goes through Google Identity Services, so `frame-src` stays
+`accounts.google.com` only — nothing ever loads the project's `authDomain` (see
+[Why Sign-In Doesn't Use Firebase's Popup](#why-sign-in-doesnt-use-firebases-popup)). Only a
+genuinely new *network* endpoint would need adding to `connect-src`. Setting
 `FIREBASE_CONFIG` to `null` returns the app to fully-local: the button hides and nothing is
 ever sent anywhere.
 
@@ -428,7 +430,7 @@ To go back to fully-local, set `FIREBASE_CONFIG` to `null` again.
 | `theme.css` | The shared palette, copied from the private theme pack. Linked by `index.html` and `privacy.html`; it has to sit beside them. |
 | `sw.js` | Service worker: keeps the app's own public files on your device so it opens offline. |
 | `sw-kill.js` | The escape hatch — copy it over `sw.js` and push to uninstall every installed worker. |
-| `tests.html` | 146 tests pinning the pure handicap maths, the leaderboard's order, the share codec, the restore/repair rules, the offline shell and the sync decisions. Loads the real `index.html` in a hidden iframe and calls its functions directly. |
+| `tests.html` | 147 tests pinning the pure handicap maths, the leaderboard's order, the share codec, the restore/repair rules, the offline shell and the sync decisions. Loads the real `index.html` in a hidden iframe and calls its functions directly. |
 | `privacy.html` | Privacy policy. Exists because other people may sign in with their own Google accounts. Linked from the app's footer, beside a **How it works** link back to this README on GitHub. |
 | `firestore.rules` | A checked-in copy of the security rules to deploy in the Firebase console. |
 | `favicon.ico` | The app's icon — the fallback a browser fetches from the site root on its own. |

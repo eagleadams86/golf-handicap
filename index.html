@@ -185,18 +185,25 @@ button {
 }
 button:hover { border-color: var(--text-muted); }
 button.primary { background: var(--btn-bg); color: var(--btn-text); border-color: var(--btn-bg); }
-button.danger { color: var(--err); border-color: var(--err); background: var(--err-bg); }
+/* Danger buttons are Sprint Velocity's: transparent at rest so the red edge and
+   text carry the warning, and the tint arrives on hover. The hover rule re-states
+   the red border, or the generic button:hover above would fade it to muted grey
+   at the very moment the button is being considered. */
+button.danger { color: var(--err); border-color: var(--err); background: transparent; }
+button.danger:hover { background: var(--err-bg); border-color: var(--err); }
 /* Link-buttons sit inside sentences, so they take the body size back, not the
    button size. */
 button.link { background: none; border: none; color: var(--accent); padding: 0;
   min-height: 0; font-size: inherit; text-decoration: underline; white-space: normal; }
 
-/* Chrome is the smaller of the two sizes: the header row, and the backup/clear
-   row in the footer. Both are utilities that sit beside small print rather than
-   actions the page is asking for, and Sprint Velocity sizes the very same three
-   controls — back up, restore, sign in — this way. At full size they towered
-   over the 12px footnote underneath them. The pickers beside a header button are
-   pinned to the same height so the row stays even. */
+/* Chrome is the smaller of the two sizes, and only the header row wears it: its
+   controls are utilities rather than the action the page is asking for, and
+   Sprint Velocity sizes the very same three — back up, share, sign in — this
+   way. (Backup/restore/clear used to be a footer row at this size for the same
+   "beside small print" reason; they are a header button and a dialog now, and
+   inside a dialog they are full-size because there they ARE the action.) The
+   pickers beside a header button are pinned to the same height so the row stays
+   even. */
 .headbar button { padding: 4px 9px; font-size: var(--fs-base); min-height: var(--chrome-h); }
 .headbar select { min-height: var(--chrome-h); padding: 4px 9px; }
 
@@ -652,7 +659,7 @@ footer a, .privacy-links a { color: var(--accent); }
 
 <footer>
   <p id="privacyNote">🔒 Private — stored in this browser; sign in to sync your own devices. No account required to use the app.</p>
-  <p class="privacy-links"><a href="privacy.html">Privacy</a> &middot;
+  <p class="privacy-links"><a href="privacy.html">Privacy policy</a> &middot;
     <a href="https://github.com/eagleadams86/golf-handicap" target="_blank" rel="noopener noreferrer">How it works</a></p>
   <!-- Authorship line, mirroring the sibling apps. Its own element, not part of
        #privacyNote, whose textContent the sync code rewrites. -->
@@ -2344,8 +2351,15 @@ document.getElementById('courseEditSave').addEventListener('click', () => {
     const keptIds = new Set(tees.map((t) => t.id));
     const orphaned = state.rounds.filter((r) => r.courseId === editingCourse.id && !keptIds.has(r.teeId)).length;
     if (orphaned && !confirm(`${orphaned} round${orphaned === 1 ? '' : 's'} used a set of tees you've removed. They'll be kept but won't count towards any handicap until you edit them. Carry on?`)) return;
-    editingCourse.name = name;
-    editingCourse.tees = tees;
+    /* Re-found by id at save time, never the object captured when the dialog
+       opened: a sync adoption or another tab's write can replace `state` while
+       the dialog is up, and an edit written onto that detached copy would be
+       silently lost. Upsert, the same guard as the round dialog's save — if the
+       course has vanished mid-edit it is re-added under its old id, which the
+       rounds still point at. */
+    const live = courseById(editingCourse.id);
+    if (live) { live.name = name; live.tees = tees; }
+    else state.courses.push({ id: editingCourse.id, name, tees });
   } else {
     state.courses.push({ id: uid(), name, tees });
   }
@@ -2487,8 +2501,15 @@ function renderGolferList() {
 
   box.querySelectorAll('[data-rename]').forEach((b) => b.addEventListener('click', () => {
     const g = state.golfers.find((x) => x.id === b.dataset.rename);
+    if (!g) { renderGolferList(); return; }   // gone since the list was drawn (sync, other tab)
     const name = prompt('Name', g.name);
-    if (name && name.trim()) { g.name = name.trim().slice(0, 60); save(); renderGolferList(); }
+    /* Re-found by id at save time rather than written to the object found
+       above — the same rule as the round and course dialogs' saves. A sync
+       adoption or another tab's write can replace `state` while the list is on
+       screen, and a rename written onto a detached copy would be silently
+       lost. */
+    const live = name && name.trim() ? state.golfers.find((x) => x.id === b.dataset.rename) : null;
+    if (live) { live.name = name.trim().slice(0, 60); save(); renderGolferList(); }
   }));
   box.querySelectorAll('[data-remove]').forEach((b) => b.addEventListener('click', () => {
     const id = b.dataset.remove;
@@ -2726,9 +2747,11 @@ document.getElementById('clearConfirm').addEventListener('click', () => {
    one golfer's rounds — enough for the official index to be issued and for the
    two methods to visibly disagree. It loads for the golfer ON SCREEN, ADDS its
    example course rather than replacing the list (someone may already have typed
-   real courses in), and never touches another golfer's rounds. The fixed
-   `demo-*` ids make a second load replace the first instead of piling up
-   duplicates. buildDemo() is pure so tests.html can pin all of that. */
+   real courses in), and never touches another golfer's rounds. The course's
+   fixed `demo-*` id makes a second load replace it rather than duplicate it;
+   the ROUNDS are replaced by dropping that golfer's rounds wholesale — behind
+   the confirm below, since real rounds would go with them. buildDemo() is pure
+   so tests.html can pin all of that. */
 function buildDemo(gid) {
   const scores = [94, 88, 91, 86, 97, 89, 84, 92, 90, 87, 95, 83, 88, 93, 86, 91, 85, 96, 89, 82, 90, 87, 94, 86];
   const start = new Date();

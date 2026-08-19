@@ -61,15 +61,14 @@ that emphasis.
   and field labels are unaffected.
 
 - The app is **`index.html` plus `theme.css`** — no build step, no server, no npm, no bundler,
-  no CDN calls beyond the Firebase
-  SDK. **It was one self-contained file until 2026-08-18**, when the palette moved from an
+  no CDN calls beyond the Firebase SDK that optional sync loads. **It was one self-contained
+  file until 2026-08-18**, when the palette moved from an
   inline transcription to the theme pack's generated `theme.css`, linked. That was the
   user's explicit call, made against the trade-off: every web app now reads the same bytes
   and cannot drift, at the cost of `index.html` no longer standing alone — **`theme.css`
   has to travel with it**, and opening the HTML off disk without it leaves the page
   unstyled. Don't re-inline the palette to "restore" the single file; the alignment is the
   point. Everything ELSE stays inline: no second script, no second stylesheet.
-  SDK that optional sync loads.
 - No account is ever required. The only exception is an **optional** Google sign-in for
   cross-device sync, backed by the `golfhandicap-14246` Firebase project (auth + one
   Firestore doc per user, free tier). `FIREBASE_CONFIG` in the bottom `<script type="module">`
@@ -166,10 +165,11 @@ that emphasis.
   *Used in* column shows which rounds each method actually leaned on. A round quietly
   missing from a handicap is worse than the bug that hiding it would avoid.
 - **Example data is per-golfer and additive.** `buildDemo()` (pure, pinned by tests) builds
-  rounds for the golfer **on screen**, the demo course is *added* to the list (never a
-  replacement — someone may have typed real courses in), and its fixed `demo-*` ids make a
-  reload replace the previous example instead of duplicating it. Other golfers' rounds are
-  never touched.
+  rounds for the golfer **on screen**, and the demo course is *added* to the list (never a
+  replacement — someone may have typed real courses in). Its fixed `demo-course` id is what
+  lets a reload replace the course instead of duplicating it; the ROUNDS are replaced by
+  dropping that golfer's rounds wholesale, behind a confirm, since real rounds would go
+  with them. Other golfers' rounds are never touched.
 - **The example-data button and "Clear everything" are a pair.** Offering one-tap sample
   data without a one-tap way back out is how someone ends up hand-deleting two dozen rounds;
   if either is ever removed, reconsider the other. Clearing uses a dialog rather than nested
@@ -302,9 +302,10 @@ that emphasis.
 - **`privacy.html` is the privacy policy** (static, linked from the footer via
   `.privacy-links` — deliberately a separate element from `#privacyNote`, whose textContent
   the sync code rewrites). It follows the saved theme: the same pre-paint boot script as
-  index.html plus the four theme blocks inlined for just the tokens it uses (inline, not a
-  stylesheet link, so `file://` keeps working). If sync or what the app stores ever changes,
-  update it and its effective date in the same commit.
+  index.html, and the same linked `theme.css` (since 2026-08-18, when the inlined theme
+  blocks went with the app's — its CSP carries `style-src 'self'` for exactly that link).
+  If sync or what the app stores ever changes, update it and its effective date in the
+  same commit.
 - **`firestore.rules` is a checked-in copy of what is deployed in the console.** Nothing here
   deploys it. If the console rules change, change this file to match.
 - **The CSP meta tag is the only place a policy can be declared** (GitHub Pages can't set

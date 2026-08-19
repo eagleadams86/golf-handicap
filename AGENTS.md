@@ -60,9 +60,15 @@ that emphasis.
   `Back Up & Restore`, `How These Are Worked Out`). Body copy, buttons, table column headers
   and field labels are unaffected.
 
-- The whole app is **one file — `index.html`** — everything inline, no build step, no server,
-  works via `file://`. Keep it that way: no npm, no bundler, no CDN calls beyond the Firebase
-  SDK that optional sync loads.
+- The app is **`index.html` plus `theme.css`** — no build step, no server, no npm, no bundler,
+  no CDN calls beyond the Firebase SDK that optional sync loads. **It was one self-contained
+  file until 2026-08-18**, when the palette moved from an
+  inline transcription to the theme pack's generated `theme.css`, linked. That was the
+  user's explicit call, made against the trade-off: every web app now reads the same bytes
+  and cannot drift, at the cost of `index.html` no longer standing alone — **`theme.css`
+  has to travel with it**, and opening the HTML off disk without it leaves the page
+  unstyled. Don't re-inline the palette to "restore" the single file; the alignment is the
+  point. Everything ELSE stays inline: no second script, no second stylesheet.
 - No account is ever required. The only exception is an **optional** Google sign-in for
   cross-device sync, backed by the `golfhandicap-14246` Firebase project (auth + one
   Firestore doc per user, free tier). `FIREBASE_CONFIG` in the bottom `<script type="module">`
@@ -100,9 +106,15 @@ that emphasis.
 - **The official calculation must never be affected by the rolling-method settings.** That
   independence is the app's whole claim; it is stated in the UI and in the README, and a
   test pins it indirectly (`whsIndex` takes only differentials).
-- The palette is **transcribed inline** from `~/claude-theme-pack` (private repo
-  eagleadams86/claude-theme-pack), the source of truth for all apps — inlined rather than
-  linked so `file://` works. Four themes (Midnight default, Dark, Light, Sepia), listed
+- The palette is **`theme.css`, linked** — copied byte-for-byte from `~/claude-theme-pack`
+  (private repo eagleadams86/claude-theme-pack), the source of truth for all apps. It was
+  transcribed inline until 2026-08-18 so `file://` would work; linking replaced that so the
+  file cannot drift from the pack or from the other apps. `privacy.html` links the same
+  file — **its CSP needed `style-src 'self'` added**, which it did not have, and a linked
+  stylesheet is silently blocked without it. `tests.html` uses no tokens and links nothing.
+  The app's own additions (`--c-roll`/`--c-whs` chart colours, `--chrome-h`, `--control-h`,
+  `--page-w`) stay in the inline `<style>` AFTER the link, which is what lets them win.
+  Four themes (Midnight default, Dark, Light, Sepia), listed
   **alphabetically** in the picker, unknown/missing saved values falling back to midnight
   (`slate` → `dark`). Never retune a colour here: change the pack's `tokens.json`, run its
   `check_contrast.py` gate, rebuild, re-transcribe, and keep the other apps in step (drift
@@ -153,10 +165,11 @@ that emphasis.
   *Used in* column shows which rounds each method actually leaned on. A round quietly
   missing from a handicap is worse than the bug that hiding it would avoid.
 - **Example data is per-golfer and additive.** `buildDemo()` (pure, pinned by tests) builds
-  rounds for the golfer **on screen**, the demo course is *added* to the list (never a
-  replacement — someone may have typed real courses in), and its fixed `demo-*` ids make a
-  reload replace the previous example instead of duplicating it. Other golfers' rounds are
-  never touched.
+  rounds for the golfer **on screen**, and the demo course is *added* to the list (never a
+  replacement — someone may have typed real courses in). Its fixed `demo-course` id is what
+  lets a reload replace the course instead of duplicating it; the ROUNDS are replaced by
+  dropping that golfer's rounds wholesale, behind a confirm, since real rounds would go
+  with them. Other golfers' rounds are never touched.
 - **The example-data button and "Clear everything" are a pair.** Offering one-tap sample
   data without a one-tap way back out is how someone ends up hand-deleting two dozen rounds;
   if either is ever removed, reconsider the other. Clearing uses a dialog rather than nested
@@ -167,6 +180,17 @@ that emphasis.
   asking to lose the method they just configured. It goes through `save()` like everything
   else, so it reaches the cloud copy, and `window.ghSignedIn()` is what lets the dialog say
   so — the classic script can't see the module-scoped `user`.
+- **The toast is a POPOVER (`popover="manual"`), and that is the only way it can be seen
+  while a dialog is open.** A modal `<dialog>` sits in the browser's TOP LAYER, which paints
+  above every z-index in the ordinary document, so a toast fired from an open dialog was
+  drawn under it and under its backdrop — invisible, indistinguishable from a button that
+  does nothing. The share dialog's "Copy link" is the case that has to work: copying leaves
+  the dialog open, so the toast is the only thing that says it happened. **Anything else
+  that has to appear over a dialog needs the same treatment** — a bigger z-index cannot
+  reach the top layer. Sprint Velocity's CLAUDE.md carries the fuller note (it is the design
+  lead for this chrome, and the fix is mirrored in all four web apps); the short version is
+  that `toast()` raises the popover before writing the text, forces a reflow so the fade
+  still runs, and drops out of the top layer once it has faded.
 - **Every dialog closes on a click outside it, except one.** `closeOnBackdropClick()` is
   Sprint Velocity's and Team Dashboard's helper, ported: it hit-tests against the dialog's
   *box* rather than `e.target === dialog` (a click on the dialog's own padding is still
@@ -278,14 +302,16 @@ that emphasis.
 - **`privacy.html` is the privacy policy** (static, linked from the footer via
   `.privacy-links` — deliberately a separate element from `#privacyNote`, whose textContent
   the sync code rewrites). It follows the saved theme: the same pre-paint boot script as
-  index.html plus the four theme blocks inlined for just the tokens it uses (inline, not a
-  stylesheet link, so `file://` keeps working). If sync or what the app stores ever changes,
-  update it and its effective date in the same commit.
+  index.html, and the same linked `theme.css` (since 2026-08-18, when the inlined theme
+  blocks went with the app's — its CSP carries `style-src 'self'` for exactly that link).
+  If sync or what the app stores ever changes, update it and its effective date in the
+  same commit.
 - **`firestore.rules` is a checked-in copy of what is deployed in the console.** Nothing here
   deploys it. If the console rules change, change this file to match.
 - **The CSP meta tag is the only place a policy can be declared** (GitHub Pages can't set
-  headers). Any new network endpoint must be added to `connect-src`, and the Firebase
-  `authDomain` to `frame-src`, or it is silently blocked.
+  headers). Any new network endpoint must be added to `connect-src` or it is silently
+  blocked. `frame-src` needs only `accounts.google.com` — GIS sign-in never loads the
+  Firebase `authDomain`, even if the project is repointed.
 - **`example-league.json` is a checked-in fixture, not data** — a backup anyone can restore
   to see a populated leaderboard (8 golfers, 112 rounds, 6 courses). `make_example_league.py`
   writes it from a fixed seed, so re-running produces the identical file; regenerate it
@@ -338,3 +364,63 @@ that emphasis.
 - Write commit subject lines in plain English a non-developer can read. The "Recent
   changes" box that made them user-facing was removed 2026-08-18, across the whole app
   family, and the GitHub API went out of the CSP with it — the habit stands anyway.
+- **There IS a service worker, and it was refused for a long time.** The three
+  objections were right to be made; two turned out to be answerable by design
+  rather than by abstention, and the third is what the whole thing is built
+  around. Recorded because the next person to touch this needs the reasoning:
+  - *"A resident process on the shared origin."* Bounded. A worker's scope
+    cannot exceed its own directory without the `Service-Worker-Allowed` header,
+    and GitHub Pages cannot send headers — so this one structurally cannot see
+    any sibling app. Locally, where the app is served from the
+    root, it does control `tests.html`; the allowlist is what makes that
+    harmless, not the scope.
+  - *"Caches are ORIGIN-wide, not per app."* True, and it does not go away — any
+    page on the origin can read this cache, and the sibling workers share the
+    store. The answer is the rule in `sw.js`: **only files already public in
+    this repo are ever cached** (`./`, `theme.css`, `privacy.html`,
+    `favicon.ico` — this app vendors no chart library). Nothing in there is anything an attacker
+    could not read straight off GitHub, and the data stays in localStorage,
+    which every page on the origin could already reach. It cuts the other way
+    too — `activate` must only ever delete caches with this app's `gh-shell-`
+    prefix, or it wipes a sibling's.
+  - *"A caching bug serves stale code to an app whose data shape moves."* Still
+    the real risk. **The worker is network-first for everything**: you can only
+    be served cached code on a visit where the network did not answer. The
+    braces to that belt is `SCHEMA` / `haltForNewerData()` above — a saved copy
+    from a newer build is refused rather than run through normalizeState(),
+    which rebuilds it without the fields that build added.
+- **The page's CSP does not apply to the worker.** It takes its policy from its
+  own script's HTTP response headers, and Pages cannot set headers, so `sw.js`
+  runs with **no CSP at all**, permanently installed. Hence: tiny, no `eval`, no
+  `importScripts`, no dynamic import, no cross-origin URL anywhere in it — and
+  hence `worker-src 'self'` spelled out in the page CSP rather than left to the
+  `worker-src → child-src → script-src` fallback chain, which would inherit
+  script-src's gstatic and accounts.google.com hosts.
+- **`sw-kill.js` is the escape hatch, and it exists BEFORE it is needed.** A bad
+  page is fixed by pushing a new one; a bad worker is resident and can keep
+  serving itself. `cp sw-kill.js sw.js`, commit, push — every installed copy
+  then clears this app's caches, unregisters itself and reloads its windows.
+- **Two traps, both of which fail silently:** `cache.addAll` is all-or-nothing
+  (one 404 rejects the whole precache, install fails, and there is no offline at
+  all while the app looks perfectly healthy online); and **`install` fires once
+  per script version**, so if the cache is later evicted nothing rebuilds it and
+  offline decays to "whatever the last online visit happened to request". Hence
+  `topUp()`, fetching entries one by one, pinged by the page on every load via a
+  `shell-check` message — the repair must be able to run without a new worker
+  version to hang it on.
+- **`shellKey()` matches on the PATH, not the URL**, because the markup asks for
+  `favicon.ico?v=1`: keyed on the full URL, the precached favicon would never be
+  the entry that answers. `index.html` folds onto `./` for the same reason.
+- Registration is guarded three ways, all load-bearing: **not in a frame** (or a
+  `tests.html` run would install a worker and then test whatever it had cached),
+  **not under `window.ghViewOnly`** — which covers both a shared view and a page
+  stopped by `haltForNewerData()`, since the halt's `throw` cannot reach a
+  separate script block — and **on `load`**.
+- **Testing it locally will mislead you.** The browser holds its own copy of
+  `sw.js`, and a byte-identical script fires no `install`, so edits appear to do
+  nothing and an emptied cache appears not to refill. `await reg.update()`
+  before judging any of it. Related: a suite run against a registered dev worker
+  is testing the cache, not the disk — unregister it on localhost before
+  trusting a green run.
+- The scope is `./`, never absolute: on the local server the app is at the root,
+  not under `/golf-handicap/`, and an absolute scope is simply invalid there.
