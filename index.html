@@ -1914,12 +1914,22 @@ function renderRounds(c) {
       box.innerHTML = '<div class="empty"><p>No rounds were shared for this golfer.</p></div>';
       return;
     }
+    /* Two examples, because they answer two different questions. The league is
+       the DEMO — it is the only one that fills the Leaderboard and the only one
+       that reaches the cases which need a field of players — so it leads. The
+       single-golfer one stays for someone who already has a league and wants to
+       see what a populated page of their own looks like. */
     box.innerHTML = `<div class="empty">
       <p>No rounds yet. Add a course first, then log a round — the two handicaps appear as soon as there is something to work from.</p>
       <button type="button" class="primary" id="firstCourseBtn">Add your first course</button>
-      <button type="button" class="link" id="demoBtn" style="margin-left:var(--sp-6)">or load some example data</button>
+      <button type="button" class="link" id="demoLeagueBtn" style="margin-left:var(--sp-6)">or load the example league</button>
+      <p class="hint" style="margin-top:var(--sp-5)">Eight golfers, six courses and a season
+        of rounds, so every figure and the whole leaderboard have something behind them.
+        Just want one populated page?
+        <button type="button" class="link" id="demoBtn">Load a single golfer's season</button></p>
     </div>`;
     document.getElementById('firstCourseBtn').addEventListener('click', () => openCourseEdit(null));
+    document.getElementById('demoLeagueBtn').addEventListener('click', loadDemoLeague);
     document.getElementById('demoBtn').addEventListener('click', loadDemo);
     return;
   }
@@ -2783,6 +2793,187 @@ function loadDemo() {
   state.rounds = state.rounds.filter((r) => r.golferId !== gid).concat(demo.rounds);
   save();
   toast('Example data loaded — download a backup or clear it when you’re done');
+}
+
+/* ── The example league: the app's DEMO ─────────────────────────────────────
+   buildDemo() above fills in ONE golfer, which is the right thing for someone
+   who already has real rounds and wants to see what a populated page looks like.
+   It cannot show the Leaderboard — half this app — and it cannot show any of the
+   cases that only exist across a field of players: an index that comes from the
+   reduced-scores table, a golfer with too few rounds for an official index at
+   all, one who has never played, negative differentials, a course whose rating
+   sits below par. Those lived only in example-league.json, which you had to find
+   on GitHub, download and restore.
+
+   So the rule this app now shares with its two siblings: THE SAMPLE DATA IS THE
+   DEMO, and a feature is not finished until the demo reaches it. Adding one means
+   adding the golfer, course or round that shows it off, a line in the roster
+   below, a row in the README's demo table, and an assertion in tests.html.
+
+   THE CAST, and the one thing each is here to show:
+
+     Alex Nash      near scratch — the differentials go NEGATIVE, which is the
+                    case a spreadsheet usually gets wrong
+     Priya Raman    a solid single figure, and one round marked "don't count"
+     Dad            the mid handicapper the app was built for; the one it lands
+                    on, and past 20 rounds so the official index is a true best-8
+     Marcus Bell    exactly ON the 20-round mark, the boundary of the WHS window,
+                    and also carries a "don't count" round
+     Joan Whitlock  improving, and under 20 rounds — the window is short
+     Sam Okafor     FOUR rounds: an index from the reduced-scores table
+     Ruth Carey     TWO rounds: under the minimum, so no official index is issued
+     New Member     has never played, so neither figure exists
+
+   And the six courses are chosen the same way: Old Mill is a par 69 whose rating
+   sits BELOW par, the one place a course handicap comes out lower than the index;
+   Kilbryde's Championship tee is slope 142, near the 155 ceiling, where the
+   113/slope factor visibly pulls a differential down; Brookvale has a single set
+   of tees, so the tee picker has a one-option case.
+
+   It is ADDITIVE and destroys nothing, the same promise buildDemo() makes: the
+   `demo-` ids are stable, so loading twice replaces the example league rather
+   than duplicating it, and anything you typed yourself is left exactly where it
+   was — including your own golfer, who simply joins the leaderboard. "Clear
+   everything", in the Back up dialog, is the way back out.
+
+   Dates are counted from TODAY, so the league is never stale, and the scores come
+   from a SEEDED generator — the same league on every device and in every run, or
+   it could not be pinned by a test or talked through twice.
+──────────────────────────────────────────────────────────────────────────── */
+
+/* mulberry32, and Box-Muller on top of it for the round-to-round scatter. Seeded
+   on purpose; never swap either for Math.random(). */
+function demoRandom(seed) {
+  let a = seed >>> 0;
+  const next = () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  next.gauss = (sd) => {
+    const u = Math.max(next(), 1e-9);
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * next()) * sd;
+  };
+  return next;
+}
+
+const DEMO_COURSES = [
+  { id: 'demo-c-parkland', name: 'Ashfield Park', tees: [
+    { id: 'demo-t-ash-yellow', name: 'Yellow', rating: 69.4, slope: 122, par: 71 },
+    { id: 'demo-t-ash-white',  name: 'White',  rating: 71.2, slope: 129, par: 71 },
+    { id: 'demo-t-ash-red',    name: 'Red',    rating: 67.8, slope: 118, par: 71 }] },
+  { id: 'demo-c-links', name: 'Carrick Links', tees: [
+    { id: 'demo-t-car-white',  name: 'White',  rating: 72.6, slope: 134, par: 72 },
+    { id: 'demo-t-car-yellow', name: 'Yellow', rating: 70.9, slope: 127, par: 72 }] },
+  { id: 'demo-c-heath', name: 'Highmoor Heath', tees: [
+    { id: 'demo-t-high-blue',  name: 'Blue',   rating: 73.1, slope: 138, par: 72 },
+    { id: 'demo-t-high-white', name: 'White',  rating: 70.5, slope: 125, par: 72 }] },
+  /* Rating BELOW par: the only place a course handicap comes out lower than the
+     index rather than higher. Delete this course and that case is unreachable. */
+  { id: 'demo-c-mill', name: 'Old Mill (short course)', tees: [
+    { id: 'demo-t-mill-white',  name: 'White',  rating: 66.2, slope: 109, par: 69 },
+    { id: 'demo-t-mill-yellow', name: 'Yellow', rating: 64.8, slope: 104, par: 69 }] },
+  /* Slope 142, near the 155 ceiling — where 113/slope visibly pulls a
+     differential down, which is the whole point of slope. */
+  { id: 'demo-c-dunes', name: 'Kilbryde Dunes', tees: [
+    { id: 'demo-t-dunes-championship', name: 'Championship', rating: 74.8, slope: 142, par: 72 },
+    { id: 'demo-t-dunes-medal',        name: 'Medal',        rating: 72.0, slope: 131, par: 72 },
+    { id: 'demo-t-dunes-forward',      name: 'Forward',      rating: 68.9, slope: 119, par: 72 }] },
+  /* One set of tees, so the tee picker has its single-option case. */
+  { id: 'demo-c-brookvale', name: 'Brookvale Municipal', tees: [
+    { id: 'demo-t-brook-main', name: 'Main', rating: 70.1, slope: 115, par: 70 }] }
+];
+
+/* name, rounds to log, average shots over the course rating, how streaky. */
+const DEMO_GOLFERS = [
+  { id: 'demo-g-1', name: 'Alex Nash',     rounds: 26, over: 2.5,  spread: 2.0 },
+  { id: 'demo-g-2', name: 'Priya Raman',   rounds: 24, over: 8.0,  spread: 2.6 },
+  { id: 'demo-g-3', name: 'Dad',           rounds: 22, over: 13.0, spread: 3.0 },
+  { id: 'demo-g-4', name: 'Marcus Bell',   rounds: 20, over: 18.5, spread: 3.4 },
+  { id: 'demo-g-5', name: 'Joan Whitlock', rounds: 14, over: 24.0, spread: 4.0 },
+  { id: 'demo-g-6', name: 'Sam Okafor',    rounds: 4,  over: 30.0, spread: 5.0 },
+  { id: 'demo-g-7', name: 'Ruth Carey',    rounds: 2,  over: 32.0, spread: 5.0 },
+  { id: 'demo-g-8', name: 'New Member',    rounds: 0,  over: 0,    spread: 0 }
+];
+
+const DEMO_NOTES = ['', '', '', 'windy', 'society day', 'medal', '', 'back nine fell apart',
+                    'best of the year'];
+
+/* Pure, so tests.html can pin every case in the roster above. */
+function buildDemoLeague() {
+  const rnd = demoRandom(20260811);
+  const tees = [];
+  DEMO_COURSES.forEach(c => c.tees.forEach(t =>
+    tees.push({ courseId: c.id, teeId: t.id, rating: t.rating })));
+
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);              // noon, so a DST shift can't move a date
+  const rounds = [];
+  let rid = 0;
+
+  DEMO_GOLFERS.forEach((g, gi) => {
+    for (let i = 0; i < g.rounds; i++) {
+      const tee = tees[(gi + i * 3) % tees.length];
+      /* A gentle improvement across the season, plus round-to-round scatter. */
+      const drift = (g.rounds - i) / Math.max(g.rounds, 1) * 2;
+      rounds.push({
+        id: 'demo-r-' + String(++rid).padStart(3, '0'),
+        golferId: g.id,
+        /* `rounds - 1 - i`, so the LAST round of each golfer lands today (give or
+           take the couple of days that stagger the field), rather than a week
+           ago. The demo says it ends today and has to. */
+        date: isoOf(new Date(today.getTime() - ((g.rounds - 1 - i) * 8 + (gi % 3)) * DAY)),
+        courseId: tee.courseId, teeId: tee.teeId,
+        score: Math.round(tee.rating + g.over + drift + rnd.gauss(g.spread)),
+        /* One round with a conditions adjustment, so PCC is not a setting nobody
+           has ever seen take effect. */
+        pcc: i === 5 ? 1 : 0,
+        note: DEMO_NOTES[(gi + i) % DEMO_NOTES.length],
+        /* A scramble and a practice round: the "left out" line under the figures
+           and the pills in the rounds table need something to name. */
+        counts: !(i === 2 && (gi === 1 || gi === 3))
+      });
+    }
+  });
+
+  return { golfers: DEMO_GOLFERS.map(g => ({ id: g.id, name: g.name })),
+           courses: DEMO_COURSES, rounds };
+}
+
+function loadDemoLeague() {
+  if (!confirm(
+      'Load the example league? Eight golfers, six courses and a season of rounds, ending '
+    + 'today.\n\n'
+    + 'Every case the figures have to handle is in it — a near-scratch player, someone on '
+    + 'four rounds, someone who has never played, and rounds marked "don\u2019t count".\n\n'
+    + 'It is added alongside anything you already have, and nothing of yours is changed. '
+    + '"Clear everything", in the Back up dialog, removes the lot.')) return;
+
+  const league = buildDemoLeague();
+  /* Replace by id rather than push, so loading twice refreshes the example league
+     instead of stacking a second copy of it — and so nothing the user typed is
+     touched, whatever it is called. */
+  const upsert = (list, items) => {
+    items.forEach(item => {
+      const at = list.findIndex(x => x.id === item.id);
+      if (at === -1) list.push(item); else list[at] = item;
+    });
+  };
+  upsert(state.golfers, league.golfers);
+  upsert(state.courses, league.courses);
+  state.rounds = state.rounds.filter(r => !String(r.id).startsWith('demo-r-')).concat(league.rounds);
+
+  /* Only move off the golfer on screen if they have nothing to show — someone
+     with real rounds did not ask to be taken away from them. */
+  if (!state.rounds.some(r => r.golferId === state.activeGolfer))
+    state.activeGolfer = 'demo-g-3';        // Dad: the mid handicapper this was built for
+
+  save();
+  /* The leaderboard is the half of the app the single-golfer example can't show,
+     so that is where loading a whole league should put you. */
+  setTab('league');
+  toast('Example league loaded — “Clear everything” in Back up removes it', 6000);
 }
 
 /* ── Toast ──────────────────────────────────────────────────────────────── */

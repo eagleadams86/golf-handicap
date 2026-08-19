@@ -46,6 +46,7 @@
   <code>clampInt</code>/<code>clampNum</code>, <code>applyCaps</code>, <code>courseHandicap</code>,
   <code>indexHistory</code>, <code>pickUsed</code>, <code>rankLeague</code>,
   <code>changeOverRounds</code>, <code>syncDecision</code>, <code>buildDemo</code>,
+  <code>buildDemoLeague</code>,
   <code>encodeShare</code>/<code>decodeShare</code>/<code>buildSharePayload</code>,
   <code>windowRounds</code>,
   <code>sanitizeIds</code> or <code>normalizeState</code>.
@@ -430,6 +431,77 @@ async function onAppLoad() {
     const d = W.buildDemo('g');
     const teeIds = d.course.tees.map((t) => t.id);
     ok(d.rounds.every((r) => r.courseId === d.course.id && teeIds.indexOf(r.teeId) !== -1));
+  });
+
+  /* ── the example league: the demo ────────────────────────────────────────
+     The sample data is this app's DEMO — what someone sent a share link
+     explores, and what the app gets shown with — so every feature has to be
+     reachable from it. Each case below is a feature that is only visible if
+     these figures hold, and they are ordinary enough that a later edit would
+     tidy them away without noticing. A NEW FEATURE MEANS A NEW TEST HERE. */
+  describe('buildDemoLeague — the demo, and every case it has to reach');
+  const LEAGUE = W.buildDemoLeague();
+  const leagueOf = (name) => LEAGUE.golfers.find((g) => g.name === name);
+  const roundsOf = (name) => LEAGUE.rounds.filter((r) => r.golferId === leagueOf(name).id);
+
+  it('fills a whole league, which is the half of the app one golfer cannot show', () => {
+    eq(LEAGUE.golfers.length, 8);
+    eq(LEAGUE.courses.length, 6);
+    eq(LEAGUE.rounds.length, 112);
+  });
+  it('covers every rung of the official calculation, from 26 rounds down to none', () => {
+    eq(LEAGUE.golfers.map((g) => LEAGUE.rounds.filter((r) => r.golferId === g.id).length),
+       [26, 24, 22, 20, 14, 4, 2, 0]);
+    ok(roundsOf('Marcus Bell').length === 20, 'one golfer sits exactly ON the 20-round window');
+    ok(roundsOf('Sam Okafor').length === 4, 'one is on four — an index from the reduced table');
+    ok(roundsOf('Ruth Carey').length === 2, 'one is under the minimum, so no index is issued');
+    ok(roundsOf('New Member').length === 0, 'and one has never played, so neither figure exists');
+  });
+  it('has a near-scratch golfer whose differentials go negative', () => {
+    const teeOf = (r) => LEAGUE.courses.find((c) => c.id === r.courseId)
+      .tees.find((t) => t.id === r.teeId);
+    const best = Math.min.apply(null, roundsOf('Alex Nash').map((r) => {
+      const t = teeOf(r);
+      return W.scoreDifferential(r.score, t.rating, t.slope, r.pcc);
+    }));
+    ok(best < 0, 'the case a spreadsheet usually gets wrong — best diff was ' + best);
+  });
+  it('has rounds left out, so the exclusion line and the pills have something to name', () => {
+    const out = LEAGUE.rounds.filter((r) => !r.counts);
+    eq(out.length, 2);
+    eq(new Set(out.map((r) => r.golferId)).size, 2, 'across two golfers, as the table reports');
+    ok(LEAGUE.rounds.some((r) => r.pcc > 0), 'and a conditions adjustment that took effect');
+  });
+  it('carries the three courses that make the course-handicap cases reachable', () => {
+    const mill = LEAGUE.courses.find((c) => c.id === 'demo-c-mill');
+    ok(mill.tees.every((t) => t.rating < t.par),
+       'Old Mill rates BELOW par — the only place a course handicap comes out under the index');
+    ok(LEAGUE.courses.some((c) => c.tees.some((t) => t.slope >= 140)),
+       'and one near the slope ceiling, where 113/slope visibly pulls a differential down');
+    ok(LEAGUE.courses.some((c) => c.tees.length === 1),
+       'and one with a single set of tees, for the tee picker with no choice in it');
+  });
+  it('points every round at a tee that exists on one of its courses', () => {
+    const tees = new Set();
+    LEAGUE.courses.forEach((c) => c.tees.forEach((t) => tees.add(c.id + '|' + t.id)));
+    ok(LEAGUE.rounds.every((r) => tees.has(r.courseId + '|' + r.teeId)));
+  });
+  it('ends today and runs back about six months, so it is never stale', () => {
+    const dates = LEAGUE.rounds.map((r) => r.date).sort();
+    const daysAgo = (d) => Math.round((Date.now() - Date.parse(d + 'T12:00:00')) / 86400000);
+    ok(daysAgo(dates[dates.length - 1]) <= 2, 'the newest round is today or thereabouts');
+    ok(daysAgo(dates[0]) >= 150, 'and the oldest is far enough back to fill the trend chart');
+  });
+  it('is seeded, so it is the same league on every device and in every run', () => {
+    const again = W.buildDemoLeague();
+    eq(again.rounds.map((r) => r.score), LEAGUE.rounds.map((r) => r.score));
+    eq(again.rounds.map((r) => r.id), LEAGUE.rounds.map((r) => r.id));
+  });
+  it('uses demo- ids throughout, which is what makes loading it twice safe', () => {
+    ok(LEAGUE.golfers.every((g) => g.id.startsWith('demo-')));
+    ok(LEAGUE.courses.every((c) => c.id.startsWith('demo-')));
+    ok(LEAGUE.rounds.every((r) => r.id.startsWith('demo-r-')),
+       'the prefix is also how a reload drops the old example rounds and nothing else');
   });
 
   /* ── the league table's order ────────────────────────────────────────── */

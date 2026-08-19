@@ -67,13 +67,48 @@ it is always visible why a number moved. A round can be marked *don't count* whe
 it — useful for a practice round or a scramble — and the app says so on the front page
 rather than quietly leaving it out.
 
-### Trying It Out
+### Trying It Out — The Example League
 
-[`example-league.json`](example-league.json) in this repo is a ready-made league — 8 golfers
-of every standard, 112 rounds, 6 courses. Download it and restore it under *Back up →
-Restore from backup* to see a populated leaderboard without typing in a season of cards.
-*Clear everything*, in the same dialog, is the way back out. There is also a one-tap
-**example data** button in the empty state, which loads a single golfer's season.
+The empty state offers **load the example league**: eight golfers, six courses and a season
+of rounds ending today, in one tap. It's the app's demo, and the rule is that **every
+feature has to be reachable from it** — so the cast is chosen to cover every case the
+figures have to handle, not just to fill the table.
+
+| Golfer | Rounds | What they're there to show |
+|---|---|---|
+| **Alex Nash** | 26 | Near scratch — the score differentials go **negative**, which is the case a spreadsheet usually gets wrong. |
+| **Priya Raman** | 24 | A solid single figure, with one round marked *don't count*. |
+| **Dad** | 22 | The mid handicapper the app was built for, and the golfer it lands on. Past 20 rounds, so the official index is a true best-8-of-20. |
+| **Marcus Bell** | 20 | Exactly **on** the 20-round WHS window, and also carries a *don't count* round. |
+| **Joan Whitlock** | 14 | Improving, and under 20 rounds, so the window is short. |
+| **Sam Okafor** | 4 | Four rounds: an index from the **reduced-scores table**. |
+| **Ruth Carey** | 2 | Two rounds: under the minimum, so **no official index is issued**. |
+| **New Member** | 0 | Has never played, so neither figure exists. |
+
+The six courses are picked the same way. **Old Mill** is a par 69 whose rating sits *below*
+par — the one place a course handicap comes out lower than the index. **Kilbryde Dunes**'s
+Championship tee is slope 142, near the 155 ceiling, where the 113/slope factor visibly
+pulls a differential down. **Brookvale Municipal** has a single set of tees, so the tee
+picker has its no-choice case. There's a round with a conditions adjustment too, so PCC
+isn't a setting nobody has seen take effect.
+
+**It adds, and destroys nothing.** Your own golfer, courses and rounds are left exactly
+where they were — your golfer simply joins the leaderboard. The `demo-` ids are stable, so
+loading it twice refreshes the example league rather than stacking a second copy. *Clear
+everything*, in the Back up dialog, is the way back out.
+
+**The dates are counted from the day you load it**, so the league is never stale, and the
+scores come from a seeded generator — the same league on every device and in every run, so
+it can be pinned by a test and talked through twice.
+
+Beside it, **load a single golfer's season** is the older, narrower example: one golfer, one
+course, added to whatever you already have. That one's for someone who already has a real
+league and just wants to see what a populated page of their own looks like.
+
+[`example-league.json`](example-league.json) is a separate thing and stays: a checked-in
+**backup file**, for exercising *Back up → Restore from backup*. It holds a league of the
+same shape, frozen at a fixed date rather than counted from today. The button is the demo;
+the file is a restore fixture.
 
 ### The Score to Enter
 
@@ -435,7 +470,7 @@ To go back to fully-local, set `FIREBASE_CONFIG` to `null` again.
 | `firestore.rules` | A checked-in copy of the security rules to deploy in the Firebase console. |
 | `favicon.ico` | The app's icon — the fallback a browser fetches from the site root on its own. |
 | `make_favicon.py` | Draws `favicon.ico` to match the inline SVG icon in `index.html`. |
-| `example-league.json` | A backup you can restore to try the app out: a league of 8 golfers, 112 rounds, 6 courses. |
+| `example-league.json` | A checked-in **backup file**, for exercising Restore: a league of 8 golfers, 112 rounds, 6 courses, frozen at a fixed date. The in-app **example league** button is the demo — see [Trying It Out](#trying-it-out--the-example-league). |
 | `make_example_league.py` | Writes `example-league.json` from a fixed seed, so re-running it produces the identical file. |
 | `LICENSE` | MIT. |
 
@@ -468,7 +503,7 @@ tests — they need `http://localhost` because `file://` iframes are blocked in 
 `scoreDifferential`, `averageLowest`, `whsIndex`/`whsSelection`,
 `rollingIndex`/`rollingSelection`, `normalizeMethod`, `clampInt`/`clampNum`, `applyCaps`,
 `courseHandicap`, `indexHistory`, `pickUsed`, `rankLeague`, `changeOverRounds`,
-`syncDecision`, `buildDemo`, `encodeShare`/`decodeShare`, `buildSharePayload`,
+`syncDecision`, `buildDemo`, `buildDemoLeague`, `encodeShare`/`decodeShare`, `buildSharePayload`,
 `windowRounds`, `sanitizeIds` or `normalizeState`.
 
 **It only runs on localhost, and enforces that itself.** The test code writes nothing, but

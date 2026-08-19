@@ -170,6 +170,32 @@ that emphasis.
   lets a reload replace the course instead of duplicating it; the ROUNDS are replaced by
   dropping that golfer's rounds wholesale, behind a confirm, since real rounds would go
   with them. Other golfers' rounds are never touched.
+- **THE SAMPLE DATA IS THE DEMO, and a feature isn't finished until it reaches it.**
+  `buildDemoLeague()` / `loadDemoLeague()` — eight golfers, six courses, a season of rounds
+  ending today — is what someone sent a share link explores and what the app gets shown
+  with, so every feature must be visible from it. Adding one means adding the golfer,
+  course or round that demonstrates it, a line in the roster comment above
+  `buildDemoLeague()`, a row in the README's demo table, and an assertion in tests.html.
+  The same rule runs in Sprint Velocity and Flow Metrics; all three got it on 2026-08-19.
+  - **Every figure in the cast is load-bearing**: 26/24/22/20/14/4/2/0 rounds walks every
+    rung of the official calculation (past 20, exactly 20, under 20, the reduced-scores
+    table at 4, under the minimum at 2, never played at 0); Alex Nash's differentials go
+    NEGATIVE; Old Mill rates below par (the only place a course handicap comes out under
+    the index); Kilbryde is slope 142; Brookvale has one set of tees. Two "don't count"
+    rounds and one PCC give the exclusion line and the pills something to name.
+  - **It is ADDITIVE and destroys nothing**, the same promise `buildDemo()` makes. Stable
+    `demo-` ids are what make that work: golfers and courses are upserted by id, the old
+    example rounds are dropped by their `demo-r-` prefix, and the user's own golfer simply
+    joins the leaderboard. It only moves off the golfer on screen if that golfer has no
+    rounds. Don't make it replace state — "Clear everything" is the way back out, and a
+    `confirm()` can't hold the backup button that makes a destructive action safe.
+  - Dates count back from today, so the league is never stale. The generator is **seeded**
+    (`demoRandom`, mulberry32 + Box-Muller) — never swap it for `Math.random()`, or the
+    league reshuffles per device and no test can pin it.
+- **`example-league.json` and the example-league BUTTON are two different things, on
+  purpose.** The button is the demo: generated, dated from today, additive. The JSON is a
+  checked-in backup file whose job is exercising *Restore*, frozen at a fixed date. Neither
+  claims to be the other, which is why they can't drift — don't "unify" them.
 - **The example-data button and "Clear everything" are a pair.** Offering one-tap sample
   data without a one-tap way back out is how someone ends up hand-deleting two dozen rounds;
   if either is ever removed, reconsider the other. Clearing uses a dialog rather than nested
@@ -312,19 +338,22 @@ that emphasis.
   headers). Any new network endpoint must be added to `connect-src` or it is silently
   blocked. `frame-src` needs only `accounts.google.com` — GIS sign-in never loads the
   Firebase `authDomain`, even if the project is repointed.
-- **`example-league.json` is a checked-in fixture, not data** — a backup anyone can restore
-  to see a populated leaderboard (8 golfers, 112 rounds, 6 courses). `make_example_league.py`
-  writes it from a fixed seed, so re-running produces the identical file; regenerate it
-  rather than hand-editing, and keep the awkward cases it deliberately holds — a
-  near-scratch player with negative differentials, golfers either side of 20 rounds, one on
-  4 (the reduced-scores table), one on 2 (no official index at all), one who has never
-  played, and two rounds marked "don't count".
+- **`example-league.json` is a checked-in fixture, not data** — a backup anyone can restore,
+  and the way *Restore from backup* gets exercised with something real (8 golfers, 112
+  rounds, 6 courses). `make_example_league.py` writes it from a fixed seed, so re-running
+  produces the identical file; regenerate it rather than hand-editing, and keep the awkward
+  cases it deliberately holds — a near-scratch player with negative differentials, golfers
+  either side of 20 rounds, one on 4 (the reduced-scores table), one on 2 (no official index
+  at all), one who has never played, and two rounds marked "don't count". Those are the same
+  cases `buildDemoLeague()` covers, and deliberately so: the two are kept in step by holding
+  the same LIST OF CASES, not the same numbers. **The demo is the button, not this file** —
+  see the demo rule above.
 - **README.md is the index** — keep it current whenever the app meaningfully changes.
 - **`tests.html` pins the pure functions — open it on a local server and check
   "All N tests pass"** whenever you touch `round1`, `scoreDifferential`, `averageLowest`,
   `whsIndex`/`whsSelection`, `rollingIndex`/`rollingSelection`, `normalizeMethod`,
   `clampInt`/`clampNum`, `applyCaps`, `courseHandicap`, `indexHistory`, `pickUsed`,
-  `syncDecision`, `buildDemo`, `rankLeague`, `changeOverRounds`,
+  `syncDecision`, `buildDemo`, `buildDemoLeague`, `rankLeague`, `changeOverRounds`,
   `encodeShare`/`decodeShare`/`buildSharePayload`, `windowRounds`, `sanitizeIds` or
   `normalizeState`. It loads
   the real `index.html` in a hidden iframe and calls the functions directly — no copies, no
