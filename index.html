@@ -347,7 +347,30 @@ td.rank, th.rank { text-align: right; font-variant-numeric: tabular-nums; color:
 }
 
 table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
-.table-scroll { overflow-x: auto; }
+/* ── A scroll box has to be POSITIONED, or iOS lets the page scroll instead ──
+   `overflow-x: auto` is the whole design here: a table too wide for a phone
+   scrolls INSIDE its card and the page stays the width of the screen. On iOS
+   that only half worked. WebKit clipped the table on screen but still counted
+   its full width in the DOCUMENT's scrollable area, so the page itself became
+   horizontally scrollable — and everything past the viewport was empty, because
+   the thing making it scrollable was drawn clipped. Pinch out to see where the
+   page ends and you get the app on the left and a wide band of nothing on the
+   right. Measured on iOS 27 at a 402px viewport: `documentElement.scrollWidth`
+   906 with a 402px body.
+
+   `position: relative` is what fixes it, and nothing weaker does: a stacking
+   context alone (`isolation: isolate`) leaves it at 906, and so does spelling
+   out `overflow-y`. `contain: paint` works but takes the containing block for
+   fixed descendants with it, which is a bigger promise than this needs. All
+   four measured side by side in Safari before choosing.
+
+   No visual change and no new containing block worth having: nothing inside either box is absolutely
+   positioned.
+
+   Chrome and Firefox were always right here, which is why this went unnoticed —
+   it is only ever visible on the phone. Mirrored in Sprint Predictability, Flow Metrics
+   and Money Map. */
+.table-scroll { overflow-x: auto; position: relative; }
 th, td { padding: var(--sp-4) var(--sp-5); text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
 thead th {
   font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: var(--ls-label);
@@ -377,7 +400,7 @@ details > summary { cursor: pointer; color: var(--accent); font-size: var(--fs-s
 details > summary:focus-visible { outline: 2px solid var(--focus-border); outline-offset: 2px; }
 .work { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-secondary); white-space: pre-wrap; margin-top: var(--sp-5); }
 
-.chart-wrap { overflow-x: auto; }
+.chart-wrap { overflow-x: auto; position: relative; }
 svg.chart { display: block; width: 100%; min-width: 320px; height: auto; }
 .legend { display: flex; flex-wrap: wrap; gap: var(--sp-6); margin-top: var(--sp-4); font-size: var(--fs-sm); color: var(--text-secondary); }
 
@@ -2160,6 +2183,60 @@ function renderLeague() {
 
 /* ── Dismissing a dialog ────────────────────────────────────────────────── */
 
+/* ── Opening a dialog on a touch screen ─────────────────────────────────────
+   `showModal()` runs the spec's dialog focusing steps: focus the `autofocus`
+   element, or failing that the FIRST FOCUSABLE ONE, whatever it happens to
+   be. Nothing here asks for that — there is no `autofocus` anywhere in the
+   file — so which dialogs summoned a phone's keyboard was decided entirely by
+   which happened to open with a text box rather than a button. Four did — a
+   round opens on its date, and the course, method and golfer editors each
+   open on a name box; the courses list, Share, Back up and Help did not. On a
+   phone the keyboard then covers half the dialog before you have read it.
+
+   So on a COARSE pointer the focus is moved off the field and onto the dialog
+   itself. Focus still goes INTO the dialog, and that part is not optional:
+   leave it on the button behind and a keyboard or screen-reader user is
+   stranded outside a thing covering the page. Landing on the CONTAINER is the
+   arrangement the ARIA practices offer for exactly this case — every dialog
+   here carries `aria-labelledby`, so it announces itself, and Tab from there
+   reaches the first field. `tabIndex` is set at open rather than in the
+   markup: a dialog is a focus target only for the moment it opens.
+
+   `(pointer: coarse)` and NOT the width breakpoint the chrome uses: the
+   keyboard is a fact about touch, not about width. A desktop window dragged
+   narrow keeps its click-and-type, and a wide tablet is still spared.
+
+   It runs only when the browser actually landed on a text-entry field, so it
+   is a no-op for the dialogs that open on a button and stays right for one
+   that later gains a field at the top. And it deliberately does nothing to a
+   caller that focuses something itself AFTERWARDS, which is how a window
+   whose whole point is typing can still ask for the keyboard.
+
+   Ported from Money Map, where it was found and worked out, and mirrored
+   here, in Sprint Predictability, Flow Metrics and PAPTrack on the same
+   afternoon. */
+const KEYBOARD_TYPES = new Set(['text', 'number', 'search', 'tel', 'url', 'email',
+  'password', 'date', 'month']);
+/* Which elements a phone answers with a keyboard — pure over {tagName, type},
+   so the list is pinned by tests rather than rediscovered the next time a
+   dialog opens on a field nobody thought about. A checkbox, a button and a
+   select all raise nothing, which is why the dialogs that open on one are left
+   exactly as they were. */
+function raisesKeyboard(el) {
+  if (!el) return false;
+  return el.tagName === 'TEXTAREA'
+    || (el.tagName === 'INPUT' && KEYBOARD_TYPES.has(el.type));
+}
+function openModal(dlg) {
+  dlg.showModal();
+  if (!window.matchMedia('(pointer: coarse)').matches) return;
+  const el = document.activeElement;
+  if (!el || !dlg.contains(el)) return;
+  if (!raisesKeyboard(el)) return;
+  dlg.tabIndex = -1;
+  dlg.focus();
+}
+
 /* A modal <dialog> ignores backdrop clicks by default, which reads as the app
    being stuck. Clicking outside now cancels, same as the Cancel button and
    Escape. Ported verbatim from Sprint Velocity and Team Dashboard, including the
@@ -2219,7 +2296,7 @@ function openRound(id) {
   document.getElementById('deleteRoundBtn').hidden = !r;
   document.getElementById('roundWarn').textContent = '';
   updateRoundHint();
-  roundDialog.showModal();
+  openModal(roundDialog);
 }
 
 /* Pre-fills a new round with whatever the last one used — most people play the
@@ -2339,7 +2416,7 @@ function openCourseEdit(id) {
   document.getElementById('deleteCourseBtn').hidden = !editingCourse;
   document.getElementById('courseWarn').textContent = '';
   if (courseDialog.open) courseDialog.close();
-  courseEditDialog.showModal();
+  openModal(courseEditDialog);
 }
 
 /* One delegated listener, attached once. Wiring each Remove button as rows were
@@ -2400,7 +2477,7 @@ document.getElementById('courseEditSave').addEventListener('click', () => {
   save();
   courseEditDialog.close();
   renderCourseList();
-  courseDialog.showModal();
+  openModal(courseDialog);
   toast('Course saved');
 });
 
@@ -2415,14 +2492,14 @@ document.getElementById('deleteCourseBtn').addEventListener('click', () => {
   save();
   courseEditDialog.close();
   renderCourseList();
-  courseDialog.showModal();
+  openModal(courseDialog);
   toast('Course deleted');
 });
 
 document.getElementById('courseEditCancel').addEventListener('click', () => {
   courseEditDialog.close();
   renderCourseList();
-  courseDialog.showModal();
+  openModal(courseDialog);
 });
 /* Escape took the browser's own route out and closed this dialog flat, leaving
    the courses list it was opened from gone as well. It now backs out the same
@@ -2431,7 +2508,7 @@ courseEditDialog.addEventListener('cancel', (e) => {
   e.preventDefault();
   document.getElementById('courseEditCancel').click();
 });
-document.getElementById('coursesBtn').addEventListener('click', () => { renderCourseList(); courseDialog.showModal(); });
+document.getElementById('coursesBtn').addEventListener('click', () => { renderCourseList(); openModal(courseDialog); });
 document.getElementById('addCourseBtn').addEventListener('click', () => openCourseEdit(null));
 document.getElementById('courseClose').addEventListener('click', () => courseDialog.close());
 
@@ -2460,7 +2537,7 @@ function openMethod() {
   document.getElementById('m_caps').checked = state.settings.applyCaps !== false;
   document.getElementById('methodWarn').textContent = '';
   updateMethodPreview();
-  methodDialog.showModal();
+  openModal(methodDialog);
 }
 
 function readMethodForm() {
@@ -2574,7 +2651,7 @@ document.getElementById('golferClose').addEventListener('click', () => golferDia
 document.getElementById('golfersBtn').addEventListener('click', () => {
   document.getElementById('golferWarn').textContent = '';
   renderGolferList();
-  golferDialog.showModal();
+  openModal(golferDialog);
 });
 document.getElementById('golferSel').addEventListener('change', (e) => {
   state.activeGolfer = e.target.value;
@@ -2669,7 +2746,7 @@ document.addEventListener('click', (e) => {
   if (!h) return;
   document.getElementById('helpTitle').textContent = h[0];
   document.getElementById('helpBody').innerHTML = h[1];
-  helpDialog.showModal();
+  openModal(helpDialog);
 });
 document.getElementById('helpClose').addEventListener('click', () => helpDialog.close());
 
@@ -2694,7 +2771,7 @@ function downloadBackup() {
 }
 document.getElementById('exportBtn').addEventListener('click', downloadBackup);
 const dataDialog = document.getElementById('dataDialog');
-document.getElementById('dataBtn').addEventListener('click', () => dataDialog.showModal());
+document.getElementById('dataBtn').addEventListener('click', () => openModal(dataDialog));
 document.getElementById('dataClose').addEventListener('click', () => dataDialog.close());
 
 document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
@@ -2751,7 +2828,7 @@ document.getElementById('clearBtn').addEventListener('click', () => {
   document.getElementById('clearSyncWarn').textContent = signedIn
     ? 'You are signed in, so this also clears the copy in your Google account. Your other devices will ask before clearing themselves.'
     : '';
-  clearDialog.showModal();
+  openModal(clearDialog);
 });
 
 document.getElementById('clearBackupBtn').addEventListener('click', downloadBackup);
@@ -3284,7 +3361,7 @@ function openShare() {
     .forEach((i) => i.addEventListener('change', () => { syncSelectAll(); refreshShareLink(); }));
   syncSelectAll();
   refreshShareLink();
-  shareDialog.showModal();
+  openModal(shareDialog);
   shareDialog.scrollTop = 0;
 }
 
@@ -3498,7 +3575,8 @@ window.addEventListener('storage', (e) => {
 /* tests.html reaches the pure functions directly — they are all plain function
    declarations, so they are already on window. This hook exists only for the
    `const` values, which are not. */
-window.__ghTestHooks = { DEFAULT_METHOD, WHS_TABLE, WHS_MIN_ROUNDS, WHS_MAX_INDEX, SOFT_CAP_AT, HARD_CAP_AT,
+window.__ghTestHooks = { raisesKeyboard,
+  DEFAULT_METHOD, WHS_TABLE, WHS_MIN_ROUNDS, WHS_MAX_INDEX, SOFT_CAP_AT, HARD_CAP_AT,
   /* Both declared above this line, which is the only reason they can be read
      here: a `const` referenced before its declaration is a temporal-dead-zone
      error that would take the whole app down at boot. */
@@ -3840,7 +3918,7 @@ function chooseSyncSource(localCount, remoteCount, remoteUpdatedAt) {
     deviceBtn.addEventListener('click', onDevice);
     googleBtn.addEventListener('click', onGoogle);
     dlg.addEventListener('cancel', preventCancel);
-    dlg.showModal();
+    openModal(dlg);
   });
 }
 

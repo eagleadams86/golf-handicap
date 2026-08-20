@@ -928,6 +928,29 @@ async function onAppLoad() {
     eq(W.esc(7), '7');
   });
 
+  describe('which fields raise a phone keyboard');
+  /* `openModal` moves focus off a text field onto the dialog on a touch screen,
+     so the on-screen keyboard doesn't cover the dialog you just opened — a round
+     opens on its date box, and the course, method and golfer editors each open
+     on a name box. What counts as "a text field" is the whole decision, and it
+     is pure, so it is pinned here rather than rediscovered the next time a
+     dialog opens on a field nobody thought about. Same block in Money Map,
+     Sprint Predictability, Flow Metrics and PAPTrack. */
+  it('a typing field does, whatever flavour', () => {
+    for (const type of ['text', 'number', 'search', 'tel', 'url', 'email',
+                        'password', 'date', 'month'])
+      ok(H.raisesKeyboard({ tagName: 'INPUT', type }), `input[type=${type}]`);
+    ok(H.raisesKeyboard({ tagName: 'TEXTAREA' }), 'a note box has no type at all');
+  });
+  it('a control you press or pick does not', () => {
+    for (const type of ['checkbox', 'radio', 'button', 'submit', 'range', 'color', 'file'])
+      eq(H.raisesKeyboard({ tagName: 'INPUT', type }), false, `input[type=${type}]`);
+    eq(H.raisesKeyboard({ tagName: 'BUTTON' }), false);
+    eq(H.raisesKeyboard({ tagName: 'SELECT' }), false);
+    eq(H.raisesKeyboard({ tagName: 'DIALOG' }), false, 'the dialog itself, once focus lands there');
+    eq(H.raisesKeyboard(null), false, 'nothing focused is not a keyboard');
+  });
+
   run();
 }
 
