@@ -893,6 +893,41 @@ async function onAppLoad() {
        'and the builder stamps the version the decoder checks for');
   });
 
+  /* ── the free-text boundary ──────────────────────────────────────────── */
+  /* `sanitizeIds` has had a hostile-id test since it was written; this boundary
+     had none, here and in three siblings, which an audit found on 2026-08-20 —
+     `esc` was never called by this suite, and it is the function between a
+     golfer or course NAME and the markup of every table, picker and the SVG
+     chart's aria-label. Names are free text capped at 40-80 characters and
+     deliberately not sanitized on the way in, because escaping at the sink is
+     the design; so the sink is what gets pinned. They also travel in share
+     links — a league link carries other people's names, which is the one place
+     the text is not something you typed yourself.
+     It matters beyond this app: every GitHub Pages site in this account shares
+     one browser origin, so a hole here is a hole in all of them. */
+  describe('esc — the free-text boundary (names reaching innerHTML)');
+  it('replaces every HTML-significant character', () => {
+    eq(W.esc('<>&"\''), '&lt;&gt;&amp;&quot;&#39;');
+  });
+  it('a hostile course name survives as text and never as markup', () => {
+    const evil = '"><img src=x onerror=alert(1)><script>alert(2)<\/script>';
+    const e = W.esc(evil);
+    /* Parsed for real rather than string-matched: the question is what a
+       BROWSER builds from this, in an attribute as much as in text — the tee
+       rows put names in value="" and the chart puts them in aria-label. A regex
+       over the output would pass on markup the parser still accepts. */
+    const probe = document.createElement('div');
+    probe.innerHTML = '<span title="' + e + '">' + e + '</span>';
+    eq(probe.querySelectorAll('img, script').length, 0, 'no element may be created');
+    eq(probe.firstElementChild.textContent, evil, 'and the text reads back unchanged');
+    eq(probe.firstElementChild.getAttribute('title'), evil, 'including inside an attribute');
+  });
+  it('handles null, undefined and numbers instead of throwing', () => {
+    eq(W.esc(null), '');
+    eq(W.esc(undefined), '');
+    eq(W.esc(7), '7');
+  });
+
   run();
 }
 
