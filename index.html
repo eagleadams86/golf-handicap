@@ -3719,29 +3719,50 @@ function onSignInFailed(e) {
 }
 
 /* Firestore's error codes mean nothing to anyone who hasn't read the docs, so
-   they are mapped to a plain sentence plus what to do about it. */
+   they are mapped to a plain sentence plus what to do about it.
+   Returns `{reason, fix}` — TWO fields, not one sentence (changed 2026-08-20).
+   This app was the only one of the five still returning a bare string, with the
+   remedy buried in the middle of the reason after an em dash; every sibling
+   splits them, so the button's tooltip can carry both while the note reads as
+   "here is what happened. Here is what to do." Same information, said the way
+   the rest of the family says it. */
 function describeSyncError(e) {
   const code = String((e && e.code) || '');
-  if (code.indexOf('permission-denied') !== -1) return 'the security rules are rejecting this account — check firestore.rules is deployed';
-  if (code.indexOf('unauthenticated') !== -1) return 'the sign-in has expired — sign out and back in';
-  if (code.indexOf('unavailable') !== -1) return 'no connection to Firebase — it will catch up when you are back online';
-  if (code.indexOf('resource-exhausted') !== -1) return 'the free Firebase quota for today is used up';
+  if (code.indexOf('permission-denied') !== -1) return {
+    reason: 'The security rules are rejecting this account.',
+    fix: 'Check that firestore.rules has been deployed in the Firebase console.' };
+  if (code.indexOf('unauthenticated') !== -1) return {
+    reason: 'The sign-in has expired.',
+    fix: 'Signing out and back in usually clears it.' };
+  if (code.indexOf('unavailable') !== -1) return {
+    reason: 'There is no connection to Firebase.',
+    fix: 'Nothing is lost — it catches up on its own once you are back online.' };
+  if (code.indexOf('resource-exhausted') !== -1) return {
+    reason: 'The free Firebase quota for today is used up.',
+    fix: 'It resets tomorrow; everything is still saved in this browser until then.' };
   /* Firestore reports two unrelated things as invalid-argument: a document over the
      1 MiB cap, and a value it can't store (an `undefined` anywhere in the object).
      Saying "too large" for both sends someone deleting rounds over an app bug, so
      the size wording waits for Firestore's own message to mention size. */
-  if (code.indexOf('invalid-argument') !== -1)
-    return /maximum allowed size|exceeds|too large|longer than|bytes/i.test(String((e && e.message) || ''))
-      ? 'this data is too large for one Firestore document'
-      : 'the cloud refused this copy — that is a fault in the app, not in your rounds. Nothing is lost; reloading the page usually clears it';
-  return 'an unexpected error — see the browser console';
+  if (code.indexOf('invalid-argument') !== -1) {
+    const detail = String((e && e.message) || '');
+    if (/maximum allowed size|exceeds|too large|longer than|bytes/i.test(detail)) return {
+      reason: 'There are more rounds here than can be synced in one go.',
+      fix: 'Back up first, then delete a course or golfer you no longer play — sync picks up again on the next change.' };
+    return {
+      reason: 'The cloud refused this copy of your rounds — that’s a fault in the app, not in what you entered.',
+      fix: 'Nothing is lost: everything is still here and still saved. Reloading the page usually clears it.' };
+  }
+  return {
+    reason: 'Something unexpected went wrong while syncing.',
+    fix: 'Your rounds are still saved in this browser. The browser console has the detail.' };
 }
 function setSyncError(e) {
   const was = syncError;
   syncError = describeSyncError(e);
   console.warn('sync error', e);
   updateUI();
-  if (!was) window.toast('Not syncing — ' + syncError);
+  if (!was) window.toast('⚠️ Not syncing — see the note at the foot of the page');
 }
 /* Only a successful push clears it. There is deliberately no retry button:
    transient causes are retried by the SDK, permanent ones are not fixed by
@@ -3751,8 +3772,9 @@ function clearSyncError() { if (syncError) { syncError = null; updateUI(); } }
 function updateUI() {
   if (syncError && user) {
     btn.textContent = '⚠️ Not syncing';
-    btn.title = 'Sync problem: ' + syncError;
-    privacyNote.textContent = `⚠️ Signed in as ${user.email}, but not syncing — ${syncError}. Your rounds are still safe in this browser.`;
+    btn.title = syncError.reason + ' ' + syncError.fix;
+    privacyNote.textContent = `⚠️ Not syncing — ${syncError.reason} Your rounds are still safe in `
+      + `this browser, but your other devices aren’t getting them. ${syncError.fix}`;
     return;
   }
   if (user) {

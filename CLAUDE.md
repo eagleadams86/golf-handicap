@@ -126,6 +126,16 @@ that emphasis.
   `--c-roll`/`--c-whs` are app-specific *additions*, not overrides of pack tokens, which is
   why their midnight values live in `:root` (as the pack's own do). Any app-local *override*
   of a pack token would have to target `[data-theme="…"]`, never `:root`.
+  **They sit OUTSIDE the pack's `check_contrast.py` gate, and that is the trade this
+  arrangement makes** (recorded 2026-08-20, after an audit asked why 8 colour values across
+  four themes were being defined outside the source of truth). Chart series aren't pack
+  tokens — the pack has no concept of "this app's two lines" — so gating them would mean
+  teaching it a per-app section, which is a bigger change than the risk warrants for two
+  colours. What that costs: nobody re-checks them automatically when the palette moves.
+  Both pairs were verified by hand at that audit and pass AA against `--bg`, `--surface`
+  and `--surface-alt` in all four themes. **Re-check them by hand whenever the pack's
+  surface tokens change**, and keep the dash/shape distinction, which is what makes the
+  chart readable regardless. Sprint Velocity carries the same note for its six series.
 - **A status surface is a tint fill plus a full-strength edge.** The `-bg` tints are nearly
   identical to each other once red-green deficiency flattens them, so `.pill` carries a
   1.5px border in the status colour and that is what tells the states apart. Never a fill
