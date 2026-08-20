@@ -3027,7 +3027,13 @@ function dropToast(el) {
   try { el.hidePopover(); } finally { toastRaised = false; }
 }
 
-function toast(msg) {
+/* `ms` is optional and defaults to the usual 3.2s. It exists because one caller
+   was already passing a duration — the example-league toast asks for 6000, since
+   it is the message that says how to REMOVE the example data and is worth
+   reading — and this function took one argument, so the number was silently
+   discarded and that toast disappeared in 3.2s like every other. Nothing said
+   so; CodeQL found it as js/superfluous-trailing-arguments on 2026-08-20. */
+function toast(msg, ms) {
   const el = document.getElementById('toast');
   clearTimeout(toastTimer);
   clearTimeout(toastHideTimer);
@@ -3045,7 +3051,7 @@ function toast(msg) {
     /* Leaves the top layer once it has faded, so a spent toast is never parked
        above whatever opens next. Matches the .2s opacity transition. */
     toastHideTimer = setTimeout(() => dropToast(el), 250);
-  }, 3200);
+  }, Number(ms) > 0 ? Number(ms) : 3200);
 }
 window.toast = toast;
 
