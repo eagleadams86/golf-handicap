@@ -710,11 +710,12 @@ async function onAppLoad() {
      All the awaiting for both groups happens here, before a single it() is
      defined, so the test bodies below stay synchronous like every other one in
      this file. */
-  const [swRes, killRes, appRes] = await Promise.all(
-    [fetch('sw.js'), fetch('sw-kill.js'), fetch('index.html')]);
+  const [swRes, killRes, appRes, privRes] = await Promise.all(
+    [fetch('sw.js'), fetch('sw-kill.js'), fetch('index.html'), fetch('privacy.html')]);
   const SW_SRC = swRes.ok ? await swRes.text() : '';
   const KILL_SRC = killRes.ok ? await killRes.text() : '';
   const APP_SRC = appRes.ok ? await appRes.text() : '';
+  const PRIV_SRC = privRes.ok ? await privRes.text() : '';
   const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const SW = strip(SW_SRC), KILL = strip(KILL_SRC);
   const shellList = (SW_SRC.match(/const SHELL = \[([\s\S]*?)\]/) || [null, ''])[1];
@@ -724,6 +725,24 @@ async function onAppLoad() {
   let futureErr = null;
   try { await S.decodeShare(futureLink); } catch (e) { futureErr = e; }
   const currentLink = await S.decodeShare(await S.encodeShare(sharePayload));
+
+  /* ── the footer every public page in this account carries ─────────────── */
+  describe('privacy.html — the family footer');
+
+  /* The privacy policy, the repo under the label "How it works", and the
+     authorship line. The APP's footer has had all three for a while; this page
+     carried none of them until 2026-08-21 — and it is a public page reached by
+     a link in that very footer, so somebody who follows it lands on a document
+     with no way back to what it documents and no statement of who wrote it.
+     The privacy link itself is deliberately absent: you are standing on it. */
+  it('the privacy page exists — the app footer links straight at it', () =>
+    ok(PRIV_SRC, 'privacy.html is missing'));
+  it('and carries the repo link, labelled "How it works" family-wide', () =>
+    ok(/>How it works</.test(PRIV_SRC)));
+  it('and the authorship line every public page in the family has', () =>
+    ok(/MIT licensed/.test(PRIV_SRC)));
+  it('but not a privacy link, which on the privacy page points at itself', () =>
+    ok(!/href="privacy\.html"/.test(PRIV_SRC)));
 
   /* ── the offline shell ───────────────────────────────────────────────── */
   describe('sw.js — the offline shell');
