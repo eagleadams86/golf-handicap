@@ -716,6 +716,7 @@ async function onAppLoad() {
   const KILL_SRC = killRes.ok ? await killRes.text() : '';
   const APP_SRC = appRes.ok ? await appRes.text() : '';
   const PRIV_SRC = privRes.ok ? await privRes.text() : '';
+  const PRIV_BARE = PRIV_SRC.replace(/<!--[\s\S]*?-->/g, '');
   const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const SW = strip(SW_SRC), KILL = strip(KILL_SRC);
   const shellList = (SW_SRC.match(/const SHELL = \[([\s\S]*?)\]/) || [null, ''])[1];
@@ -743,6 +744,17 @@ async function onAppLoad() {
     ok(/MIT licensed/.test(PRIV_SRC)));
   it('but not a privacy link, which on the privacy page points at itself', () =>
     ok(!/href="privacy\.html"/.test(PRIV_SRC)));
+  /* Comments stripped FIRST, and the footer matched by its CLASS. The notes
+     beside both elements name them in prose — and one of those notes is in the
+     <style> block, which an HTML-comment strip does not reach — so a bare
+     /<main>/ or a bare '<footer' would pass on a page that had lost the element
+     and kept the comment explaining it, which is the one way this could rot. */
+  it('the footer is a real <footer> — a contentinfo landmark, not a styled paragraph', () =>
+    ok(/<footer class="foot">/.test(PRIV_BARE)));
+  it('and the policy sits in <main>, or contentinfo is the page\u2019s only landmark', () =>
+    ok(/<main>/.test(PRIV_BARE)));
+  it('with main CLOSED before it — a <footer> inside main is not contentinfo at all', () =>
+    ok(PRIV_BARE.indexOf('</main>') < PRIV_BARE.indexOf('<footer class="foot"')));
 
   /* ── the offline shell ───────────────────────────────────────────────── */
   describe('sw.js — the offline shell');
