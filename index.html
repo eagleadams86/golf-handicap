@@ -153,6 +153,24 @@
 }
 
 * { box-sizing: border-box; }
+/* THE `hidden` ATTRIBUTE HAS TO BEAT A CLASS THAT SETS `display`, AND ON ITS OWN
+   IT DOESN'T. The browser's own `[hidden] { display: none }` lives in the
+   user-agent stylesheet, and ANY author rule beats a UA rule whatever the
+   specificity — so a `.filterbar { display: flex }` quietly cancels it and the
+   element stays on screen with `hidden` set. Nothing fails and nothing logs; the
+   thing is simply there.
+
+   This has now bitten twice: `.tabs` was patched with its own `.tabs[hidden]`
+   rule when the Leaderboard tab would not hide, and the rounds filter shipped
+   with the same fault in August 2026 — a Course picker with nothing in it and a
+   Clear link, sitting above an app with no rounds in it at all. So it is fixed
+   for every element here rather than one at a time, and `!important` is what
+   makes it independent of source order: a per-element `[hidden]` rule and its
+   class rule have identical specificity, so without it the fix would depend on
+   which of the two was written further down the file.
+
+   Nothing wants to be `hidden` and visible, so there is no case to lose. */
+[hidden] { display: none !important; }
 /* iOS text autosizing is turned off in theme.css (pack rule 9), not here. */
 body {
   margin: 0;
@@ -386,7 +404,6 @@ th:has(.help-btn), td:has(.help-btn) { white-space: nowrap; }
    the boot script in <head>. No attribute (no script) shows both panels.
 ─────────────────────────────────────────────────────────────────────────── */
 .tabs { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
-.tabs[hidden] { display: none; }
 .tab {
   background: var(--surface-alt); border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);

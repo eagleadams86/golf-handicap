@@ -1493,6 +1493,46 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
     eq(spinProbe(W, (box) => { spinFocusIn(W, box); }), false);
   });
 
+  /* ── the hidden attribute ────────────────────────────────────────────────
+     Its own group because the failure is SILENT: the browser's
+     `[hidden] { display: none }` lives in the user-agent stylesheet, any author
+     rule beats a UA rule whatever the specificity, and so a class that sets
+     `display` leaves the element on screen with `hidden` set. Nothing throws
+     and nothing logs. It has cost this app twice — the Leaderboard tab, then
+     the rounds filter, which shipped showing an empty course picker above an
+     app with no rounds in it. Computed style rather than a grep for the rule:
+     what matters is the answer the browser gives, not the text that produced
+     it. */
+  describe('the hidden attribute actually hides');
+  const displayWhenHidden = (className) => {
+    const d = W.document;
+    const el = d.createElement('div');
+    el.className = className;
+    el.hidden = true;
+    d.body.appendChild(el);
+    const display = W.getComputedStyle(el).display;
+    el.remove();
+    return display;
+  };
+  it('beats a class that sets display, which the UA rule alone does not', () =>
+    eq(displayWhenHidden('filterbar'), 'none'));
+  it('holds for every class in this app that sets its own display', () => {
+    /* Not an exhaustive list of classes — an exhaustive list of the ones a
+       `hidden` is ever put on, or has a fair chance of being put on. */
+    ['filterbar', 'tabs', 'stat', 'card', 'figure', 'scorerows', 'scorerow']
+      .forEach((c) => eq(displayWhenHidden(c), 'none', `.${c} should hide:`));
+  });
+  it('hides the real filter bar and the real tablist', () => {
+    const d = W.document;
+    [d.getElementById('roundsFilter'), d.querySelector('.tabs')].forEach((el) => {
+      const was = el.hidden;
+      el.hidden = true;
+      const display = W.getComputedStyle(el).display;
+      el.hidden = was;
+      eq(display, 'none', `#${el.id || el.className} should hide:`);
+    });
+  });
+
   run();
 }
 

@@ -421,6 +421,19 @@ that emphasis.
   and hidden on failure**, not the other way round, and midnight carries `selected` in the
   theme picker so it never reads a different theme from the one already painted. If you add
   header chrome, give it its final width in the HTML.
+- **`[hidden] { display: none !important; }` sits at the top of the stylesheet, and it is
+  not belt-and-braces** (2026-08-22). The browser's own `[hidden]` rule lives in the
+  USER-AGENT stylesheet, and any author rule beats a UA rule whatever the specificity — so a
+  class that sets `display` cancels it and the element stays on screen with `hidden` set.
+  Nothing throws and nothing logs; the thing is simply there. It has cost this app twice:
+  `.tabs` was patched with its own `.tabs[hidden]` rule when the Leaderboard tab would not
+  hide, and the rounds filter shipped with the same fault — an empty course picker and a
+  Clear link above an app with no rounds in it. The per-element patch is gone in favour of
+  the global one, and `!important` is what makes it independent of source order (a
+  `.thing[hidden]` rule and `.thing` have identical specificity, so otherwise the fix would
+  depend on which was written further down). **A new class that sets `display` needs no
+  special case now — leave it that way rather than reintroducing per-element rules.**
+  Pinned by tests that read COMPUTED STYLE in the app frame, not the rule text.
 - **Live regions stay in the tree.** `#handicapWarn` and the dialog warnings are
   `role="status"` and are emptied rather than `hidden` — an element toggled out of the tree
   announces nothing on the way back — with `.warn:empty` collapsing them visually.
