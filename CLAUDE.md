@@ -487,6 +487,18 @@ that emphasis.
   the same LIST OF CASES, not the same numbers. **The demo is the button, not this file** —
   see the demo rule above.
 - **README.md is the index** — keep it current whenever the app meaningfully changes.
+- **`tests.html` busts its own cache, on the frame AND on the source fetches
+  (2026-08-22), and that is not tidiness.** `const BUST = '?t=' + Date.now()` goes on
+  the hidden `iframe.src` and through `bustFetch()` on every read of a file this repo
+  ships. The frame cache and the HTTP cache are different caches and they can disagree:
+  in the lottery repo the same harness reported **all-green against a page three
+  features out of date**, because the source-level tests were reading the file off the
+  server while the frame ran a copy the browser had cached. Nothing errored; the new
+  code was simply never run. A suite that can pass against a build which exists nowhere
+  is worse than no suite — it turns "untested" into "verified". **If a test passes when
+  you expected it to fail, check the frame's `contentWindow` has the function you just
+  wrote before believing anything.** `api.github.com` is deliberately left un-busted:
+  somebody else's endpoint, not a file we ship.
 - **`tests.html` pins the pure functions — open it on a local server and check
   "All N tests pass"** whenever you touch `round1`, `scoreDifferential`, `averageLowest`,
   `whsIndex`/`whsSelection`, `rollingIndex`/`rollingSelection`, `normalizeMethod`,

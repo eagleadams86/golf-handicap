@@ -59,6 +59,21 @@
      not exist until the localhost gate at the foot of this file has passed. -->
 
 <script>
+/* One cache-buster for this run, on the hidden frame AND on every fetch of a
+   file this repo ships. The two are different caches and they can disagree: on
+   2026-08-22 the lottery repo's suite reported all-green against a page three
+   features out of date, because its source-level tests were reading the file
+   off the server while its frame ran a copy the browser had cached. Nothing
+   errored and nothing looked wrong — the new code was simply never run. A suite
+   that can pass against a build which exists nowhere is worse than no suite,
+   because it turns "untested" into "verified".
+
+   `no-store` as well as the query, since a query alone is only a hint. The
+   `api.github.com` call is deliberately left alone: somebody else's endpoint,
+   not a file we ship. */
+const BUST = '?t=' + Date.now();
+const bustFetch = (f, init) => fetch(f + BUST, Object.assign({ cache: 'no-store' }, init || {}));
+
 const groups = [];
 let current = null;
 function describe(name) { current = { name, tests: [] }; groups.push(current); }
@@ -1053,7 +1068,7 @@ async function onAppLoad() {
      defined, so the test bodies below stay synchronous like every other one in
      this file. */
   const [swRes, killRes, appRes, privRes] = await Promise.all(
-    [fetch('sw.js'), fetch('sw-kill.js'), fetch('index.html'), fetch('privacy.html')]);
+    [bustFetch('sw.js'), bustFetch('sw-kill.js'), bustFetch('index.html'), bustFetch('privacy.html')]);
   const SW_SRC = swRes.ok ? await swRes.text() : '';
   const KILL_SRC = killRes.ok ? await killRes.text() : '';
   const APP_SRC = appRes.ok ? await appRes.text() : '';
@@ -1122,7 +1137,7 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
      manifest while the page went on fetching the old one. Pinning the two
      together turns that PR into the right instruction — "a newer SDK exists,
      now change the URL too" — rather than a false record. */
-  const [pkgRes, appRes] = await Promise.all([fetch('package.json'), fetch('index.html')]);
+  const [pkgRes, appRes] = await Promise.all([bustFetch('package.json'), bustFetch('index.html')]);
   ok(pkgRes.ok, 'package.json is missing — Dependabot then scans nothing at all');
   ok(appRes.ok, 'index.html is missing');
   const PKG = await pkgRes.text(), APPSRC = await appRes.text();
@@ -1507,7 +1522,7 @@ if (LOCAL_HOSTS.includes(location.hostname)) {
   frame.setAttribute('data-gh-tests', '');
   frame.setAttribute('aria-hidden', 'true');
   frame.addEventListener('load', onAppLoad, { once: true });
-  frame.src = 'index.html';           /* set before append: one load event, the real one */
+  frame.src = 'index.html' + BUST;    /* set before append: one load event, the real one */
   document.body.appendChild(frame);
 } else {
   /* Two different reasons to be here, and they need different sentences: a
