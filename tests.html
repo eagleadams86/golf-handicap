@@ -1196,8 +1196,12 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
     ok(/>How it works</.test(PRIV_SRC)));
   it('and the authorship line every public page in the family has', () =>
     ok(/MIT licensed/.test(PRIV_SRC)));
-  it('but not a privacy link, which on the privacy page points at itself', () =>
-    ok(!/href="privacy\.html"/.test(PRIV_SRC)));
+  /* Guarded: this assertion is a NOT, and a NOT over an empty string passes — a
+     privacy.html that failed to load would report green having proved nothing. */
+  it('but not a privacy link, which on the privacy page points at itself', () => {
+    ok(PRIV_SRC, 'privacy.html did not load — the negation below passes on an empty string');
+    ok(!/href="privacy\.html"/.test(PRIV_SRC));
+  });
   /* Comments stripped FIRST, and the footer matched by its CLASS. The notes
      beside both elements name them in prose — and one of those notes is in the
      <style> block, which an HTML-comment strip does not reach — so a bare
@@ -1236,6 +1240,9 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
         ok(!pat.test(entry), `"${entry}" must never be cached`);
   });
   it('touches nothing cross-origin, and has no eval', () => {
+    /* Guarded before the negations. Both assertions are NOTs, and a NOT over an
+       empty string passes — an sw.js that failed to load would report green. */
+    ok(SW_SRC, 'sw.js did not load — the negations below both pass on an empty string');
     ok(!/https?:\/\//.test(SW), 'sw.js names an off-origin URL in executable code');
     /* A worker on Pages runs with NO CSP at all, so these are not merely untidy. */
     ok(!SW.includes('eval(') && !SW.includes('importScripts(') && !SW.includes('new Function('),
