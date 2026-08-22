@@ -127,10 +127,21 @@
    are named in the legend. These are ADDITIONS, not overrides of pack tokens,
    so the midnight defaults live in :root exactly as the pack's own do.
 ─────────────────────────────────────────────────────────────────────────── */
-:root { --c-roll: #8ab4ff; --c-whs: #e3b04b; }
-[data-theme="dark"]  { --c-roll: #8ab4ff; --c-whs: #e3b04b; }
-[data-theme="light"] { --c-roll: #1f5fb0; --c-whs: #7a5c0c; }
-[data-theme="sepia"] { --c-roll: #2c5a94; --c-whs: #6f5407; }
+/* `color-scheme` rides along with the chart colours, one per theme, the same
+   shape PAPTrack and Money Map use. It is not a colour of ours and it overrides
+   nothing in the pack — it is how a page TELLS the browser which way round it is,
+   so the parts of a control the browser draws itself follow the theme. Without
+   it they are always drawn light: the calendar button inside `<input type=date>`
+   was a near-black glyph on a near-black field on the two dark themes, and it is
+   the one control in the round form that cannot be restyled from CSS. It fixes
+   the number spinners, the checkbox and the scrollbars too, which had the same
+   problem more quietly.
+   Note the pairing follows the PALETTE, not the theme's name: sepia is a warm
+   LIGHT theme and takes `light`. */
+:root { color-scheme: dark; --c-roll: #8ab4ff; --c-whs: #e3b04b; }
+[data-theme="dark"]  { color-scheme: dark;  --c-roll: #8ab4ff; --c-whs: #e3b04b; }
+[data-theme="light"] { color-scheme: light; --c-roll: #1f5fb0; --c-whs: #7a5c0c; }
+[data-theme="sepia"] { color-scheme: light; --c-roll: #2c5a94; --c-whs: #6f5407; }
 
 * { box-sizing: border-box; }
 /* iOS text autosizing is turned off in theme.css (pack rule 9), not here. */
@@ -641,6 +652,22 @@ main:focus { outline: none; }
 .empty { text-align: center; padding: var(--sp-8) var(--sp-6); color: var(--text-secondary); }
 .empty p { max-width: 46ch; margin: 0 auto var(--sp-5); }
 
+/* The first thing anyone sees, and until 2026-08-21 it was a 46ch column of body
+   text adrift in a card the full width of the page — the four cards that used to
+   sit above it were doing the work of making the page look occupied, and they are
+   gone now (see `renderEmptyState`). So this one has to hold the space on its own:
+   deeper padding, the opening line set a size up and given a wider measure, and
+   the two ways in on a row of their own instead of one button with an inline
+   margin pushing the other along. Scoped to `.first-run`, so the app's other
+   empty states — a filtered list, a shared view with nothing in it — keep the
+   quiet version, which is right for a message you land on mid-task. */
+.empty.first-run { padding: var(--sp-9) var(--sp-6); }
+.empty.first-run .lede { font-size: var(--fs-lg); max-width: 54ch; color: var(--text-primary);
+                         margin-bottom: var(--sp-7); }
+.first-run-actions { display: flex; flex-wrap: wrap; gap: var(--sp-5);
+                     align-items: center; justify-content: center; }
+.empty.first-run .hint { margin-top: var(--sp-7); max-width: 52ch; }
+
 @media (max-width: 560px) {
   .wrap { padding: 0 var(--sp-5) var(--sp-8); }
   .headbar { padding: 0 var(--sp-5); }
@@ -667,7 +694,7 @@ main:focus { outline: none; }
     <!-- Name then strapline behind a middle dot, the family's brand line — Sprint
          Predictability wears "· Charlie's Epic Sprint Planner" and Money Map "·
          Charlie's Epic Money Map". It is FIXED text, not a setting: it used to be
-         typed into the League rule window's "What to call it" box, which labelled
+         typed into the League Rules window's "What to call it" box, which labelled
          the calculation rather than the app and put the name somewhere nobody
          would look for it. -->
     <h1 class="brand"><img class="mark" src="favicon.ico?v=1" width="22" height="22" alt="">Golf&nbsp;Handicap <span>&middot; Charlie&rsquo;s Epic League Tracker</span></h1>
@@ -685,8 +712,19 @@ main:focus { outline: none; }
          belonged to the rounds on screen. Up here with the other things that
          apply everywhere, and the Rounds card is left with the one button it is
          actually asking you to press. -->
-    <button id="manageBtn" title="Add, rename or remove golfers, and add or edit courses and their tees">Golfers &amp; courses</button>
-    <button id="methodBtn" title="Change how the league handicap is worked out">League rule</button>
+    <!-- Every button in this row wears a glyph in front of its word, the way Money
+         Map's does. They are plain text characters, not emoji and not an icon
+         font — one more file to fetch is the last thing a header painted this
+         early needs, and a text glyph inherits the theme's colour for free, so it
+         can never become the thing that carries a meaning by hue. Each is
+         aria-hidden: a screen reader announcing "downwards white arrow, Back up"
+         is noise, and the word beside it is already the whole label. The glyphs
+         are Money Map's own where the button exists there — ⇩ Back up, ↗ Share,
+         ⚙ for settings — so the same action looks the same in every app. ☁️ Sign
+         in to sync keeps its emoji: the sync module rewrites that label as the
+         state changes, and it is the one control here about somewhere else. -->
+    <button id="manageBtn" title="Add, rename or remove golfers, and add or edit courses and their tees"><span aria-hidden="true">☰</span> Golfers &amp; Courses</button>
+    <button id="methodBtn" title="Change how the league handicap is worked out"><span aria-hidden="true">⚙</span> League Rules</button>
     <label class="sr-only" for="themeSel">Theme</label>
     <!-- Themes are listed alphabetically; midnight is the default but is not listed
          first. It carries `selected` so the picker never reads one theme while the
@@ -700,8 +738,8 @@ main:focus { outline: none; }
     <!-- Back up sits in the header, as it does in Team Dashboard and Sprint
          Velocity: it belongs with the other things you do to the data as a
          whole, not tucked away at the foot of the page where it used to live. -->
-    <button id="dataBtn" title="Back up, restore or clear your data">Back up</button>
-    <button id="shareBtn" title="Create a read-only link to show someone these handicaps">Share</button>
+    <button id="dataBtn" title="Back up, restore or clear your data"><span aria-hidden="true">⇩</span> Back up</button>
+    <button id="shareBtn" title="Create a read-only link to show someone these handicaps"><span aria-hidden="true">↗</span> Share</button>
     <button id="syncBtn" title="Sign in with Google to see the same data on all your devices">☁️ Sign in to sync</button>
   </div>
 </header>
@@ -1416,7 +1454,7 @@ function rollingSelection(values, method) {
 }
 
 /* The method's name is DERIVED, never stored — `autoName` off the window and the
-   count, every time. It used to be a text field in the League rule window ("What
+   count, every time. It used to be a text field in the League Rules window ("What
    to call it"), kept in step with the numbers by an `auto` flag that a hand-typed
    name cleared; the comment on that flag already said what was wrong with it,
    which is that "Rolling last 5" sitting above a best-3-of-5 calculation is worse
@@ -1895,6 +1933,30 @@ function pickUsed(newestFirst, vals, pick) {
 
 let lastCompute = null;
 
+/* What the page shows before there is anything to show it FROM.
+   ─────────────────────────────────────────────────────────────────────────────
+   Two things get out of the way until they have something to say, which is the
+   arrangement the sibling apps use: PAPTrack draws its empty state and nothing
+   else, and does not put four cards of em-dashes above it first.
+
+   • WITH NO ROUNDS, only the Rounds card is drawn. Current Handicap, At a
+     Glance, Handicap Over Time and Course Handicap are all reports on rounds,
+     and with none logged each was a heading over a dash — four cards of chrome
+     between a first-time visitor and the one button they need. They come back
+     the moment a round exists, which is the same moment they can say anything.
+     ("How These Are Worked Out" needs no line of its own — it is a <details>
+     inside Current Handicap, so it goes with that card.)
+
+   • THE LEADERBOARD TAB waits for a SECOND golfer. It ranks golfers against each
+     other; with one, it is a table of one row and its own explanatory note says
+     so. Hidden rather than disabled, because there is nothing to press it for.
+     If it was the tab you were last on when the second golfer went away, the
+     view falls back to My handicap rather than leaving the panel showing with no
+     tab selected.
+
+   Both are pure display: nothing is deleted, nothing is stored, and the same
+   `render()` puts it all back. A shared view is left alone — `viewOnly` builds
+   its own panel and hides the tablist itself. */
 function render() {
   const c = computeAll();
   lastCompute = c;
@@ -1906,6 +1968,20 @@ function render() {
   renderRounds(c);
   renderWorking(c);
   renderLeague();
+  renderEmptyState();
+}
+
+function renderEmptyState() {
+  if (window.ghViewOnly) return;
+  const bare = state.rounds.length === 0;
+  ['handicapCard', 'statsCard', 'trendCard', 'playingCard'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = bare;
+  });
+  const solo = state.golfers.length < 2;
+  const tab = document.getElementById('tab-league');
+  if (tab) tab.hidden = solo;
+  if (solo && document.documentElement.getAttribute('data-tab') === 'league') setTab('player');
 }
 
 function renderGolfers() {
@@ -2112,11 +2188,14 @@ function renderRounds(c) {
        that reaches the cases which need a field of players — so it leads. The
        single-golfer one stays for someone who already has a league and wants to
        see what a populated page of their own looks like. */
-    box.innerHTML = `<div class="empty">
-      <p>No rounds yet. Add a course first, then log a round — the two handicaps appear as soon as there is something to work from.</p>
-      <button type="button" class="primary" id="firstCourseBtn">Add your first course</button>
-      <button type="button" class="link" id="demoLeagueBtn" style="margin-left:var(--sp-6)">or load the example league</button>
-      <p class="hint" style="margin-top:var(--sp-5)">Eight golfers, six courses and a season
+    box.innerHTML = `<div class="empty first-run">
+      <p class="lede">No rounds yet. Add a course first, then log a round — both handicaps
+        appear as soon as there is something to work from.</p>
+      <div class="first-run-actions">
+        <button type="button" class="primary" id="firstCourseBtn">Add your first course</button>
+        <button type="button" class="link" id="demoLeagueBtn">or load the example league</button>
+      </div>
+      <p class="hint">Eight golfers, six courses and a season
         of rounds, so every figure and the whole leaderboard have something behind them.
         Just want one populated page?
         <button type="button" class="link" id="demoBtn">Load a single golfer's season</button></p>
@@ -2974,7 +3053,7 @@ themeSel.addEventListener('change', () => {
 });
 
 const HELP = {
-  handicap: ['The Two Handicaps', `<p>The <strong>league handicap</strong> is whatever you have set under “League rule” — by default, the average of your last 5 rounds' score differentials. It reacts quickly to how you are playing right now, and it is the figure the leaderboard is ranked on. One rule applies to everyone in the app, which is what makes that table a fair comparison.</p>
+  handicap: ['The Two Handicaps', `<p>The <strong>league handicap</strong> is whatever you have set under “League Rules” — by default, the average of your last 5 rounds' score differentials. It reacts quickly to how you are playing right now, and it is the figure the leaderboard is ranked on. One rule applies to everyone in the app, which is what makes that table a fair comparison.</p>
     <p><strong>Official</strong> is the World Handicap System index: the average of your best 8 score differentials from your last 20 rounds. With fewer than 20 rounds it uses a smaller set from a fixed table (and below 3 rounds it will not produce a number at all). Because it keeps only your best rounds, it describes your potential rather than your average day — which is why it is usually the lower of the two.</p>
     <p>Both are calculated from exactly the same rounds. Nothing you change about the league rule affects the official figure.</p>`],
   diff: ['Score Differential', `<p>A score differential turns a score on one course into a number you can compare with a score on any other course:</p>

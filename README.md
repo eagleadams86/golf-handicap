@@ -59,7 +59,7 @@ The app has two tabs. **My handicap** is one golfer's page — the two figures, 
 chart, the course handicap and the full list of rounds. **Leaderboard** is everybody at
 once (see [The leaderboard](#the-leaderboard)).
 
-Multiple golfers are supported: use **Golfers & courses** in the header, which is also where
+Multiple golfers are supported: use **Golfers & Courses** in the header, which is also where
 courses and their tees are added and edited. Each golfer keeps their own rounds and their own
 handicap. Courses and the league rule are shared between everyone, which is what makes the
 leaderboard a fair comparison.
@@ -156,7 +156,7 @@ figures are counted up underneath the table, as they are on the front page.
 
 ## The League Handicap
 
-*League rule*, in the header. Everything about the rolling calculation is a setting, so most
+*League Rules*, in the header. Everything about the rolling calculation is a setting, so most
 club and society formulas can be reproduced exactly:
 
 | Setting | What it does |
@@ -222,7 +222,7 @@ one — inventing a number there would be worse than saying so. The result is ca
 
 **Soft cap and hard cap.** Once 20 rounds exist, a rise is measured against the lowest index
 held in the previous 365 days: anything more than **3.0** above it counts half, and it can
-never sit more than **5.0** above it. These can be switched off under *League rule* to see the
+never sit more than **5.0** above it. These can be switched off under *League Rules* to see the
 uncapped figure, but that is not what a club would issue. Two caveats, both deliberate and
 both pinned by tests:
 
