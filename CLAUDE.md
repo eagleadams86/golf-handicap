@@ -240,6 +240,23 @@ that emphasis.
   deliberately run a size above the 13px body text. `.link` and `.rowbtn`
   take the body size back: they sit inside sentences and tables, not on their own.
   **A change to this block belongs in Sprint Velocity too, or the two drift.**
+- **The base field rule's TYPE LIST is the theme pack's own, and it has to be** (2026-08-22).
+  `select, textarea, input[type=text|number|date|month|search|tel|url|email|password]` — the
+  same list the pack's coarse-pointer rule enumerates. It is a whitelist because it must be
+  (a checkbox handed a surface, a border and a 32px box stops being a checkbox), and a
+  whitelist grown by hand is a field that arrives silently unstyled: the rounds filter's
+  `type=search` shipped wearing the browser's own grey rounded box beside three fields
+  wearing the theme's, and nothing failed — it just looked wrong. Borrowing the pack's list
+  is what stops that being a fresh discovery each time, since it is the same question
+  ("is this a thing you type into?") already answered there. **Adding a type to one means
+  adding it to the other.** `input[type=search]` also takes `appearance: none`, like the
+  pack's date fields, because the native inset shape ignores the border and radius; that
+  removes Chromium's native × as well, which is a fair trade only because the Clear control
+  beside it does strictly more.
+  **The siblings carry the same gap**: Flow Metrics and Money Map have their own hand-grown
+  lists with no `search` in them, and PAPTrack, which does have a search box, styles it
+  through a bespoke `.search` class rather than the rule. Nothing is broken in any of them
+  today — the next search field is what would break.
 - **Help buttons (`.help-btn`) carry `margin-left: 7px`** and cells containing one are
   `nowrap`. An icon must never sit flush against the word it follows — a standing preference
   across every app in this family.

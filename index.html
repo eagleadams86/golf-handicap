@@ -214,11 +214,34 @@ header {
 .brand .mark { width: 22px; height: 22px; vertical-align: -4px; margin-right: 9px; }
 
 select, input, textarea, button { font: inherit; color: inherit; }
-select, input[type="text"], input[type="number"], input[type="date"], textarea {
+/* THE TYPE LIST IS THE THEME PACK'S OWN, copied from its coarse-pointer rule —
+   text, number, date, month, search, tel, url, email, password — rather than a
+   list grown here one field at a time. It is a whitelist because it has to be
+   (a checkbox given a surface and 32px of box is not a checkbox), and a
+   whitelist grown by hand is a field that silently arrives unstyled: the rounds
+   filter's `type=search` landed in August 2026 wearing the browser's own grey
+   box, beside three fields wearing the theme's. Borrowing the pack's list is
+   what stops that being a per-field discovery — it is the same question ("is
+   this a thing you type into?"), already answered there, and adding a type to
+   one now means adding it to the other. */
+select, textarea,
+input[type="text"], input[type="number"], input[type="date"], input[type="month"],
+input[type="search"], input[type="tel"], input[type="url"], input[type="email"],
+input[type="password"] {
   background: var(--surface); color: var(--text-primary);
   border: 1px solid var(--input-border); border-radius: var(--radius-sm);
   padding: var(--sp-3) var(--sp-4); min-height: 32px;
 }
+/* A search field is drawn natively with its own inset shape, which ignores the
+   border and radius above. `appearance: none` hands the box back — the same
+   move the pack makes for date fields, and for the same reason.
+   It takes the native × that clears the field with it, in Chromium at least.
+   That is a fair trade HERE and would not be everywhere: this box filters a
+   table that is already on screen rather than submitting a query, and the
+   Clear beside it does strictly more than the × would — it drops the course
+   filter as well. A search field somewhere without that control should think
+   again before copying this line. */
+input[type="search"] { -webkit-appearance: none; appearance: none; }
 select { cursor: pointer; }
 textarea { min-height: 60px; resize: vertical; width: 100%; }
 :focus-visible { outline: 2px solid var(--focus-border); outline-offset: 2px; }
