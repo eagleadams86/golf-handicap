@@ -13,7 +13,7 @@
   (function () {
     var t = localStorage.getItem('gh-theme');
     if (t === 'slate') t = 'dark';
-    var valid = ['midnight', 'dark', 'light', 'sepia'];
+    var valid = ['auto', 'midnight', 'dark', 'light', 'sepia'];
     if (valid.indexOf(t) === -1) t = 'midnight';
     document.documentElement.setAttribute('data-theme', t);
   })();

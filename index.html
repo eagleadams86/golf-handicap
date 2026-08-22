@@ -81,7 +81,7 @@
   (function () {
     var t = localStorage.getItem('gh-theme');
     if (t === 'slate') t = 'dark';
-    var valid = ['midnight', 'dark', 'light', 'sepia'];
+    var valid = ['auto', 'midnight', 'dark', 'light', 'sepia'];
     if (valid.indexOf(t) === -1) t = 'midnight';
     document.documentElement.setAttribute('data-theme', t);
     var tab = localStorage.getItem('gh-tab');
@@ -803,6 +803,7 @@ main:focus { outline: none; }
          first. It carries `selected` so the picker never reads one theme while the
          boot script in <head> has already painted another. -->
     <select id="themeSel" title="Change the colour theme">
+      <option value="auto">◐ Auto</option>
       <option value="dark">☾ Dark</option>
       <option value="light">☀ Light</option>
       <option value="midnight" selected>✦ Midnight</option>
@@ -1407,7 +1408,7 @@ const UPDATED_KEY = 'gh-updated';
    missing one. */
 const SCHEMA = 2;
 const THEME_KEY = 'gh-theme';
-const THEMES = ['midnight', 'dark', 'light', 'sepia'];
+const THEMES = ['auto', 'midnight', 'dark', 'light', 'sepia'];
 /* Which view is open. Its own key, alongside the theme rather than inside the
    saved data: it is where this browser is looking, not something about the
    golfers, so it has no business travelling to another device. */
@@ -3923,6 +3924,14 @@ function applyThemeColor() {
   if (bar && bg) bar.setAttribute('content', bg);
 }
 applyThemeColor();
+/* On Auto the palette can change while the page is open — the reader switches their
+   phone to dark at sunset and theme.css follows on its own. The theme-color meta tag
+   does not: it was written once from the computed --bg, and it is what paints an
+   installed window's title bar and Android's address bar. This re-reads it, and only
+   it; the theme itself is still resolved entirely by CSS. */
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if (document.documentElement.getAttribute('data-theme') === 'auto') applyThemeColor();
+});
 
 const themeSel = document.getElementById('themeSel');
 themeSel.value = document.documentElement.getAttribute('data-theme') || 'midnight';
