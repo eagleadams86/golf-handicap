@@ -344,9 +344,13 @@ button.link { background: none; border: none; color: var(--accent); padding: 0;
 h2 .help-btn, .label .help-btn { vertical-align: middle; }
 th:has(.help-btn), td:has(.help-btn) { white-space: nowrap; }
 
+/* 18px, the family's card. Golf Handicap was --sp-6 (16px) and PAPTrack
+   14px 14px 12px, so a card was a slightly different box in three of the five
+   apps — which is what the .card.welcome pin below was working around rather
+   than fixing. */
 .card {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: var(--sp-6); margin-bottom: var(--sp-6);
+  border-radius: var(--radius); padding: 18px; margin-bottom: var(--sp-6);
 }
 .card > h2 {
   margin: 0 0 var(--sp-5); font-size: var(--fs-md); font-weight: var(--fw-semibold);
