@@ -282,6 +282,17 @@ textarea { min-height: 60px; resize: vertical; width: 100%; }
    A fine pointer never takes that path, which is why no desktop ever shows it — found
    on an iPhone. Fixed across the whole family in one pass; PAPTrack led. */
 dialog:focus { outline: none; }
+/* WHERE FOCUS GOES AFTER AN IN-PAGE NAVIGATION (2026-08-22). Pressing a golfer's name
+   switches tab and rebuilds the page under it, which destroys the button that was just
+   pressed — so focus fell to <body>, the top of the document, and a keyboard or
+   screen-reader user was silently returned to the start with nothing said about where
+   they now were. `focusPanel()` moves focus to the heading of the panel that replaced
+   it instead.
+   The ring is OPT IN and keyboard-only, the same rule as `dialog:focus` above and as
+   PAPTrack's supply card: a screen reader on a touch device still needs the focus to
+   MOVE, but somebody who tapped a name does not need a heading to light up. */
+.landing:focus { outline: none; }
+.landing.ring-focus:focus { outline: 2px solid var(--focus-border); outline-offset: 2px; }
 
 /* Buttons are the shared object across this family of apps — Sprint Velocity is
    the design lead, so these metrics are its `.btn` verbatim: 15px text, 7/12
@@ -3388,6 +3399,10 @@ function renderLeague() {
     state.activeGolfer = el.dataset.golfer;
     save();
     setTab('player');
+    /* The name that was pressed is gone with the league table, so focus has to be put
+       somewhere deliberate or it lands on <body>. `e.detail` is 0 for a keyboard press
+       and non-zero for a pointer — see focusPanel. */
+    focusPanel('playerPanel', e.detail === 0);
   });
 
   /* Exclusions are never silent here either: a round left out of a figure is
@@ -4160,6 +4175,24 @@ document.getElementById('golferSel').addEventListener('change', (e) => {
    boot script in <head>. Everything else this does is keeping the tablist
    honest for a screen reader: one stop in the tab order, on the selected tab.
 ─────────────────────────────────────────────────────────────────────────── */
+/* Move focus into a panel that has just replaced what the user was standing on.
+   `fromKeyboard` comes from the click event's `detail` — 0 when a button was activated
+   with Enter or Space, non-zero for a real mouse or finger. Focus moves either way, so
+   a screen reader announces the new panel on a phone too; only the visible ring is
+   conditional. tabIndex is set here rather than in the markup, so the heading is only
+   a focus target for the moment it is landed on and never joins the tab order. */
+function focusPanel(panelId, fromKeyboard) {
+  const h = document.getElementById(panelId)?.querySelector('h2');
+  if (!h) return;
+  h.tabIndex = -1;
+  h.classList.add('landing');
+  if (fromKeyboard) {
+    h.classList.add('ring-focus');
+    h.addEventListener('blur', () => h.classList.remove('ring-focus'), { once: true });
+  }
+  h.focus();
+}
+
 function setTab(name) {
   const t = TABS.indexOf(name) === -1 ? TABS[0] : name;
   document.documentElement.setAttribute('data-tab', t);

@@ -102,7 +102,7 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'expected truthy'); }
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 229;
+const EXPECTED = 230;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -1288,6 +1288,17 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
        'this looks cache-first — the whole design rests on network-first');
     ok(/!res\.ok && cached/.test(SW),
        'a same-origin error reply with a cached copy in hand must serve the cache');
+  });
+  /* Pressing a golfer's name switches tab and rebuilds the page, destroying the button
+     that was pressed. Without focusPanel() focus lands on <body> — the top of the
+     document — with nothing announced. Nothing automated can see it; source is the guard. */
+  it('opening a golfer from the league table moves focus into their panel', () => {
+    ok(/function focusPanel\(panelId, fromKeyboard\)/.test(APP_SRC), 'the helper has to exist');
+    ok(/setTab\('player'\);[\s\S]{0,320}?focusPanel\('playerPanel', e\.detail === 0\);/.test(APP_SRC),
+      'the league row must hand focus on, with the modality — detail 0 is a keypress');
+    ok(/\.landing:focus \{ outline: none/.test(APP_SRC) &&
+       /\.landing\.ring-focus:focus \{ outline: 2px solid var\(--focus-border\)/.test(APP_SRC),
+      'the landing heading is quiet by default and rings only for the keyboard');
   });
   it('a dialog focused as a container does not ring itself', () => {
     /* openModal focuses the dialog itself on a coarse pointer so opening a form does not
