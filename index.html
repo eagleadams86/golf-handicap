@@ -327,7 +327,7 @@ button.link { background: none; border: none; color: var(--accent); padding: 0;
 .headbar select:hover { border-color: var(--text-muted); }
 
 /* The sync button is the one control in the row whose label changes: it paints
-   as "☁️ Sign in to sync" (125px) and then, the moment Firebase reports who you
+   as "☁️ Sign In to Sync" (125px) and then, the moment Firebase reports who you
    are, becomes "☁️ Charlie" (79px) — and every control to its left slid right
    on every refresh. Pinning it to its widest state holds the row still. This is
    Sprint Velocity's fix and, at this font size, its very number. */
@@ -961,7 +961,7 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
          other end: its label changes width the moment Firebase reports who you
          are, and at the left-hand end of a right-aligned row that growth pushes
          into space rather than shoving five controls sideways. -->
-    <button id="syncBtn" title="Sign in with Google to see the same data on all your devices">☁️ Sign in to sync</button>
+    <button id="syncBtn" title="Sign in with Google to see the same data on all your devices">☁️ Sign in to Sync</button>
     <label class="sr-only" for="golferSel">Golfer</label>
     <select id="golferSel" title="Which golfer you're looking at" style="min-width:130px"><option>—————</option></select>
     <!-- ONE button, not the two this row carried until 2026-08-21. Golfers and
@@ -992,7 +992,7 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
     <!-- Back up sits in the header, as it does in Team Dashboard and Sprint
          Velocity: it belongs with the other things you do to the data as a
          whole, not tucked away at the foot of the page where it used to live. -->
-    <button id="dataBtn" title="Back up, restore or clear your data"><span aria-hidden="true">⇩</span> Back up</button>
+    <button id="dataBtn" title="Back up, restore or clear your data"><span aria-hidden="true">⇩</span> Back Up</button>
     <button id="shareBtn" title="Create a read-only link to show someone these handicaps"><span aria-hidden="true">↗</span> Share</button>
     <label class="sr-only" for="themeSel">Theme</label>
     <!-- Themes are listed alphabetically; midnight is the default but is not listed
@@ -1021,7 +1021,7 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
        Dashboard. The labels are written at their final size, like the header's:
        nothing here is filled in by script. -->
   <div class="tabs" role="tablist" aria-label="Views">
-    <button class="tab" role="tab" id="tab-player" aria-controls="playerPanel" data-tab="player" aria-selected="true"  tabindex="0">My handicap</button>
+    <button class="tab" role="tab" id="tab-player" aria-controls="playerPanel" data-tab="player" aria-selected="true"  tabindex="0">My Handicap</button>
     <button class="tab" role="tab" id="tab-league" aria-controls="leaguePanel" data-tab="league" aria-selected="false" tabindex="-1">Leaderboard</button>
   </div>
 
@@ -1058,7 +1058,7 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
     <p><strong>Load Sample Data</strong> fills every tab with an invented league: eight golfers,
       six courses and a season of rounds, so every figure and the whole leaderboard have
       something behind them. Just want one populated page?
-      <button type="button" class="link" id="welcomeSoloBtn">Load a single golfer's season</button></p>
+      <button type="button" class="link" id="welcomeSoloBtn">Load a Single Golfer's Season</button></p>
     <p><strong>Restore a Backup</strong> reads a Golf Handicap export.</p>
   </div></div>
 
@@ -1159,7 +1159,7 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
     <h2 id="roundsHead">
       Rounds
       <span class="spacer"></span>
-      <button class="primary" id="addRoundBtn">+ Add round</button>
+      <button class="primary" id="addRoundBtn">+ Add Round</button>
     </h2>
     <!-- Built once in the markup and never redrawn, unlike the table below it:
          a render that replaced this row would replace the box being typed in and
@@ -1310,7 +1310,7 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
       <button type="button" id="deleteRoundBtn" class="danger" hidden>Delete</button>
       <span class="spacer"></span>
       <button type="button" id="roundCancel">Cancel</button>
-      <button type="button" class="primary" id="roundSave">Save round</button>
+      <button type="button" class="primary" id="roundSave">Save Round</button>
     </div>
   </form>
 </dialog>
@@ -1323,13 +1323,13 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
       <input type="text" id="c_name" required maxlength="80" placeholder="Royal Ashdown Forest">
     </div>
     <div id="teeRows"></div>
-    <button type="button" id="addTeeBtn">+ Add another set of tees</button>
+    <button type="button" id="addTeeBtn">+ Add Another Set of Tees</button>
     <p class="warn" id="courseWarn" role="status"></p>
     <div class="row-actions">
-      <button type="button" id="deleteCourseBtn" class="danger" hidden>Delete course</button>
+      <button type="button" id="deleteCourseBtn" class="danger" hidden>Delete Course</button>
       <span class="spacer"></span>
       <button type="button" id="courseEditCancel">Cancel</button>
-      <button type="button" class="primary" id="courseEditSave">Save course</button>
+      <button type="button" class="primary" id="courseEditSave">Save Course</button>
     </div>
   </form>
 </dialog>
@@ -1394,10 +1394,10 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
     </div>
     <p class="warn" id="methodWarn" role="status"></p>
     <div class="row-actions">
-      <button type="button" id="methodReset">Reset to last 5</button>
+      <button type="button" class="danger" id="methodReset">Reset to Last 5</button>
       <span class="spacer"></span>
       <button type="button" id="methodCancel">Cancel</button>
-      <button type="button" class="primary" id="methodSave">Save rule</button>
+      <button type="button" class="primary" id="methodSave">Save Rule</button>
     </div>
   </form>
 </dialog>
@@ -1423,7 +1423,7 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
 
   <div class="sec-hd">
     <h3>Golfers</h3>
-    <button type="button" id="addGolferBtn">+ Add golfer</button>
+    <button type="button" id="addGolferBtn">+ Add Golfer</button>
   </div>
   <p class="hint">Each golfer keeps their own rounds and their own handicap. Courses are shared between everyone.</p>
   <div id="golferList"></div>
@@ -1431,7 +1431,7 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
 
   <div class="sec-hd">
     <h3>Courses</h3>
-    <button type="button" id="addCourseBtn">+ Add course</button>
+    <button type="button" id="addCourseBtn">+ Add Course</button>
   </div>
   <p class="hint">A course needs a <strong>rating</strong> and a <strong>slope</strong> for each set of tees — both are printed on the scorecard. The rating is the score a scratch golfer is expected to shoot; the slope (55–155, usually near 113) is how much harder it plays for everyone else.</p>
   <div id="courseList"></div>
@@ -1464,7 +1464,7 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
     <legend>Which Golfers</legend>
     <div class="checklist-head">
       <span class="hint" id="shareGolferCount" role="status"></span>
-      <button type="button" class="link" id="shareSelectAll">Select all</button>
+      <button type="button" class="link" id="shareSelectAll">Select All</button>
     </div>
     <div class="checklist" id="shareGolfers"></div>
     <p class="hint" style="margin:var(--sp-5) 0 0">Pick more than one and the link opens on the
@@ -1503,8 +1503,8 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
     <p class="hint" id="shareMeta" role="status" style="margin:var(--sp-4) 0 0"></p>
     <p class="warn" id="shareWarn" role="status"></p>
     <div class="row-actions" style="justify-content:flex-start">
-      <button type="button" class="primary" id="shareCopyBtn">Copy link</button>
-      <button type="button" id="shareOpenBtn">Preview it</button>
+      <button type="button" class="primary" id="shareCopyBtn">Copy Link</button>
+      <button type="button" id="shareOpenBtn">Preview It</button>
     </div>
   </fieldset>
 
@@ -1525,8 +1525,8 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
     independent of this browser and of any Google account. With no account required to
     use the app, clearing your browser data is the one thing that will lose your history.</p>
   <div class="row-actions" style="justify-content:flex-start">
-    <button type="button" id="exportBtn"><span aria-hidden="true">⬇︎</span> Download backup (JSON)</button>
-    <button type="button" id="importBtn"><span aria-hidden="true">⬆︎</span> Restore from backup…</button>
+    <button type="button" id="exportBtn"><span aria-hidden="true">⬇︎</span> Download Backup (JSON)</button>
+    <button type="button" id="importBtn"><span aria-hidden="true">⬆︎</span> Restore from Backup…</button>
     <input type="file" id="importFile" accept="application/json,.json" class="sr-only" aria-hidden="true" tabindex="-1">
   </div>
   <hr style="border:0;border-top:1px solid var(--border);margin:16px 0">
@@ -1535,7 +1535,7 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
     beside each score. It is a one-way door: the CSV is for reading and charting elsewhere,
     and <strong>Restore reads the JSON above, never this</strong>.</p>
   <div class="row-actions" style="justify-content:flex-start">
-    <button type="button" id="csvBtn"><span aria-hidden="true">⬇︎</span> Download rounds (CSV)</button>
+    <button type="button" id="csvBtn"><span aria-hidden="true">⬇︎</span> Download Rounds (CSV)</button>
   </div>
   <hr style="border:0;border-top:1px solid var(--border);margin:16px 0">
   <p class="hint" style="margin-top:var(--sp-5)">Restoring <strong>replaces everything in this
@@ -1546,7 +1546,7 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
     <p class="hint" style="margin-top:var(--sp-5)">Deletes every round, course and golfer.
       The league rule and your theme are kept.</p>
     <div class="row-actions" style="justify-content:flex-start">
-      <button type="button" id="clearBtn" class="danger">Delete all data</button>
+      <button type="button" id="clearBtn" class="danger">Delete All Data</button>
     </div>
   </details>
   <div class="row-actions">
@@ -1559,10 +1559,10 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
   <p id="clearBody"></p>
   <p class="warn" id="clearSyncWarn" role="status"></p>
   <div class="row-actions">
-    <button type="button" id="clearBackupBtn"><span aria-hidden="true">⬇︎</span> Download backup first</button>
+    <button type="button" id="clearBackupBtn"><span aria-hidden="true">⬇︎</span> Download Backup First</button>
     <span class="spacer"></span>
     <button type="button" id="clearCancel">Cancel</button>
-    <button type="button" id="clearConfirm" class="danger">Delete everything</button>
+    <button type="button" id="clearConfirm" class="danger">Delete Everything</button>
   </div>
 </dialog>
 
@@ -1579,8 +1579,8 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
   <h2 id="syncChoiceTitle">Which Copy Do You Want to Keep?</h2>
   <p id="syncChoiceBody"></p>
   <div class="row-actions">
-    <button type="button" id="syncKeepDeviceBtn">Keep this device's</button>
-    <button type="button" id="syncKeepGoogleBtn" class="primary">Keep the Google one</button>
+    <button type="button" id="syncKeepDeviceBtn">Keep This Device's</button>
+    <button type="button" id="syncKeepGoogleBtn" class="primary">Keep the Google One</button>
   </div>
 </dialog>
 
@@ -2862,12 +2862,12 @@ function renderRounds(c) {
         : 'No rounds yet. Add a course first, then log a round — both handicaps appear as soon as there is something to work from.'}</p>
       <div class="first-run-actions">
         <button type="button" class="primary" id="firstCourseBtn">${haveCourse ? '+ Add round' : 'Add your first course'}</button>
-        <button type="button" class="link" id="demoLeagueBtn">or load the example league</button>
+        <button type="button" class="link" id="demoLeagueBtn">Or Load the Example League</button>
       </div>
       <p class="hint">Eight golfers, six courses and a season
         of rounds, so every figure and the whole leaderboard have something behind them.
         Just want one populated page?
-        <button type="button" class="link" id="demoBtn">Load a single golfer's season</button></p>
+        <button type="button" class="link" id="demoBtn">Load a Single Golfer's Season</button></p>
     </div>`;
     document.getElementById('firstCourseBtn').addEventListener('click',
       () => (haveCourse ? openRound(null) : openCourseEdit(null)));
@@ -3855,7 +3855,7 @@ function teeRowHtml(t) {
         <div class="field"><label>9-hole slope<input type="number" class="t-slope9" min="55" max="155" step="1" value="${num(v.slope9)}" placeholder="—"></label></div>
       </div>
     </details>
-    <button type="button" class="link removeTee">Remove these tees</button>
+    <button type="button" class="link removeTee">Remove These Tees</button>
   </fieldset>`;
 }
 
@@ -5643,8 +5643,8 @@ function updateUI() {
     btn.title = 'Syncing across devices — tap to sign out';
     privacyNote.textContent = `☁️ Signed in as ${user.email} — your rounds sync privately to your own account and still work offline.`;
   } else {
-    btn.textContent = '☁️ Sign in to sync';
-    btn.setAttribute('aria-label', 'Sign in to sync');
+    btn.textContent = '☁️ Sign In to Sync';
+    btn.setAttribute('aria-label', 'Sign In to Sync');
     btn.title = 'Sign in with Google to see the same rounds on all your devices';
     privacyNote.textContent = '🔒 Private — stored in this browser; sign in to sync your own devices. No account required to use the app.';
   }
