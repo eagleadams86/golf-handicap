@@ -8,6 +8,7 @@ Most handicap apps will only ever show you the official figure. Plenty of golfer
 work it out that way — they take their last few cards and average them, usually in a
 spreadsheet. This app does both, from exactly the same rounds, and shows them side by side:
 
+- **Install it like an app** — on a Mac or a PC, open the site in Chrome or Edge and choose "Install Golf Handicap". It gets its own window with no browser chrome, its own icon in the Dock or on the taskbar, and it opens straight from there. On an iPhone or iPad, Safari's Share ▸ "Add to Home Screen" does the same. Working offline was already here and is unchanged — the app has kept a copy of itself since August; what is new is that the manifest and its icons are kept too, because an installed app is the copy most likely to be opened with no connection at all
 - **The league handicap** — by default the average of your **last 5 rounds**, and
   configurable from there (see [The League Handicap](#the-league-handicap)). This is the
   figure the app leads with, and the one the leaderboard is ranked on.

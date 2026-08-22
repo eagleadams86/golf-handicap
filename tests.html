@@ -772,7 +772,9 @@ async function onAppLoad() {
   /* Exact equality, not "contains". A new entry has to be added here too, which
      is the moment to ask whether the file is genuinely public. */
   it('caches only files that are already public in this repo', () =>
-    eq(shell, ['./', 'favicon.ico', 'privacy.html', 'theme.css']));
+    eq(shell, ['./', 'favicon.ico', 'icon-192.png', 'icon-512-maskable.png',
+               'icon-512.png', 'manifest.webmanifest', 'privacy.html',
+               'theme.css']));
   it('never caches the rounds, the suite, or the example league', () => {
     const banned = [/\.json$/, /^tests\.html$/, /\.py$/, /CLAUDE/i, /README/i, /example/i];
     for (const entry of shell)

@@ -36,6 +36,29 @@ BALL = (41, 43, 5.5)            # x, y, radius
 SCALE = 8                       # supersample, then reduce
 SIZES = [16, 32, 48, 64, 128, 256]
 
+# The INSTALL icons, named by manifest.webmanifest and cached by sw.js. Renaming
+# one means editing both of those files as well as this line.
+#
+# 192 and 512 are the two sizes Chrome asks for when it offers "Install app" on a
+# Mac or a PC. They are the same drawing as favicon.ico, ROUNDED: nothing masks a
+# `purpose: any` icon, so the corners have to be in the file.
+PWA_ICONS = [(192, 'icon-192.png'), (512, 'icon-512.png')]
+
+# The maskable one is the same drawing with SQUARE corners, and that is the only
+# difference. A launcher crops it to whatever outline it likes — a circle on a lot
+# of Android ones — so anything in the corners is thrown away, and rounding it as
+# well would round a picture that is about to be rounded again.
+#
+# Nothing has to move for that crop, and it is worth writing down rather than
+# leaving to be rediscovered. The circular safe zone is a disc of 80% of the
+# width: radius 25.6 in this 64 viewport. The furthest point of the mark — the
+# flag's tip at (44,25), the stick's foot at (21,47), the ball at (41,43) r5.5 —
+# is 21.1 from the centre, and the mark's bounding box is centred on (32.4, 32.2),
+# which is the tile's own centre. Everything survives the crop with room to
+# spare; only the corner glow is cut, and that is background weather. Move the
+# flagstick or grow the ball and re-check this number.
+MASKABLE = (512, 'icon-512-maskable.png')
+
 
 def lerp(a, b, t):
     return tuple(round(x + (y - x) * t) for x, y in zip(a, b))
@@ -91,7 +114,7 @@ def gradient_polygon(img, pts):
     img.paste(fill, (0, 0), mask)
 
 
-def build():
+def build(rounded=True):
     n = 64 * SCALE
     img = Image.new('RGBA', (n, n), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
@@ -110,6 +133,10 @@ def build():
     d.ellipse([(bx - br) * SCALE, (by - br) * SCALE,
                (bx + br) * SCALE, (by + br) * SCALE], fill=GRAD_TO + (255,))
 
+    if not rounded:
+        # Full bleed, for the maskable icon — see MASKABLE. The glow is drawn to
+        # overflow the tile, so without the mask it needs cutting back to it.
+        return img.convert('RGB')
     # Round the corners with an alpha mask. The SVG leaves the disc square at
     # the edges; an icon reads better rounded, and this is the file that ends
     # up on a bookmarks bar.
@@ -126,9 +153,21 @@ def main():
     frames[-1].save('favicon.ico', format='ICO',
                     sizes=[(s, s) for s in SIZES])
     print('favicon.ico written at ' + ', '.join(f'{s}px' for s in SIZES))
+
+    for size, name in PWA_ICONS:
+        art.resize((size, size), Image.LANCZOS).save(name, format='PNG',
+                                                     optimize=True)
+        print(f'{name} written (rounded — nothing masks a `purpose: any` icon)')
+
+    size, name = MASKABLE
+    build(rounded=False).resize((size, size), Image.LANCZOS).save(
+        name, format='PNG', optimize=True)
+    print(f'{name} written (full bleed — the launcher supplies the shape)')
+
     print('Now bump the ?v= on every favicon.ico reference — index.html and '
           'privacy.html — browsers cache an icon for a long time and will keep '
-          'showing the old one otherwise.')
+          'showing the old one otherwise. The manifest icons are versioned by '
+          "sw.js's CACHE constant instead; bump that too.")
 
 
 if __name__ == '__main__':

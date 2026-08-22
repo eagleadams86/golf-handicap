@@ -54,7 +54,7 @@
 /* Bump when the shell list changes, so old caches are purged on activate. It is
    NOT load-bearing for freshness — network-first means a forgotten bump cannot
    serve you stale code — it only stops dead entries accumulating. */
-const CACHE = 'gh-shell-v1';
+const CACHE = 'gh-shell-v2';
 const PREFIX = 'gh-shell-';
 
 /* THE ALLOWLIST, and the security boundary of this file. Every entry is a file
@@ -64,11 +64,27 @@ const PREFIX = 'gh-shell-';
    intercepted at all: it goes to the network as if this worker did not
    exist. Adding a line here is a
    security decision, so justify it in the commit. */
+/* The manifest and the three install icons joined on 2026-08-21, when the app
+   became installable on a Mac or a PC. Each is a file already committed here, so
+   the origin-wide-cache rule above is unchanged by them. They earn their place
+   because an INSTALLED app is the copy most likely to be opened with no network
+   at all: a launcher re-reads the manifest and its icons to draw the window, and
+   without them a cold offline start shows a blank icon and can drop back out of
+   standalone display.
+
+   Their justification is written HERE rather than between the entries. The suite
+   pulls every quoted string out of this array straight from the source, comments
+   and all, so a note sitting inside it with an apostrophe in the prose would hand
+   that check a fake entry. */
 const SHELL = [
   './',
   'theme.css',
   'privacy.html',
-  'favicon.ico'
+  'favicon.ico',
+  'manifest.webmanifest',
+  'icon-192.png',
+  'icon-512.png',
+  'icon-512-maskable.png'
 ];
 
 /* Resolved against this file's own URL, so the same list works unchanged on

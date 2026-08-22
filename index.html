@@ -20,7 +20,14 @@
      foot of the file). firebaseapp.com and apis.google.com are deliberately NOT
      here: they served Firebase's hosted popup, which this app no longer uses —
      the same as Team Dashboard and Sprint Velocity. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://accounts.google.com; worker-src 'self'; frame-src https://accounts.google.com; base-uri 'none'; form-action 'self'">
+<!-- manifest-src is 'self' for the install manifest, and it has to be spelled
+     out: it falls back to default-src, which is 'none' here, so without this the
+     fetch of manifest.webmanifest is refused and "Install app" silently stops
+     being offered — no error anywhere except the console. What it allows is a
+     static JSON file on this origin and nothing else; a manifest executes nothing
+     and reads no data. Same line, same reasoning, in Money Map, PAPTrack and the
+     lottery pages. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://accounts.google.com; manifest-src 'self'; worker-src 'self'; frame-src https://accounts.google.com; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Golf Handicap — rolling handicap tracker</title>
 <meta name="description" content="Track your golf rounds and see your handicap two ways: a configurable league handicap over your last N rounds, and the official World Handicap System calculation. Compare every golfer on one leaderboard. Works offline, no account required.">
@@ -41,6 +48,26 @@
      URIs, so the SVG costs no extra request. -->
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'> <defs><linearGradient id='g' x1='10' y1='52' x2='54' y2='12' gradientUnits='userSpaceOnUse'> <stop offset='0' stop-color='%23818cf8'/><stop offset='1' stop-color='%23a5b4fc'/></linearGradient></defs> <rect width='64' height='64' rx='14' fill='%230a0e1a'/> <circle cx='14' cy='52' r='20' fill='%23141c33'/> <path d='M21 16V47' fill='none' stroke='url(%23g)' stroke-width='5.5' stroke-linecap='round'/> <path d='M21 17 L44 25 L21 33 Z' fill='url(%23g)'/> <circle cx='41' cy='43' r='5.5' fill='%23a5b4fc'/> </svg>">
 <link rel="alternate icon" href="favicon.ico?v=1">
+<!-- Installing the app. The manifest is what turns Chrome's "Install page as
+     app…" into a real install: its own window with no browser chrome, its own
+     icon in the Dock or on the taskbar, and its own entry in the app switcher.
+     Offline was already here — that is sw.js, and it predates this; what the
+     manifest adds is the window and the icon, not the caching.
+
+     The icons it names are FILES rather than the inline SVG data URI above,
+     because a manifest's icons are fetched by URL. make_favicon.py writes them
+     from the same drawing as everything else, so every copy of the mark stays
+     one picture.
+
+     Deliberately NOT linked from privacy.html: that is a policy page, not a
+     surface anyone installs the app from, and a manifest on it would offer to
+     install something the reader is not looking at. -->
+<link rel="manifest" href="manifest.webmanifest">
+<!-- The colour of the window's title bar in an installed app, and of the address
+     bar on Android. Midnight's page colour to start with, because that is the
+     default theme; the theme picker rewrites it, so an installed window follows
+     the theme rather than staying dark behind a light page. -->
+<meta name="theme-color" content="#0a0e1a">
 <script>
   // Apply the saved theme before first paint so there is no flash. Midnight is the
   // default for every app in this family; "slate" is the old name for Dark.
@@ -2790,12 +2817,26 @@ document.getElementById('primWhs').addEventListener('click', () => { state.setti
 document.getElementById('leaguePrimRoll').addEventListener('click', () => { state.settings.primary = 'rolling'; save(); });
 document.getElementById('leaguePrimWhs').addEventListener('click', () => { state.settings.primary = 'whs'; save(); });
 
+/* Keeps the installed app window's title bar with the theme. Read back out of the
+   pack's `--bg` rather than listed here, so a palette change in the theme pack
+   carries across without a second place to remember it. Only an installed window
+   and mobile browser chrome read it; in an ordinary tab it does nothing. Same
+   function, same reasoning, in Money Map, PAPTrack and the lottery pages. */
+function applyThemeColor() {
+  const bar = document.querySelector('meta[name="theme-color"]');
+  const bg = getComputedStyle(document.documentElement)
+    .getPropertyValue('--bg').trim();
+  if (bar && bg) bar.setAttribute('content', bg);
+}
+applyThemeColor();
+
 const themeSel = document.getElementById('themeSel');
 themeSel.value = document.documentElement.getAttribute('data-theme') || 'midnight';
 themeSel.addEventListener('change', () => {
   const t = THEMES.indexOf(themeSel.value) === -1 ? 'midnight' : themeSel.value;
   document.documentElement.setAttribute('data-theme', t);
   try { localStorage.setItem(THEME_KEY, t); } catch (e) { /* the theme just won't be remembered */ }
+  applyThemeColor();
 });
 
 const HELP = {
