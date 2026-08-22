@@ -637,6 +637,12 @@ dialog {
      1100px is Sprint Predictability's width for the window this one is modelled
      on, and now that the page is 1500 too it is the same proportion of it. */
   #manageDialog { max-width: 1100px; }
+  /* The same width as Flow Metrics' Settings window, which is the family's
+     settings screen: 1100px. These three hold the app-wide settings and now share
+     a shape — heading, note, two columns of labelled fields — so they share the
+     width that shape needs. At 880px and 560px the field pairs were stacking into
+     one column while Flow Metrics' sat side by side. */
+  #methodDialog { max-width: 1100px; }
   /* No align-items: start — the two panels stretch to the taller of them, so
      the pair reads as one row rather than two boxes of unrelated height. */
   #shareDialog .share-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
@@ -665,6 +671,30 @@ dialog h2 { margin: 0 0 var(--sp-5); font-size: var(--fs-md); }
 .field > label { display: block; font-size: var(--fs-xs); color: var(--text-secondary); margin-bottom: var(--sp-2); }
 .field input, .field select { width: 100%; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-5); }
+/* ── Flow Metrics' settings-window furniture, shared ────────────────────────
+   The three windows that hold app-wide SETTINGS — Flow Metrics' Settings,
+   Sprint Predictability's Targets and Golf Handicap's League Handicap — are the
+   same kind of screen and now look it (2026-08-22). Flow Metrics' is the shape:
+   a heading, a sentence under it, then two columns of labelled fields.
+
+   `.manage-head` is the section heading, `.manage-note` the sentence under it,
+   and `.grid.two` the field pair. `auto-fit` with a 260px floor rather than a
+   flat `1fr 1fr`, so a narrow window stacks them instead of squeezing two
+   half-width number boxes side by side; `align-items: end` so a one-line label
+   and a two-line label still put their inputs on the same line. */
+.manage-head { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.manage-note { color: var(--text-secondary); font-size: var(--fs-xs); margin: 4px 0 0; }
+.grid.two { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  align-items: end; }
+.grid.two > div { display: flex; flex-direction: column; justify-content: flex-end; }
+/* The label carries its own size and ink here rather than relying on a bare
+   `label` rule: Flow Metrics has one, these two apps style labels through
+   `label.field` / `.field > label` instead, and a field wrapper that is a plain
+   <div> in this grid would otherwise fall back to body text. Same three values
+   Flow Metrics' `label` rule gives. */
+.grid.two > div > label { flex: 0 0 auto; display: block; font-size: var(--fs-xs);
+  color: var(--text-secondary); font-weight: var(--fw-semibold); margin-bottom: 4px; }
+.grid.two > div > input, .grid.two > div > select { width: 100%; }
 /* Three across, for the one group that is genuinely three numbers off a
    scorecard — par, rating and slope for a nine. Splitting them 2 + 1 across
    two .grid2 rows would leave the third box beside dead space. */
@@ -1307,36 +1337,47 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
 <dialog id="methodDialog" aria-labelledby="methodTitle">
   <form method="dialog" id="methodForm">
     <h2 id="methodTitle">The League Handicap</h2>
-    <p class="hint">The calculation the app shows first, and the one the leaderboard is ranked on. It applies to <strong>every golfer here</strong> — one rule, so the table compares like with like. The official World Handicap System figure is always worked out alongside it and never changes.</p>
-    <div class="grid2">
-      <div class="field">
+    <p class="manage-note">The calculation the app shows first, and the one the leaderboard is ranked on. It applies to <strong>every golfer here</strong> — one rule, so the table compares like with like. The official World Handicap System figure is always worked out alongside it and never changes.</p>
+    <div class="row spread" style="margin-top:16px">
+      <strong class="manage-head">The Calculation</strong>
+    </div>
+    <p class="manage-note">Which rounds it looks at, and what it does with them.</p>
+    <div class="grid two" style="margin-top:var(--sp-5)">
+      <div>
         <label for="m_window">Look at the last … rounds</label>
         <input type="number" id="m_window" min="1" max="60" step="1" required inputmode="numeric">
       </div>
-      <div class="field">
+      <div>
         <label for="m_use">…and use the best … of them</label>
         <input type="number" id="m_use" min="1" max="60" step="1" required inputmode="numeric">
       </div>
     </div>
-    <div class="field">
-      <label for="m_basis">Work from</label>
-      <select id="m_basis">
-        <option value="differential">Score differentials (uses course rating &amp; slope)</option>
-        <option value="overPar">Shots over par (ignores rating &amp; slope)</option>
-      </select>
+    <div class="grid two" style="margin-top:var(--sp-5)">
+      <div>
+        <label for="m_basis">Work from</label>
+        <select id="m_basis">
+          <option value="differential">Score differentials (uses course rating &amp; slope)</option>
+          <option value="overPar">Shots over par (ignores rating &amp; slope)</option>
+        </select>
+      </div>
     </div>
-    <div class="grid2">
-      <div class="field">
+    <div class="grid two" style="margin-top:var(--sp-5)">
+      <div>
         <label for="m_mult">Then multiply by</label>
         <input type="number" id="m_mult" min="0.1" max="2" step="0.01" required inputmode="decimal">
       </div>
-      <div class="field">
+      <div>
         <label for="m_adj">And add (or subtract)</label>
         <input type="number" id="m_adj" min="-20" max="20" step="0.1" required inputmode="decimal">
       </div>
     </div>
     <p class="hint" id="methodPreview"></p>
-    <hr style="border:none;border-top:1px solid var(--border);margin:var(--sp-6) 0">
+    <div class="row spread" style="margin-top:20px">
+      <strong class="manage-head">The Official Caps</strong>
+    </div>
+    <p class="manage-note">Parts of the WHS calculation you can switch off to see the plain
+      averaging underneath. Neither touches the league handicap.</p>
+    <div style="margin-top:var(--sp-5)">
     <div class="field checkline">
       <input type="checkbox" id="m_caps">
       <label for="m_caps" style="margin:0">Apply the official soft cap and hard cap</label>
@@ -1349,6 +1390,7 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
       <input type="checkbox" id="m_esr">
       <label for="m_esr" style="margin:0">Apply the official exceptional score reduction</label>
       <button class="help-btn" type="button" data-help="esr" aria-label="About exceptional scores">?</button>
+    </div>
     </div>
     <p class="warn" id="methodWarn" role="status"></p>
     <div class="row-actions">
