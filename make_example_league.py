@@ -8,7 +8,15 @@ Every awkward case the league table has to handle is deliberately in here: a
 near-scratch player whose differentials go negative, golfers either side of the
 20-round mark, one on 4 rounds (the reduced-scores table), one on 2 (no official
 index is issued at all), one who has never played, and two rounds marked "don't
-count" so the exclusion line has something to say.
+count" so the exclusion line has something to say. Since 2026-08-22 it also
+carries the nine-hole cases (a pair that combines into one 18-hole record, and a
+single nine still waiting for a partner) and one round exceptional enough to earn
+a reduction that is still in force.
+
+This file and the app's own "load the example league" button are two different
+things, deliberately: the button generates a league dated from today, this is a
+frozen backup for exercising Restore. They are kept in step by holding the same
+LIST OF CASES, not the same numbers.
 
 Scores come from a per-golfer target and a fixed seed, so re-running this writes
 the identical file — a fixture that changes under you is no use. Run it with
@@ -23,7 +31,8 @@ COURSES = [
     {
         "id": "c-parkland", "name": "Ashfield Park",
         "tees": [
-            {"id": "t-ash-yellow", "name": "Yellow", "rating": 69.4, "slope": 122, "par": 71},
+            {"id": "t-ash-yellow", "name": "Yellow", "rating": 69.4, "slope": 122, "par": 71,
+             "rating9": 34.6, "slope9": 120, "par9": 35},
             {"id": "t-ash-white", "name": "White", "rating": 71.2, "slope": 129, "par": 71},
             {"id": "t-ash-red", "name": "Red", "rating": 67.8, "slope": 118, "par": 71},
         ],
@@ -64,7 +73,8 @@ COURSES = [
     {
         "id": "c-brookvale", "name": "Brookvale Municipal",
         "tees": [
-            {"id": "t-brook-main", "name": "Main", "rating": 70.1, "slope": 115, "par": 70},
+            {"id": "t-brook-main", "name": "Main", "rating": 70.1, "slope": 115, "par": 70,
+             "rating9": 35.0, "slope9": 113, "par9": 35},
         ],
     },
 ]
@@ -72,15 +82,28 @@ COURSES = [
 TEES = [(c["id"], t["id"], t["par"]) for c in COURSES for t in c["tees"]]
 
 # name, rounds to log, average shots over the course rating, how streaky they are
+# name, rounds, average shots over the rating, streakiness, and which of their
+# own rounds (if any) is the exceptional one that earns a reduction.
 GOLFERS = [
-    ("Alex Nash",      26, 2.5,  2.0),   # near scratch — a low single figure
-    ("Priya Raman",    24, 8.0,  2.6),   # solid single figure
-    ("Dad",            22, 13.0, 3.0),   # the mid handicapper the app was built for
-    ("Marcus Bell",    20, 18.5, 3.4),   # mid-to-high, right on the 20-round mark
-    ("Joan Whitlock",  14, 24.0, 4.0),   # improving, fewer than 20 rounds
-    ("Sam Okafor",      4, 30.0, 5.0),   # four rounds: an index from the reduced table
-    ("Ruth Carey",      2, 32.0, 5.0),   # two rounds: no official index at all
-    ("New Member",      0, 0.0,  0.0),   # signed up, hasn't played yet
+    ("Alex Nash",      26, 2.5,  2.0, None),  # near scratch — a low single figure
+    ("Priya Raman",    24, 8.0,  2.6, None),  # solid single figure
+    ("Dad",            22, 13.0, 3.0, None),  # the mid handicapper the app was built for
+    ("Marcus Bell",    20, 18.5, 3.4, None),  # mid-to-high, right on the 20-round mark
+    ("Joan Whitlock",  14, 24.0, 4.0, 10),    # improving, and the round of her life
+    ("Sam Okafor",      4, 30.0, 5.0, None),  # four rounds: an index from the reduced table
+    ("Ruth Carey",      2, 32.0, 5.0, None),  # two rounds: no official index at all
+    ("New Member",      0, 0.0,  0.0, None),  # signed up, hasn't played yet
+]
+
+# The nine-hole rounds. Joan's two PAIR into one 18-hole record; Alex's single one
+# is left WAITING for a partner. Alex holds the waiting one because his job here
+# is negative differentials rather than a round count — on Marcus, who is there
+# to sit exactly on the 20-round window, an extra round counting towards nothing
+# would muddy the case he exists for.
+NINES = [
+    ("g-5", "c-brookvale", "t-brook-main", 9, 47, "quick nine after work"),
+    ("g-5", "c-brookvale", "t-brook-main", 4, 45, ""),
+    ("g-1", "c-parkland",  "t-ash-yellow", 2, 37, "nine before the light went"),
 ]
 
 NOTES = ["", "", "", "windy", "society day", "medal", "", "back nine fell apart", "best of the year"]
@@ -90,7 +113,7 @@ golfers = []
 today = date(2026, 8, 11)
 rid = 0
 
-for gi, (name, count, over, spread) in enumerate(GOLFERS):
+for gi, (name, count, over, spread, esr_at) in enumerate(GOLFERS):
     gid = "g-%d" % (gi + 1)
     golfers.append({"id": gid, "name": name})
     for i in range(count):
@@ -99,7 +122,13 @@ for gi, (name, count, over, spread) in enumerate(GOLFERS):
                       for t in c["tees"] if t["id"] == tee_id)
         # A gentle improvement over the season, plus round-to-round noise.
         drift = (count - i) / max(count, 1) * 2.0
-        score = round(rating + over + drift + random.gauss(0, spread))
+        # The exceptional round: fifteen shots better than she usually plays,
+        # which is what puts the differential far enough below the INDEX she was
+        # holding — already a best-of average several shots under her typical
+        # round — to trigger the reduction. Twelve was tried and was not enough.
+        this_over = over - 15 if esr_at == i else over
+        score = round(rating + this_over + drift
+                      + (0 if esr_at == i else random.gauss(0, spread)))
         played = today - timedelta(days=(count - i) * 8 + (gi % 3))
         rid += 1
         rounds.append({
@@ -114,10 +143,29 @@ for gi, (name, count, over, spread) in enumerate(GOLFERS):
             # A couple of scrambles and a practice round, so the "left out" line
             # and the pills in the rounds table have something to show.
             "counts": not (i == 2 and gi in (1, 3)),
+            "holes": 18,
         })
 
+for gid, course_id, tee_id, days_ago, score, note in NINES:
+    rid += 1
+    rounds.append({
+        "id": "r-%03d" % rid,
+        "golferId": gid,
+        "date": (today - timedelta(days=days_ago)).isoformat(),
+        "courseId": course_id,
+        "teeId": tee_id,
+        "score": score,
+        "pcc": 0,
+        "note": note,
+        "counts": True,
+        "holes": 9,
+    })
+
 state = {
-    "version": 1,
+    # Bumped with the app's SCHEMA when `holes` and the 9-hole tee figures
+    # arrived: a build that predates them would drop `holes` at its boundary and
+    # score a nine as a full round, so it refuses this file instead.
+    "version": 2,
     "golfers": golfers,
     "activeGolfer": golfers[2]["id"],
     "courses": COURSES,
@@ -126,6 +174,7 @@ state = {
         "method": {"name": "Rolling last 5", "window": 5, "use": 5,
                    "basis": "differential", "multiplier": 1, "adjustment": 0},
         "applyCaps": True,
+        "applyEsr": True,
         "primary": "rolling",
     },
     "exportedAt": "2026-08-11T09:00:00.000Z",

@@ -44,6 +44,8 @@
   <code>averageLowest</code>, <code>whsIndex</code>/<code>whsSelection</code>,
   <code>rollingIndex</code>/<code>rollingSelection</code>, <code>normalizeMethod</code>,
   <code>clampInt</code>/<code>clampNum</code>, <code>applyCaps</code>, <code>courseHandicap</code>,
+  <code>playingHandicap</code>/<code>allowanceById</code>, <code>esrFor</code>,
+  <code>pairNines</code>, <code>courseStats</code>, <code>csvRounds</code>/<code>csvCell</code>,
   <code>indexHistory</code>, <code>pickUsed</code>, <code>rankLeague</code>,
   <code>changeOverRounds</code>, <code>syncDecision</code>, <code>buildDemo</code>,
   <code>buildDemoLeague</code>,
@@ -235,6 +237,42 @@ async function onAppLoad() {
   it('has nothing to convert without an index', () =>
     eq(W.courseHandicap(null, 122, 69.4, 71), null));
 
+  /* ── playingHandicap ─────────────────────────────────────────────────── */
+  describe('playingHandicap');
+  it('leaves a full handicap alone', () => eq(W.playingHandicap(18, 100), 18));
+  it('takes the four-ball allowance off', () => eq(W.playingHandicap(20, 90), 18));
+  it('rounds a half AWAY from zero, so a plus handicap is not handed a shot', () => {
+    eq(W.playingHandicap(5, 50), 3);            // 2.5 → 3
+    eq(W.playingHandicap(-5, 50), -3);          // −2.5 → −3, not −2
+  });
+  it('has nothing to reduce without a course handicap', () =>
+    eq(W.playingHandicap(null, 90), null));
+  it('every allowance is a whole percentage with a label that names the format', () => {
+    ok(H.ALLOWANCES.length >= 4);
+    ok(H.ALLOWANCES.every((a) => a.pct > 0 && a.pct <= 100 && Number.isInteger(a.pct)));
+    ok(H.ALLOWANCES.every((a) => /\(\d+%\)$/.test(a.label)),
+       'the percentage is in the label, so the picker says what it will do');
+    eq(H.ALLOWANCES[0].id, H.DEFAULT_ALLOWANCE, 'the default is the first option');
+    eq(W.allowanceById(H.DEFAULT_ALLOWANCE).pct, 100,
+       'and the default takes nothing off anybody');
+  });
+  it('falls back to the full handicap for an id it does not know', () =>
+    eq(W.allowanceById('nonsense-from-an-old-key').id, H.DEFAULT_ALLOWANCE));
+
+  /* ── esrFor ──────────────────────────────────────────────────────────── */
+  describe('esrFor — the exceptional score reduction');
+  it('does nothing for an ordinary round', () => eq(W.esrFor(18, 20), 0));
+  it('does nothing 0.1 short of the threshold', () => eq(W.esrFor(13.1, 20), 0));
+  it('takes 1.0 off at exactly 7.0 below the index', () => eq(W.esrFor(13, 20), -1));
+  it('still takes only 1.0 off at 9.9 below', () => eq(W.esrFor(10.1, 20), -1));
+  it('takes 2.0 off at exactly 10.0 below', () => eq(W.esrFor(10, 20), -2));
+  it('takes 2.0 off however far below it goes', () => eq(W.esrFor(-5, 20), -2));
+  it('cannot apply to a golfer who has no index yet', () => eq(W.esrFor(2, null), 0));
+  it('returns 0 rather than null, so the held total is arithmetic', () => {
+    eq(W.esrFor(null, 20), 0);
+    eq(typeof W.esrFor(18, 20), 'number');
+  });
+
   /* ── indexHistory ────────────────────────────────────────────────────── */
   describe('indexHistory');
   const seq = (n, diff) => {
@@ -285,6 +323,114 @@ async function onAppLoad() {
     eq(last.cap, null);
     eq(last.whs, last.whsUncapped);
     eq(last.whs, 45);
+  });
+
+  /* ── indexHistory, with exceptional scores ───────────────────────────────
+     Caps OFF throughout, so the figure under test is the reduction and not the
+     two rules interacting. One round in twenty-five is played out of the
+     golfer's skin; everything else is a flat 20. */
+  const flat = (n, at, low) => seq(n, (i) => (i === at ? low : 20));
+  it('reduces the index when a round comes in far enough below it', () => {
+    const h = W.indexHistory(flat(10, 5, 5), M(), false, true);
+    eq(h[5].esr, -2, 'five is fifteen below the 20 they were holding:');
+    eq(h[5].whs, W.round1(h[5].whsUncapped - 2));
+  });
+  it('measures against the index HELD, not the one the round produces', () => {
+    /* The same 5 played as the very first round earns nothing: there is no
+       index to be exceptional against yet. */
+    const h = W.indexHistory(flat(10, 0, 5), M(), false, true);
+    eq(h[0].esr, 0);
+  });
+  it('keeps the reduction in force for the next 19 scores, then lets it go', () => {
+    const h = W.indexHistory(flat(30, 5, 5), M(), false, true);
+    eq(h[5].esrHeld, -2, 'in force on the round that earned it');
+    eq(h[24].esrHeld, -2, 'still in force 19 rounds later');
+    eq(h[25].esrHeld, 0, 'and gone on the twentieth, as that round leaves the window');
+  });
+  it('stacks two exceptional rounds inside the same window', () => {
+    const two = seq(20, (i) => (i === 5 || i === 9 ? 5 : 20));
+    const h = W.indexHistory(two, M(), false, true);
+    ok(h[5].esr < 0 && h[9].esr < 0, 'both rounds should earn one');
+    eq(h[9].esrHeld, h[5].esr + h[9].esr, 'and the held total is the sum, not the latest');
+  });
+  it('does nothing at all when the reduction is switched off', () => {
+    const h = W.indexHistory(flat(10, 5, 5), M(), false, false);
+    ok(h.every((x) => x.esr === 0 && x.esrHeld === 0));
+    eq(h[5].whs, h[5].whsUncapped);
+  });
+  it('applies the reduction BEFORE the cap, not after it', () => {
+    /* Twenty good rounds, then a collapse — which is what makes the hard cap
+       bite — and one exceptional round inside the collapse. The two orders give
+       genuinely different answers here, and the official one is reduce-then-cap:
+       the cap procedure is run on the index the reduction produced, using the
+       Low Handicap Index. Note what that means, since it reads like a bug and
+       is not: under a HARD cap the figure is pinned to the low index either way,
+       so the reduction can be swallowed. That is the rule, not a rounding
+       accident, and this test exists so nobody "fixes" it by reordering. */
+    const mixed = seq(40, (i) => (i < 20 ? 5 : (i === 35 ? 0 : 45)));
+    const h = W.indexHistory(mixed, M(), true, true);
+    const row = h[35];
+    ok(row.esr < 0, 'the round inside the collapse should be exceptional');
+    ok(row.cap, 'and the cap should be biting, or this test proves nothing');
+    const reduceThenCap = W.applyCaps(W.round1(row.whsUncapped + row.esrHeld), row.lowIndex).value;
+    const capThenReduce = W.round1(W.applyCaps(row.whsUncapped, row.lowIndex).value + row.esrHeld);
+    ok(reduceThenCap !== capThenReduce, 'the two orders must differ, or the assertion is empty');
+    eq(row.whs, reduceThenCap);
+  });
+
+  /* ── pairNines ───────────────────────────────────────────────────────── */
+  describe('pairNines — two nines make one game');
+  const E = (id, date, holes, diff, overPar) =>
+    ({ round: { id, holes }, date, diff, overPar });
+  it('passes an 18-hole round straight through as its own game', () => {
+    const { games, pending } = W.pairNines([E('a', '2026-01-01', 18, 12, 5)]);
+    eq(games.length, 1);
+    eq(games[0].diff, 12);
+    eq(games[0].parts.length, 1);
+    eq(pending, null);
+  });
+  it('ADDS two nine-hole differentials, which is what the official system does', () => {
+    const { games } = W.pairNines([E('a', '2026-01-01', 9, 10.5, 6), E('b', '2026-01-08', 9, 11.5, 7)]);
+    eq(games.length, 1);
+    eq(games[0].diff, 22);
+    eq(games[0].overPar, 13);
+    eq(games[0].parts.map((p) => p.round.id), ['a', 'b']);
+  });
+  it('dates the game to the SECOND nine — it was not a game until then', () => {
+    const { games } = W.pairNines([E('a', '2026-01-01', 9, 10, 5), E('b', '2026-03-04', 9, 10, 5)]);
+    eq(games[0].date, '2026-03-04');
+  });
+  it('leaves an odd nine pending rather than dropping or half-counting it', () => {
+    const { games, pending } = W.pairNines([E('a', '2026-01-01', 9, 10, 5)]);
+    eq(games.length, 0);
+    eq(pending.round.id, 'a');
+  });
+  it('pairs in the order played, oldest first, across intervening 18s', () => {
+    const { games, pending } = W.pairNines([
+      E('n1', '2026-01-01', 9, 10, 5),
+      E('full', '2026-01-05', 18, 20, 10),
+      E('n2', '2026-01-09', 9, 12, 6),
+      E('n3', '2026-01-11', 9, 9, 4),
+      E('n4', '2026-01-15', 9, 8, 3),
+    ]);
+    /* n1 waits for n2, so their game COMPLETES on the 9th — after the full round
+       on the 5th, which is why the 18 comes out first. The list has to stay in
+       completion order: indexHistory walks it forward and measures the low
+       index's 365 days from each entry's own date, so a game sitting earlier
+       than the day it became a game would be read against the wrong year. */
+    eq(games.map((g) => g.parts.map((p) => p.round.id)),
+       [['full'], ['n1', 'n2'], ['n3', 'n4']]);
+    eq(games.map((g) => g.date), ['2026-01-05', '2026-01-09', '2026-01-15']);
+    ok(games.every((g, i) => i === 0 || g.date >= games[i - 1].date),
+       'and the games always come out in date order');
+    eq(pending, null);
+  });
+  it('holds the LAST unpaired nine, not the first', () => {
+    const { pending } = W.pairNines([
+      E('n1', '2026-01-01', 9, 10, 5), E('n2', '2026-01-02', 9, 10, 5),
+      E('n3', '2026-01-03', 9, 10, 5),
+    ]);
+    eq(pending.round.id, 'n3');
   });
 
   describe('daysBefore');
@@ -438,6 +584,129 @@ async function onAppLoad() {
     eq(s.rounds.length, 2);
     ok(s.rounds[0].id !== s.rounds[1].id, 'the second round should get a fresh id');
   });
+  /* The SCHEMA 2 fields. Every one of them is a wrong FIGURE if it is dropped
+     rather than a missing one, which is why the version was bumped with them. */
+  it('treats a round with no holes field as the 18 it always was', () => {
+    const s = W.normalizeState({ rounds: [{ id: 'r', date: '2026-05-01', score: 90 }] });
+    eq(s.rounds[0].holes, 18);
+  });
+  it('keeps a nine, and refuses any hole count that is not 9 or 18', () => {
+    const holes = (h) => W.normalizeState({ rounds: [{ id: 'r', date: '2026-05-01', score: 45, holes: h }] }).rounds[0].holes;
+    eq(holes(9), 9);
+    eq(holes('9'), 9, 'a hand-edited backup writes strings');
+    eq(holes(12), 18, 'twelve holes is not a case this app has — 18 is the safe reading');
+    eq(holes(0), 18);
+  });
+  it('keeps the optional 9-hole figures, and leaves them NULL rather than guessing', () => {
+    const tee = (t) => W.normalizeState({ courses: [{ id: 'c', name: 'C', tees: [
+      Object.assign({ id: 't', rating: 70, slope: 113, par: 72 }, t)] }] }).courses[0].tees[0];
+    const full = tee({ rating9: 34.6, slope9: 120, par9: 35 });
+    eq([full.rating9, full.slope9, full.par9], [34.6, 120, 35]);
+    const none = tee({});
+    eq([none.rating9, none.slope9, none.par9], [null, null, null],
+       'a default here would be a guess the differential then acts on');
+    eq(tee({ rating9: 999, slope9: 999, par9: 999 }).slope9, 155, 'and they clamp like the rest');
+  });
+  it('defaults the exceptional-score reduction ON, like the caps beside it', () => {
+    eq(W.normalizeState({}).settings.applyEsr, true);
+    eq(W.normalizeState({ settings: { applyEsr: false } }).settings.applyEsr, false);
+  });
+
+  /* ── courseStats ─────────────────────────────────────────────────────── */
+  describe('courseStats — the By Course table');
+  const G = (courseId, name, date, diff, score, parts) => ({
+    date, diff, overPar: 0,
+    parts: parts || [{ round: { score }, course: { id: courseId, name } }],
+  });
+  it('groups by course and counts a paired game ONCE', () => {
+    const rows = W.courseStats([
+      G('c1', 'Ashfield', '2026-01-01', 20, 92),
+      /* one game, two nines, both at Brookvale */
+      { date: '2026-01-08', diff: 22, overPar: 0, parts: [
+        { round: { score: 47 }, course: { id: 'c2', name: 'Brookvale' } },
+        { round: { score: 45 }, course: { id: 'c2', name: 'Brookvale' } }] },
+    ]);
+    eq(rows.length, 2);
+    const brook = rows.find((r) => r.name === 'Brookvale');
+    eq(brook.n, 1, 'one GAME, not two rounds');
+    eq(brook.bestScore, 92, 'and the two nines add up to an 18-hole score');
+  });
+  it('orders by average differential, best first', () => {
+    const rows = W.courseStats([
+      G('c1', 'Hard', '2026-01-01', 30, 100),
+      G('c2', 'Easy', '2026-01-02', 10, 80),
+    ]);
+    eq(rows.map((r) => r.name), ['Easy', 'Hard']);
+  });
+  it('averages and finds the best of several rounds at one course', () => {
+    const rows = W.courseStats([
+      G('c1', 'Ashfield', '2026-01-01', 20, 95),
+      G('c1', 'Ashfield', '2026-02-01', 10, 85),
+      G('c1', 'Ashfield', '2026-03-05', 15, 90),
+    ]);
+    eq(rows[0].n, 3);
+    eq(rows[0].bestDiff, 10);
+    eq(rows[0].avgDiff, 15);
+    eq(rows[0].bestScore, 85);
+    eq(rows[0].avgScore, 90);
+    eq(rows[0].last, '2026-03-05', 'and the last played is the latest date, not the last row');
+  });
+  it('sends a course with no usable differential to the FOOT, never the top', () => {
+    const rows = W.courseStats([
+      G('c1', 'Scored', '2026-01-01', 20, 95),
+      { date: '2026-01-02', diff: null, overPar: null,
+        parts: [{ round: { score: 95 }, course: { id: 'c2', name: 'Unscored' } }] },
+    ]);
+    eq(rows.map((r) => r.name), ['Scored', 'Unscored']);
+    eq(rows[1].avgDiff, null);
+  });
+
+  /* ── csvRounds ───────────────────────────────────────────────────────── */
+  describe('csvRounds — the spreadsheet export');
+  const CSV_STATE = {
+    golfers: [{ id: 'g1', name: 'Dad' }],
+    courses: [{ id: 'c1', name: 'Ashfield', tees: [
+      { id: 't1', name: 'Yellow', rating: 69.4, slope: 122, par: 71, rating9: 34.6, slope9: 120, par9: 35 }] }],
+    rounds: [
+      { id: 'r1', golferId: 'g1', date: '2026-05-01', courseId: 'c1', teeId: 't1', score: 90, pcc: 0, note: '', counts: true, holes: 18 },
+      { id: 'r2', golferId: 'g1', date: '2026-05-08', courseId: 'c1', teeId: 't1', score: 45, pcc: 0, note: '', counts: true, holes: 9 },
+    ],
+  };
+  it('writes a header and one line per round, oldest first', () => {
+    const lines = W.csvRounds(CSV_STATE).split('\r\n');
+    ok(lines[0].startsWith('Golfer,Date,Course,Tee,Holes,Score'));
+    eq(lines[1].split(',')[1], '2026-05-01');
+    eq(lines[2].split(',')[1], '2026-05-08');
+    eq(lines[3], '', 'and it ends with a line break, as a text file should');
+  });
+  it('scores a nine against the NINE-hole figures, like the app does', () => {
+    const lines = W.csvRounds(CSV_STATE).split('\r\n');
+    eq(lines[2].split(',')[4], '9');
+    eq(lines[2].split(',')[7], W.scoreDifferential(45, 34.6, 120, 0).toFixed(1));
+  });
+  it('says so rather than going blank when the course was deleted', () => {
+    const orphan = Object.assign({}, CSV_STATE, { courses: [] });
+    ok(W.csvRounds(orphan).indexOf('(course deleted)') !== -1);
+  });
+  it('quotes a field holding a comma, and doubles a quote inside it', () => {
+    eq(W.csvCell('The "Old" Course, Ashfield'), '"The ""Old"" Course, Ashfield"');
+    eq(W.csvCell('plain'), 'plain', 'and leaves an ordinary field alone');
+    eq(W.csvCell('two\nlines'), '"two\nlines"');
+  });
+  it('defuses a field a spreadsheet would run as a FORMULA', () => {
+    /* Nothing in this app can hold one today. A CSV is a file that leaves the
+       app, though, and the day somebody restores a hand-edited backup is the
+       day this matters. */
+    ['=1+1', '+1', '-1', '@SUM(A1)'].forEach((v) =>
+      ok(W.csvCell(v).charAt(0) === "'", v + ' should be prefixed'));
+  });
+  it('carries every golfer, not just the one on screen', () => {
+    const two = Object.assign({}, CSV_STATE, {
+      golfers: CSV_STATE.golfers.concat([{ id: 'g2', name: 'Priya' }]),
+      rounds: CSV_STATE.rounds.concat([Object.assign({}, CSV_STATE.rounds[0], { id: 'r3', golferId: 'g2' })]),
+    });
+    ok(W.csvRounds(two).indexOf('Priya') !== -1);
+  });
 
   /* ── example data ────────────────────────────────────────────────────── */
   describe('buildDemo');
@@ -465,18 +734,70 @@ async function onAppLoad() {
   const leagueOf = (name) => LEAGUE.golfers.find((g) => g.name === name);
   const roundsOf = (name) => LEAGUE.rounds.filter((r) => r.golferId === leagueOf(name).id);
 
+  const fullRoundsOf = (name) => roundsOf(name).filter((r) => r.holes !== 9);
+
   it('fills a whole league, which is the half of the app one golfer cannot show', () => {
     eq(LEAGUE.golfers.length, 8);
     eq(LEAGUE.courses.length, 6);
-    eq(LEAGUE.rounds.length, 112);
+    eq(LEAGUE.rounds.length, 115);
   });
   it('covers every rung of the official calculation, from 26 rounds down to none', () => {
-    eq(LEAGUE.golfers.map((g) => LEAGUE.rounds.filter((r) => r.golferId === g.id).length),
+    /* Counted over the 18-hole rounds, because that is what the rungs are about
+       — the three nines are a separate case and are asserted on their own
+       below. Alex and Joan carry them, so their TOTALS are 27 and 16. */
+    eq(LEAGUE.golfers.map((g) => LEAGUE.rounds.filter((r) => r.golferId === g.id && r.holes !== 9).length),
        [26, 24, 22, 20, 14, 4, 2, 0]);
-    ok(roundsOf('Marcus Bell').length === 20, 'one golfer sits exactly ON the 20-round window');
-    ok(roundsOf('Sam Okafor').length === 4, 'one is on four — an index from the reduced table');
-    ok(roundsOf('Ruth Carey').length === 2, 'one is under the minimum, so no index is issued');
-    ok(roundsOf('New Member').length === 0, 'and one has never played, so neither figure exists');
+    ok(fullRoundsOf('Marcus Bell').length === 20, 'one golfer sits exactly ON the 20-round window');
+    ok(fullRoundsOf('Sam Okafor').length === 4, 'one is on four — an index from the reduced table');
+    ok(fullRoundsOf('Ruth Carey').length === 2, 'one is under the minimum, so no index is issued');
+    ok(fullRoundsOf('New Member').length === 0, 'and one has never played, so neither figure exists');
+  });
+  it('reaches BOTH nine-hole cases — a pair, and one still waiting', () => {
+    const nines = LEAGUE.rounds.filter((r) => r.holes === 9);
+    eq(nines.length, 3);
+    const joan = nines.filter((r) => r.golferId === leagueOf('Joan Whitlock').id);
+    eq(joan.length, 2, 'two that pair into one 18-hole record');
+    const alex = nines.filter((r) => r.golferId === leagueOf('Alex Nash').id);
+    eq(alex.length, 1, 'and one left over, so the "waiting" state is reachable');
+    /* Marcus is deliberately NOT the one holding it: he is there to sit exactly
+       on the 20-round window, and an extra round counting towards nothing would
+       muddy the case he exists for. */
+    eq(nines.filter((r) => r.golferId === leagueOf('Marcus Bell').id).length, 0);
+  });
+  it('gives the nines tees that can actually score them, and leaves others that cannot', () => {
+    const teeOf = (r) => LEAGUE.courses.find((c) => c.id === r.courseId)
+      .tees.find((t) => t.id === r.teeId);
+    ok(LEAGUE.rounds.filter((r) => r.holes === 9).every((r) => {
+      const t = teeOf(r);
+      return t.rating9 != null && t.slope9 != null && t.par9 != null;
+    }), 'every demo nine is playable');
+    ok(LEAGUE.courses.some((c) => c.tees.every((t) => t.rating9 == null)),
+       'and a course with no 9-hole figures at all, so the "add them" state is reachable too');
+  });
+  it('carries a round exceptional enough to earn a reduction that is still in force', () => {
+    /* The demo is the only place the exceptional-score rule can be SEEN, and it
+       is easy to lose by retuning the cast: the threshold is measured against
+       the index, which already sits several shots below what that golfer
+       usually goes round in. */
+    const joan = leagueOf('Joan Whitlock');
+    const st = W.normalizeState({ golfers: LEAGUE.golfers, courses: LEAGUE.courses,
+      rounds: LEAGUE.rounds, activeGolfer: joan.id, settings: {} });
+    const entries = st.rounds.filter((r) => r.golferId === joan.id)
+      .slice().sort((a, b) => a.date.localeCompare(b.date))
+      .map((r) => {
+        const c = st.courses.find((x) => x.id === r.courseId);
+        const t = c.tees.find((x) => x.id === r.teeId);
+        const nine = r.holes === 9;
+        return { round: r, date: r.date,
+          diff: nine ? W.scoreDifferential(r.score, t.rating9, t.slope9, (r.pcc || 0) / 2)
+                     : W.scoreDifferential(r.score, t.rating, t.slope, r.pcc),
+          overPar: W.round1(r.score - (nine ? t.par9 : t.par)) };
+      });
+    const games = W.pairNines(entries).games;
+    const h = W.indexHistory(games.map((g) => ({ date: g.date, diff: g.diff, value: g.diff })),
+      H.DEFAULT_METHOD, true, true);
+    ok(h.some((x) => x.esr < 0), 'one of her rounds is exceptional');
+    ok(h[h.length - 1].esrHeld < 0, 'and it is still in force today, which is the other half of the rule');
   });
   it('has a near-scratch golfer whose differentials go negative', () => {
     const teeOf = (r) => LEAGUE.courses.find((c) => c.id === r.courseId)
