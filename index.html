@@ -358,7 +358,14 @@ th:has(.help-btn), td:has(.help-btn) { white-space: nowrap; }
 }
 .card > h2 .spacer { flex: 1 1 auto; }
 .muted { color: var(--text-secondary); }
-.hint { color: var(--text-muted); font-size: var(--fs-xs); }
+/* --text-secondary, not --text-muted. THIS is why Charles said "the text in
+   golf looks more muted than the other apps" — `.hint` is this app's main
+   supporting-text class, used 31 times, and it was one ink dimmer than the
+   identical class in Flow Metrics (`.card .hint`, --text-secondary) and than
+   Sprint Predictability's `.sub`. An app whose supporting text sits a tier
+   below everyone else's reads as greyer throughout, which is exactly what it
+   was doing. --text-muted stays available for what is genuinely a tier down. */
+.hint { color: var(--text-secondary); font-size: var(--fs-xs); }
 /* ── DIALOG PROSE IS ONE SIZE AND ONE INK, family-wide ──────────────────────
    Charles, 2026-08-22, with the five Back Up windows side by side: "how do you
    consider the text on these windows the same?" It was not. Five apps, five
@@ -1477,7 +1484,7 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
     use the app, clearing your browser data is the one thing that will lose your history.</p>
   <div class="row-actions" style="justify-content:flex-start">
     <button type="button" id="exportBtn"><span aria-hidden="true">⬇︎</span> Download backup (JSON)</button>
-    <button type="button" id="importBtn"><span aria-hidden="true">⬆︎</span> Restore from backup</button>
+    <button type="button" id="importBtn"><span aria-hidden="true">⬆︎</span> Restore from backup…</button>
     <input type="file" id="importFile" accept="application/json,.json" class="sr-only" aria-hidden="true" tabindex="-1">
   </div>
   <hr style="border:0;border-top:1px solid var(--border);margin:16px 0">
@@ -1501,7 +1508,7 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
     </div>
   </details>
   <div class="row-actions">
-    <button type="button" id="dataClose" class="primary">Done</button>
+    <button type="button" id="dataClose" class="primary">Close</button>
   </div>
 </dialog>
 
