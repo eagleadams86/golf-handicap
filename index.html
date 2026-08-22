@@ -948,7 +948,14 @@ main:focus { outline: none; }
   </section>
 
   <section class="card" id="roundsCard">
-    <h2>
+    <!-- The heading row goes with the other cards on first load: with no rounds
+         the card is holding the whole page on its own, and "Rounds" over an
+         empty state that already says there are none — beside an Add round the
+         empty state offers again, in the right order, under a sentence saying
+         which comes first — is a title and a button competing with the one
+         thing a first-time visitor is being asked to do. It comes back with the
+         first round, which is the moment it starts labelling something. -->
+    <h2 id="roundsHead">
       Rounds
       <span class="spacer"></span>
       <button class="primary" id="addRoundBtn">+ Add round</button>
@@ -2368,6 +2375,14 @@ function renderEmptyState() {
     const el = document.getElementById(id);
     if (el) el.hidden = bare;
   });
+  /* The Rounds card STAYS — it is what holds the empty state — but its heading
+     row goes with the rest. "Rounds" over a card that says there are none, beside
+     an "+ Add round" the empty state offers again in the right order, is two
+     controls competing with the one thing a first-time visitor is being asked to
+     do. The card keeps its own heading for a screen reader either way: the empty
+     state's lede is the first thing in it. */
+  const head = document.getElementById('roundsHead');
+  if (head) head.hidden = bare;
   const solo = state.golfers.length < 2;
   const tab = document.getElementById('tab-league');
   if (tab) tab.hidden = solo;
@@ -2608,11 +2623,18 @@ function renderRounds(c) {
        that reaches the cases which need a field of players — so it leads. The
        single-golfer one stays for someone who already has a league and wants to
        see what a populated page of their own looks like. */
+    /* The card's heading row is hidden in this state, so whatever is offered
+       here is the ONLY way in — which means it has to be the right next step,
+       not always the first one. With a course already saved, "Add your first
+       course" is an instruction the visitor has followed, and the round they
+       cannot otherwise reach is the thing to offer. */
+    const haveCourse = state.courses.length > 0;
     box.innerHTML = `<div class="empty first-run">
-      <p class="lede">No rounds yet. Add a course first, then log a round — both handicaps
-        appear as soon as there is something to work from.</p>
+      <p class="lede">${haveCourse
+        ? 'No rounds yet. Log one and both handicaps appear straight away.'
+        : 'No rounds yet. Add a course first, then log a round — both handicaps appear as soon as there is something to work from.'}</p>
       <div class="first-run-actions">
-        <button type="button" class="primary" id="firstCourseBtn">Add your first course</button>
+        <button type="button" class="primary" id="firstCourseBtn">${haveCourse ? '+ Add round' : 'Add your first course'}</button>
         <button type="button" class="link" id="demoLeagueBtn">or load the example league</button>
       </div>
       <p class="hint">Eight golfers, six courses and a season
@@ -2620,7 +2642,8 @@ function renderRounds(c) {
         Just want one populated page?
         <button type="button" class="link" id="demoBtn">Load a single golfer's season</button></p>
     </div>`;
-    document.getElementById('firstCourseBtn').addEventListener('click', () => openCourseEdit(null));
+    document.getElementById('firstCourseBtn').addEventListener('click',
+      () => (haveCourse ? openRound(null) : openCourseEdit(null)));
     document.getElementById('demoLeagueBtn').addEventListener('click', loadDemoLeague);
     document.getElementById('demoBtn').addEventListener('click', loadDemo);
     return;
