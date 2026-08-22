@@ -49,7 +49,12 @@
 </head>
 <body>
 <div class="wrap">
-  <a class="back" href="index.html">← Back to Golf Handicap</a>
+  <!-- The back link stays OUTSIDE <main> — it is navigation, not the document —
+       but "outside main" is not the same as "outside every landmark", which is
+       where it sat until 2026-08-21: axe-core's `region` rule found it on all
+       six privacy pages at once. A <nav> is what it always was; now it says so,
+       and a reader moving by landmark can find the way back. -->
+  <nav aria-label="Back to Golf Handicap"><a class="back" href="index.html">← Back to Golf Handicap</a></nav>
 
   <!-- A real <main>, so the policy itself is a landmark a screen reader can jump
        straight to — and so the <footer> below is genuinely the OTHER end of the
@@ -116,11 +121,20 @@
   </ul>
 
   <h2>Third Parties</h2>
-  <p>If, and only if, you sign in, the app talks to Google Firebase (Authentication and
-  Firestore) on your behalf. Their handling of that data is covered by
+  <p><strong>Your rounds</strong> reach Google Firebase (Authentication and Firestore) if,
+  and only if, you sign in. Their handling of that data is covered by
   <a href="https://firebase.google.com/support/privacy" rel="noopener noreferrer">Firebase's
-  privacy documentation</a>. The page is served by GitHub Pages, which — like any web host
-  — sees the ordinary request information involved in serving a page.</p>
+  privacy documentation</a>.</p>
+  <p><strong>Google's code, though, loads on every visit</strong> — and this page said
+  otherwise until August 21, 2026. The app cannot know whether you are <em>already</em>
+  signed in on this device without asking Firebase, and it cannot ask without loading
+  Firebase first, so its scripts are fetched from <code>www.gstatic.com</code> and
+  <code>accounts.google.com</code> as the page opens. Those two requests tell Google your IP
+  address, your browser's user-agent and which page asked — the ordinary information any
+  request to any server carries. None of your rounds goes with them, and nothing is stored
+  or synced until you sign in; but the requests happen either way.</p>
+  <p>The page itself is served by GitHub Pages, which — like any web host — sees the same
+  ordinary request information involved in serving a page.</p>
 
   <h2>Deleting Your Data</h2>
   <p>Signed out: clear this site's data in your browser, and it is gone. Signed in: sign in,

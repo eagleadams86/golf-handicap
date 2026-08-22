@@ -1135,8 +1135,8 @@ main:focus { outline: none; }
     independent of this browser and of any Google account. With no account required to
     use the app, clearing your browser data is the one thing that will lose your history.</p>
   <div class="row-actions" style="justify-content:flex-start">
-    <button type="button" id="exportBtn">⬇︎ Download backup (JSON)</button>
-    <button type="button" id="importBtn">⬆︎ Restore from backup</button>
+    <button type="button" id="exportBtn"><span aria-hidden="true">⬇︎</span> Download backup (JSON)</button>
+    <button type="button" id="importBtn"><span aria-hidden="true">⬆︎</span> Restore from backup</button>
     <input type="file" id="importFile" accept="application/json,.json" class="sr-only" aria-hidden="true" tabindex="-1">
   </div>
   <p class="hint" style="margin-top:var(--sp-5)">Restoring <strong>replaces everything in this
@@ -1160,7 +1160,7 @@ main:focus { outline: none; }
   <p id="clearBody"></p>
   <p class="warn" id="clearSyncWarn" role="status"></p>
   <div class="row-actions">
-    <button type="button" id="clearBackupBtn">⬇︎ Download backup first</button>
+    <button type="button" id="clearBackupBtn"><span aria-hidden="true">⬇︎</span> Download backup first</button>
     <span class="spacer"></span>
     <button type="button" id="clearCancel">Cancel</button>
     <button type="button" id="clearConfirm" class="danger">Delete everything</button>
@@ -3708,7 +3708,7 @@ function shareBanner() {
     windowNote = `Covers each golfer's last ${Math.floor(shareMeta.lastN)} rounds, so the figures are worked out from those alone. `;
   }
   return '<div class="viewbar">'
-    + '<strong>👁 Read-only view' + (shareMeta && shareMeta.label ? ' — ' + esc(shareMeta.label) : '') + '</strong>'
+    + '<strong><span aria-hidden="true">👁️</span> Read-only view' + (shareMeta && shareMeta.label ? ' — ' + esc(shareMeta.label) : '') + '</strong>'
     + '<span class="muted">Shared' + (when ? ' on ' + esc(when) : '') + '. ' + esc(windowNote)
     + 'Nothing you do here is saved, and your own rounds are untouched.</span>'
     + '<a class="mine" href="' + esc(location.pathname) + '">Open my own data</a>'
@@ -4245,8 +4245,16 @@ function setSyncError(e) {
 function clearSyncError() { if (syncError) { syncError = null; updateUI(); } }
 
 function updateUI() {
+  /* The leading glyph is decoration and must not reach the button's accessible
+     name — the rule every other control in the header follows with an
+     aria-hidden span. This one cannot use a span: the sync module rewrites the
+     label with textContent as the state changes (and textContent rather than
+     innerHTML on purpose — an account's display name reaches this line). So the
+     name is stated outright instead, and re-stated in every branch below so it
+     can never be left describing the previous state. */
   if (syncError && user) {
     btn.textContent = '⚠️ Not syncing';
+    btn.setAttribute('aria-label', 'Not syncing');
     btn.title = syncError.reason + ' ' + syncError.fix;
     privacyNote.textContent = `⚠️ Not syncing — ${syncError.reason} Your rounds are still safe in `
       + `this browser, but your other devices aren’t getting them. ${syncError.fix}`;
@@ -4254,10 +4262,13 @@ function updateUI() {
   }
   if (user) {
     btn.textContent = `☁️ ${user.displayName ? user.displayName.split(' ')[0] : user.email}`;
+    btn.setAttribute('aria-label',
+      `Signed in as ${user.displayName ? user.displayName.split(' ')[0] : user.email}`);
     btn.title = 'Syncing across devices — tap to sign out';
     privacyNote.textContent = `☁️ Signed in as ${user.email} — your rounds sync privately to your own account and still work offline.`;
   } else {
     btn.textContent = '☁️ Sign in to sync';
+    btn.setAttribute('aria-label', 'Sign in to sync');
     btn.title = 'Sign in with Google to see the same rounds on all your devices';
     privacyNote.textContent = '🔒 Private — stored in this browser; sign in to sync your own devices. No account required to use the app.';
   }

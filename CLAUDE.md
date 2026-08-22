@@ -586,5 +586,25 @@ page out of five is not a convention.
     block, which an HTML-comment strip does not reach. Without both, a page that had lost the
     element and kept the comment explaining it would still pass. That is not hypothetical —
     it is how the first version of this test failed.
+  - **The strip is a LOOP, not a single `.replace()`** (2026-08-21, `stripHtmlComments`).
+    One pass over a multi-character delimiter can leave a NEW opener behind that the pass has
+    already gone past, so a single pass is only as good as the input is well-formed — CodeQL's
+    `js/incomplete-multi-character-sanitization` flagged exactly this line, and it was open on
+    five of the nine public repos at once. Nothing here renders what it strips, so there was
+    no vulnerability; the reason to fix it is that a helper that can be fooled about what is
+    commented out is one that can miss a live off-origin script, which is what these suites
+    exist to catch. Same helper, same wording, in every sibling repo's suite.
   - `.foot` sets `margin`, not `margin-top`, so the rule no longer depends on which element
     carries it: a `<p>` brought a UA bottom margin with it and a `<footer>` does not.
+
+- **The privacy page's back link lives in a `<nav>` (2026-08-21).** It stays OUTSIDE `<main>`
+  — it is navigation, not the document — but "outside main" is not the same as "outside every
+  landmark", which is where it sat: axe-core's `region` rule found it on all six privacy pages
+  at once. The `<nav>` carries an `aria-label` naming where it goes back to.
+- **Decorative glyphs on buttons are `aria-hidden` everywhere, not just in the header.** The
+  header row got the treatment on 2026-08-21 and the rest of the app did not, so a screen
+  reader still read "downwards black arrow, Export JSON" in every dialog. Around 50 buttons
+  across the family were wrapped in the same pass. The sync button is the exception that
+  proves it: its label is rewritten with `textContent` as the state changes, so a span there
+  would be blown away — it carries an `aria-label`, re-stated in every branch of `updateUI()`
+  so it can never be left describing the previous state.

@@ -67,6 +67,27 @@ function eq(a, b, msg) {
   if (A !== B) throw new Error(`${msg || ''} expected ${B}, got ${A}`);
 }
 function ok(v, msg) { if (!v) throw new Error(msg || 'expected truthy'); }
+/* HTML comments explain things by naming them — including the very elements
+   these assertions look for, and one of those notes lives in a <style> block a
+   strip does not reach. So the comments come out before the page is matched
+   against, or the prose passes the test it is describing.
+
+   Looped until the string stops changing, rather than a single .replace(). One
+   pass over a multi-character delimiter can leave a NEW opener behind that the
+   pass already went past — `<` `!--` `<` `!--` `--` `>` collapses to a live
+   `<` `!--` on the way out — so a single pass is only as good as the input is
+   well-formed. CodeQL's js/incomplete-multi-character-sanitization flagged
+   exactly this. The stakes are low (this reads local repo files to assert on
+   them, it does not sanitize anything a browser will render) but a test that
+   can be fooled about what is commented out is a test that can miss a live
+   off-origin script, so it is worth doing properly. Same helper, same wording,
+   in every sibling repo’s suite. */
+const stripHtmlComments = (s) => {
+  let out = String(s), prev;
+  do { prev = out; out = out.replace(/<!--[\s\S]*?-->/g, ''); } while (out !== prev);
+  return out;
+};
+
 
 /* Async because the share codec is: deflate-raw runs through a stream. Every
    await happens up here, before the tests are defined, so run() stays
@@ -716,7 +737,7 @@ async function onAppLoad() {
   const KILL_SRC = killRes.ok ? await killRes.text() : '';
   const APP_SRC = appRes.ok ? await appRes.text() : '';
   const PRIV_SRC = privRes.ok ? await privRes.text() : '';
-  const PRIV_BARE = PRIV_SRC.replace(/<!--[\s\S]*?-->/g, '');
+  const PRIV_BARE = stripHtmlComments(PRIV_SRC);
   const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const SW = strip(SW_SRC), KILL = strip(KILL_SRC);
   const shellList = (SW_SRC.match(/const SHELL = \[([\s\S]*?)\]/) || [null, ''])[1];
@@ -729,6 +750,30 @@ async function onAppLoad() {
 
   /* ── the footer every public page in this account carries ─────────────── */
   describe('privacy.html — the family footer');
+  it('the policy says WHEN Google\u2019s code loads, because it is not on sign-in', () => {
+  /* The claim this pins was FALSE until 2026-08-21: the policy said Google's
+     code loaded "only when you choose to sign in", and a network trace of an
+     ordinary visit showed firebase-app/auth/firestore fetched from
+     www.gstatic.com and the sign-in client from accounts.google.com before
+     anyone had touched anything. The app cannot know whether you are ALREADY
+     signed in without asking Firebase, and cannot ask without loading it — so
+     the code is right and the sentence was wrong. This ties the two together:
+     while the CSP admits those two hosts, which is the app's own record that it
+     loads them, the policy has to say so. */
+  const cspEager = (APP_SRC.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/) || [])[1] || '';
+  ok(/gstatic\.com/.test(cspEager) && /accounts\.google\.com/.test(cspEager),
+    'this test assumes the app still loads Google code on every visit. If it no longer '
+    + 'does, the CSP should have stopped naming those hosts — and then this test, and the '
+    + 'paragraph it pins, both want revisiting rather than deleting.');
+  const policySrc = PRIV_SRC;
+  ok(/every visit/i.test(policySrc),
+    'the policy must say Google\u2019s code loads on EVERY visit, not only on sign-in — the '
+    + 'page fetches it before anyone signs in, and a trace shows it');
+  ok(/gstatic/.test(policySrc) && /accounts\.google\.com/.test(policySrc),
+    'and must name the two hosts, so the claim is checkable against a network trace');
+  ok(!/only when you (choose to )?sign in/i.test(policySrc),
+    'the old, untrue wording is back: Google\u2019s code does NOT load only on sign-in');
+  });
 
   /* The privacy policy, the repo under the label "How it works", and the
      authorship line. The APP's footer has had all three for a while; this page

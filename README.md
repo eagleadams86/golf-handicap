@@ -546,3 +546,25 @@ Commit subject lines are written in plain English for a reader, not for a diff. 
 - Not affiliated with, endorsed by, or a substitute for your club or golf association. The
   official figure here is a faithful implementation of the published method, but the
   handicap that counts is the one your association issues.
+
+## What Google's Code Does on an Ordinary Visit (2026-08-21)
+
+A network trace of a plain page load — no clicking, no signing in — shows four requests to
+Google: `firebase-app.js`, `firebase-auth.js` and `firebase-firestore.js` from
+`www.gstatic.com`, and the sign-in client from `accounts.google.com`. That is not a bug. The
+app cannot know whether you are **already** signed in on this device without asking Firebase,
+and it cannot ask without loading Firebase first, so `init()` runs on load.
+
+What was wrong was the **privacy policy**, which said Google's code loaded "only when you
+choose to sign in". It now says what actually happens, names the two hosts so the claim can be
+checked against a trace of your own, and is explicit that no app data goes with those requests
+and nothing is stored or synced until you press the button. `tests.html` ties the two
+together: while the CSP still admits `gstatic.com` and `accounts.google.com` — the app's own
+record that it loads them — the policy has to carry the "every visit" paragraph, and the old
+wording fails the suite.
+
+**If this should stop being true**, the change is to defer `init()` until either the sign-in
+button is pressed or a stored flag says this browser has signed in before. That keeps a
+returning user signed in while giving a first-time visitor a page that talks to nobody. It is
+a real refactor of the sync module, not a wording change, and the test above is written to be
+revisited rather than deleted if it happens.
