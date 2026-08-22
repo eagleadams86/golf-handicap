@@ -102,7 +102,7 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'expected truthy'); }
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 228;
+const EXPECTED = 229;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -1288,6 +1288,17 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
        'this looks cache-first — the whole design rests on network-first');
     ok(/!res\.ok && cached/.test(SW),
        'a same-origin error reply with a cached copy in hand must serve the cache');
+  });
+  it('a dialog focused as a container does not ring itself', () => {
+    /* openModal focuses the dialog itself on a coarse pointer so opening a form does not
+       drag the on-screen keyboard up with it — which also makes the dialog match the
+       :focus-visible rule, and every phone drew a ring around the whole window until
+       2026-08-22. A fine pointer never takes that path, so no desktop and no CI run will
+       ever show this coming back; the source is the only guard. */
+    ok(/dialog:focus \{ outline: none/.test(APP_SRC),
+       'without this the whole dialog rings itself on every phone and tablet');
+    ok(/dlg\.tabIndex = -1;\s*\n\s*dlg\.focus\(\);/.test(APP_SRC),
+       'and that container focus is still how the keyboard is kept down');
   });
   it('can repair its cache without a new worker version', () => {
     /* install fires ONCE per script version, so an evicted cache would never be
