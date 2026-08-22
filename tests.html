@@ -1544,11 +1544,15 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
      screen. What matters here is what the markup promises. */
   describe('the welcome card — the first screen');
 
-  const welcomeHtml = (APP_SRC.match(/<div class="card" id="welcomeCard"[\s\S]*?<\/div><\/div>/) || [])[0] || '';
+  /* Anchored on the ID and the closing pair, not on an exact class string: the
+     wrapper gained `welcome` on 2026-08-22 when the card's box was pinned across
+     the family, and a test that spells the whole opening tag out fails on every
+     class added to it forever after. What matters here is the SHAPE. */
+  const welcomeHtml = (APP_SRC.match(/<div class="[^"]*" id="welcomeCard"[\s\S]*?<\/div><\/div>/) || [])[0] || '';
 
   it('exists, as a .empty nested in a card — the family\u2019s shape', () =>
-    ok(/<div class="card" id="welcomeCard" hidden><div class="empty">/.test(welcomeHtml),
-       'no #welcomeCard in the expected shape'));
+    ok(/<div class="card welcome" id="welcomeCard" hidden><div class="empty">/.test(welcomeHtml),
+       'no #welcomeCard in the expected shape — it is a .card.welcome wrapping a .empty'));
   it('names the app in the family\u2019s words', () =>
     ok(/<h2>Welcome to Golf Handicap<\/h2>/.test(welcomeHtml), welcomeHtml.slice(0, 120)));
   it('offers the family\u2019s three buttons, in the family\u2019s order and Title Case', () =>

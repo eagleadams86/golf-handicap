@@ -756,7 +756,15 @@ main:focus { outline: none; }
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
-.empty { text-align: center; padding: var(--sp-8) var(--sp-6); color: var(--text-secondary); }
+/* 40px 20px, the family's number, not --sp-8/--sp-6 (32/16). This app's empty
+   states sat 8px higher than the same card in every sibling, which reads as the
+   welcome heading starting at a different place on the page when you have two
+   of these open. */
+.empty { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
+/* The heading is PRIMARY ink. Without this it inherited --text-secondary off
+   the line above — every sibling app sets it, this one had no rule at all, and
+   the welcome card's title came out muted grey against their near-white. */
+.empty h2 { color: var(--text-primary); }
 .empty p { max-width: 46ch; margin: 0 auto var(--sp-5); }
 /* ── The welcome card, and only it ───────────────────────────────────────────
    Every other empty state here is a `.empty` inside a card that already has a
@@ -779,7 +787,20 @@ main:focus { outline: none; }
    `1.5em` of a 16px root, which is not a step on the scale and would drift the
    moment anything touched the root. Declared, and the same declaration in every
    app. */
-.card > .empty h2 { font-size: var(--fs-xl); }
+/* MARGIN 0, and that is the other half of lining these up. The h2 kept the
+   browser's own ~0.83em top margin in three apps and had it zeroed in a fourth,
+   so the same welcome heading started 59px down the card in one app and 81px in
+   another. At 0 it sits exactly at the card's padding, and the first paragraph's
+   own 1em top margin is the gap under it — one number, in one place, five apps. */
+.card > .empty h2 { font-size: var(--fs-xl); margin: 0; }
+/* THE WELCOME CARD IS ONE COMPONENT ACROSS FIVE APPS, so its box is pinned here
+   rather than left to whatever each app's ordinary `.card` happens to use. Those
+   differ on purpose — 18px in the three planners, 16px in Golf Handicap, 14px on
+   PAPTrack's dense supply cards — and the welcome heading was landing 58px, 56px
+   and 54px from the top of the card in three different apps as a result. Same
+   number everywhere now, so the title starts at the same place on the page
+   whichever one you open. */
+.card.welcome { padding: 18px; }
 html[data-welcome] .tabs,
 html[data-welcome] [role="tabpanel"] { display: none !important; }
 
@@ -922,7 +943,7 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
        a course and it steps aside for the Rounds card's own first-run state,
        which is written for "you have somewhere to play and nothing logged yet"
        and is the right next instruction at that point. -->
-  <div class="card" id="welcomeCard" hidden><div class="empty">
+  <div class="card welcome" id="welcomeCard" hidden><div class="empty">
     <h2>Welcome to Golf Handicap</h2>
     <p>A handicap tracker for golfers who keep their own number. Log a round and it works out
       both figures from the same cards — the league handicap, an average of your last few
