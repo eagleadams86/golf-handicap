@@ -556,6 +556,16 @@ svg.spark { vertical-align: middle; margin-right: var(--sp-4); overflow: visible
 
 details { border-top: 1px solid var(--border); margin-top: var(--sp-5); padding-top: var(--sp-5); }
 details > summary { cursor: pointer; color: var(--accent); font-size: var(--fs-xs); }
+/* THE DANGER ZONE, and it is the family's rule verbatim. This app had no
+   `details.danger-zone` block at all, so "Start Again" fell through to
+   `details > summary` above and rendered in --accent — the one app in the
+   family whose delete-everything toggle was painted the same colour as a link.
+   Secondary ink, going primary on hover, with the rule above it that separates
+   it from the backup controls. */
+details.danger-zone { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
+details.danger-zone > summary { cursor: pointer; font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  color: var(--text-secondary); }
+details.danger-zone > summary:hover { color: var(--text-primary); }
 details > summary:focus-visible { outline: 2px solid var(--focus-border); outline-offset: 2px; }
 .work { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-secondary); white-space: pre-wrap; margin-top: var(--sp-5); }
 
@@ -588,7 +598,15 @@ dialog {
    the lines longer. Scoped to this dialog, as in Team Dashboard — the help
    dialog is prose, and a wider measure makes prose harder to read, not easier. */
 @media (min-width: 760px) {
-  #shareDialog { max-width: 820px; }
+  /* THE SAME WIDTH AS MONEY MAP'S, which is the family's share window: 1100px,
+   its --dialog-w-wide. Asked for on 2026-08-22 — these were 880, 820, 820 and
+   560 across five pages, so the same action opened a different-sized window in
+   every app. */
+/* THE SAME WIDTH AS MONEY MAP'S BACK UP WINDOW: 700px, its --dialog-w-narrow.
+   Asked for on 2026-08-22, alongside the share windows — these were all 560px,
+   so the same dialog opened narrower here than in the app beside it. */
+#dataDialog { max-width: 700px; }
+#shareDialog { max-width: 1100px; }
   /* Two tables one under the other need the room the 560px base has not got.
      1100px is Sprint Predictability's width for the window this one is modelled
      on, and now that the page is 1500 too it is the same proportion of it. */
@@ -1342,7 +1360,7 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
      The three things you can do to the data as a whole, in one place, reached
      from the header — Team Dashboard's arrangement, which puts them beside the
      sync button they are the alternative to. They were a row in the footer,
-     where "Clear everything" sat permanently one press away under the small
+     where the delete-everything button sat permanently one press away under the small
      print. Full-size buttons here: in a dialog they are the action being asked
      for, not chrome beside a footnote. -->
 <dialog id="shareDialog" aria-labelledby="shareDialogTitle">
@@ -1421,6 +1439,7 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
     <button type="button" id="importBtn"><span aria-hidden="true">⬆︎</span> Restore from backup</button>
     <input type="file" id="importFile" accept="application/json,.json" class="sr-only" aria-hidden="true" tabindex="-1">
   </div>
+  <hr style="border:0;border-top:1px solid var(--border);margin:16px 0">
   <p class="hint" style="margin-top:var(--sp-5)">Every round as a spreadsheet, for anyone who
     keeps their handicap in one — every golfer, with the differential the app worked out
     beside each score. It is a one-way door: the CSV is for reading and charting elsewhere,
@@ -1428,15 +1447,16 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
   <div class="row-actions" style="justify-content:flex-start">
     <button type="button" id="csvBtn"><span aria-hidden="true">⬇︎</span> Download rounds (CSV)</button>
   </div>
+  <hr style="border:0;border-top:1px solid var(--border);margin:16px 0">
   <p class="hint" style="margin-top:var(--sp-5)">Restoring <strong>replaces everything in this
     browser</strong>. You are shown what the file holds and asked to confirm first — and if you
     are signed in, the restored copy becomes the one your other devices get.</p>
-  <details>
+  <details class="danger-zone">
     <summary>Start Again</summary>
     <p class="hint" style="margin-top:var(--sp-5)">Deletes every round, course and golfer.
       The league rule and your theme are kept.</p>
     <div class="row-actions" style="justify-content:flex-start">
-      <button type="button" id="clearBtn" class="danger">Clear everything</button>
+      <button type="button" id="clearBtn" class="danger">Delete all data</button>
     </div>
   </details>
   <div class="row-actions">
@@ -4617,7 +4637,7 @@ function loadDemoLeague() {
     + 'Every case the figures have to handle is in it — a near-scratch player, someone on '
     + 'four rounds, someone who has never played, and rounds marked "don\u2019t count".\n\n'
     + 'It is added alongside anything you already have, and nothing of yours is changed. '
-    + '"Clear everything", in the Back up dialog, removes the lot.')) return;
+    + '"Delete all data", in the Back up dialog, removes the lot.')) return;
 
   const league = buildDemoLeague();
   /* Replace by id rather than push, so loading twice refreshes the example league
@@ -4642,7 +4662,7 @@ function loadDemoLeague() {
   /* The leaderboard is the half of the app the single-golfer example can't show,
      so that is where loading a whole league should put you. */
   setTab('league');
-  toast('Example league loaded — “Clear everything” in Back up removes it', 6000);
+  toast('Example league loaded — “Delete all data” in Back up removes it', 6000);
 }
 
 /* ── Toast ──────────────────────────────────────────────────────────────── */
@@ -5686,7 +5706,7 @@ window.cloudPush = () => {
   pushTimer = setTimeout(() => { pushTimer = null; pushNow().catch(setSyncError); }, 1200);
 };
 
-/* Skips the debounce. "Clear everything" calls this so the cleared state
+/* Skips the debounce. "Delete all data" calls this so the cleared state
    reaches the cloud before the tab can be closed. */
 window.cloudFlush = () => {
   if (!user) return;
