@@ -59,9 +59,10 @@ The app has two tabs. **My handicap** is one golfer's page — the two figures, 
 chart, the course handicap and the full list of rounds. **Leaderboard** is everybody at
 once (see [The leaderboard](#the-leaderboard)).
 
-Multiple golfers are supported: use **Golfers** in the header. Each golfer keeps their own
-rounds and their own handicap. Courses and the league rule are shared between everyone,
-which is what makes the leaderboard a fair comparison.
+Multiple golfers are supported: use **Golfers & courses** in the header, which is also where
+courses and their tees are added and edited. Each golfer keeps their own rounds and their own
+handicap. Courses and the league rule are shared between everyone, which is what makes the
+leaderboard a fair comparison.
 
 Under **Rounds**, the *Used in* column shows which rounds each figure actually leaned on, so
 it is always visible why a number moved. A round can be marked *don't count* when you edit

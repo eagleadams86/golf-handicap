@@ -116,7 +116,7 @@
   --control-h: 38.5px; /* every button in the page body */
   /* Read by BOTH .wrap and .headbar — see the note on .wrap for why they must
      stay the same number. */
-  --page-w: 1100px;
+  --page-w: 1500px;
 }
 
 /* ── App-specific chart colours ──────────────────────────────────────────────
@@ -144,12 +144,14 @@ body {
    They have to be the same number or the brand stops lining up with the left
    edge of the first card, so both read it from here rather than repeating it.
 
-   1100px, not the siblings' 1500px: Team Dashboard and Sprint Velocity earn that
-   width with dense many-column tables, and this app's widest thing is a seven
-   column rounds table that just went sparse and gappy when stretched to it. The
-   16px gutter and everything else about the bar are theirs; only the number
-   differs, and it is deliberate. (`--page-w` lives with the other layout tokens
-   at the top.) */
+   1500px since 2026-08-21 — Sprint Predictability's and Flow Metrics' number, so
+   the three are one page width, and PAPTrack and the lottery pages are on it too.
+   It was 1100 on the reasoning that this app's widest thing is a rounds table
+   that went sparse stretched to 1500, which was true of the table and was
+   overruled deliberately: the apps in this family are opened side by side, and a
+   window that changes width as you move between them is more jarring than a
+   roomy table. If a page ever needs its own number again, Money Map's 2400 is
+   the precedent for saying so out loud. */
 .wrap { max-width: var(--page-w); margin: 0 auto; padding: 0 16px 64px; }
 
 /* ── Header ─────────────────────────────────────────────────────────────────
@@ -182,13 +184,23 @@ header {
 .brand {
   margin: 0 auto 0 0; font-size: 17px; font-weight: var(--fw-bold);
   letter-spacing: var(--ls-tight);
-  display: flex; align-items: center; gap: var(--sp-4);
 }
-/* Width and height are on the element as well as here, so the row is laid out at
-   its final size before the icon arrives — the same final-width rule as the rest of
-   this bar. `flex: none` because .brand is a flex row and an image would otherwise
-   be squeezed by a long strapline. */
-.brand .mark { width: 22px; height: 22px; flex: none; }
+/* The strapline: muted and lighter than the name, behind a middle dot. Sprint
+   Predictability's and Money Map's rule, to the token. */
+.brand span { color: var(--text-muted); font-weight: var(--fw-normal); }
+/* NOT a flex row any more, and that is the point rather than tidying. It was one,
+   which was fine while the line was two words; with a strapline on the end, flex
+   makes the name and the strapline two COLUMNS, and on a phone the strapline then
+   wraps inside its own narrow column beside the name instead of running on below
+   it. Inline flow is what Sprint Predictability uses for the same reason, and its
+   comment says so explicitly. The mark sits in the heading's own text flow, which
+   is why it needs `vertical-align` rather than `align-items` — and `flex: none`
+   has gone with the flex row that made it necessary.
+
+   Width and height stay on the element as well as here, so the row is laid out at
+   its final size before the icon arrives — the same final-width rule as the rest
+   of this bar. */
+.brand .mark { width: 22px; height: 22px; vertical-align: -4px; margin-right: 9px; }
 
 select, input, textarea, button { font: inherit; color: inherit; }
 select, input[type="text"], input[type="number"], input[type="date"], textarea {
@@ -232,7 +244,18 @@ button.link { background: none; border: none; color: var(--accent); padding: 0;
    pickers beside a header button are pinned to the same height so the row stays
    even. */
 .headbar button { padding: 4px 9px; font-size: var(--fs-base); min-height: var(--chrome-h); }
-.headbar select { min-height: var(--chrome-h); padding: 4px 9px; }
+/* The two pickers in this row are dressed as BUTTONS, not as inputs, and the
+   scope is the whole point. The base `select` rule gives every dropdown the input
+   palette — `--surface` on `--input-border` — which is right in a dialog, where a
+   select sits beside text fields and is a thing you fill in. Up here it sits
+   beside five buttons and is a thing you press, and wearing the input colours
+   made the golfer and theme pickers read as two dark holes in a row of raised
+   controls. Same two tokens as `button` above, so this is not a new colour. */
+.headbar select {
+  min-height: var(--chrome-h); padding: 4px 9px;
+  background: var(--surface-alt); border-color: var(--border-strong);
+}
+.headbar select:hover { border-color: var(--text-muted); }
 
 /* The sync button is the one control in the row whose label changes: it paints
    as "☁️ Sign in to sync" (125px) and then, the moment Firebase reports who you
@@ -457,6 +480,10 @@ dialog {
    dialog is prose, and a wider measure makes prose harder to read, not easier. */
 @media (min-width: 760px) {
   #shareDialog { max-width: 820px; }
+  /* Two tables one under the other need the room the 560px base has not got.
+     1100px is Sprint Predictability's width for the window this one is modelled
+     on, and now that the page is 1500 too it is the same proportion of it. */
+  #manageDialog { max-width: 1100px; }
   /* No align-items: start — the two panels stretch to the taller of them, so
      the pair reads as one row rather than two boxes of unrelated height. */
   #shareDialog .share-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--sp-5); }
@@ -471,6 +498,60 @@ dialog h2 { margin: 0 0 var(--sp-5); font-size: var(--fs-lg); }
 .field > label { display: block; font-size: var(--fs-sm); color: var(--text-secondary); margin-bottom: var(--sp-2); }
 .field input, .field select { width: 100%; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-5); }
+/* ── The square icon button, ported from Sprint Predictability ───────────────
+   A row in Golfers & Courses ends in one of these. It replaced a worded "Remove"
+   link per golfer, which down a list of four was four words of chrome for an
+   action everybody already knows the shape of — and it gives the courses table
+   the delete it never had in the list at all, where the only way to remove a
+   course was to open it and find the button inside.
+
+   The base is NEUTRAL and hover is what turns it red, which is the siblings'
+   rule and NOT what this app's `button.danger` does — that one is red at rest,
+   which is right for a full-width "Delete everything" and wrong for a column of
+   small squares, where it turns a quiet list into a wall of red. So the two
+   colour declarations here are written to beat `button.danger` on specificity
+   (`button.icon-btn.danger`) rather than left to inherit it. Disabled dims by
+   opacity rather than by a greyed colour, so nothing invents a palette value.
+
+   30px square is `--chrome-h`, not a new number: it is the height the header
+   controls already use, and a row action is the same class of object. */
+.icon-btn { appearance: none; background: none; border: 1px solid var(--border-strong);
+  color: var(--text-muted); border-radius: var(--radius-sm); cursor: pointer;
+  width: var(--chrome-h); height: var(--chrome-h); min-height: 0;
+  font-size: var(--fs-base); line-height: 1; padding: 0; }
+.icon-btn:hover { color: var(--text-primary); border-color: var(--text-muted); }
+button.icon-btn.danger { color: var(--text-muted); border-color: var(--border-strong); background: none; }
+button.icon-btn.danger:hover { color: var(--err); border-color: var(--err); background: none; }
+.icon-btn:disabled { opacity: .45; cursor: not-allowed; }
+.icon-btn:disabled:hover { color: var(--text-muted); border-color: var(--border-strong); }
+/* Kept on one line and pushed to the right edge, so the buttons line up down the
+   table however wide the columns end up. */
+.rowacts { display: flex; gap: var(--sp-3); justify-content: flex-end; white-space: nowrap; }
+
+/* The tees on a course's row. A wrapping ROW, not one per line: they were joined
+   with <br>, which stacked three sets of tees down a column wide enough to hold
+   all three side by side and made a two-course table taller than it needed to be.
+   Flex wrap spreads them while there is room and stacks them when there is not,
+   so the same markup is right in the dialog and on a phone.
+
+   Each set is kept whole with `white-space: nowrap` — "White (71.2/129/par 71)"
+   is one fact, and letting it break after the name would put a bare number at the
+   start of a line looking like the next tee. The column gap is wider than the row
+   gap so that where they DO wrap, the rows still read as rows. */
+.tees { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-6); }
+.tee { white-space: nowrap; }
+
+/* A section heading inside a dialog, with the button that adds to that section on
+   the same line — the siblings' `.row.spread`, named here for what it is. The
+   <h3> keeps the dialog's outline navigable: the window is one <h2> with a real
+   heading per list under it, rather than two bold spans a screen reader walks
+   straight past. Margin only on top, so the hint below stays attached to the
+   heading it explains; `:first-of-type` drops it for the first section, which
+   follows the <h2> and needs no gap of its own. */
+.sec-hd { display: flex; align-items: center; justify-content: space-between;
+          gap: var(--sp-4); flex-wrap: wrap; margin-top: var(--sp-7); }
+.sec-hd:first-of-type { margin-top: var(--sp-5); }
+.sec-hd h3 { font-size: var(--fs-base); margin: 0; }
 .row-actions { display: flex; flex-wrap: wrap; gap: var(--sp-4); justify-content: flex-end; margin-top: var(--sp-6); }
 .row-actions .spacer { flex: 1 1 auto; }
 .checkline { display: flex; align-items: center; gap: var(--sp-4); }
@@ -583,16 +664,28 @@ main:focus { outline: none; }
          favicon for a long time, and without it the header would keep showing
          whatever icon it cached the first time. Bump it on every reference (here,
          the <link> in <head>, and privacy.html's) when make_favicon.py is re-run. -->
-    <h1 class="brand"><img class="mark" src="favicon.ico?v=1" width="22" height="22" alt=""> Golf&nbsp;Handicap</h1>
+    <!-- Name then strapline behind a middle dot, the family's brand line — Sprint
+         Predictability wears "· Charlie's Epic Sprint Planner" and Money Map "·
+         Charlie's Epic Money Map". It is FIXED text, not a setting: it used to be
+         typed into the League rule window's "What to call it" box, which labelled
+         the calculation rather than the app and put the name somewhere nobody
+         would look for it. -->
+    <h1 class="brand"><img class="mark" src="favicon.ico?v=1" width="22" height="22" alt="">Golf&nbsp;Handicap <span>&middot; Charlie&rsquo;s Epic League Tracker</span></h1>
     <label class="sr-only" for="golferSel">Golfer</label>
     <select id="golferSel" title="Which golfer you're looking at" style="min-width:130px"><option>—————</option></select>
-    <button id="golfersBtn" title="Add, rename or remove golfers">Golfers</button>
-    <!-- Courses and the method are settings for the whole app, shared by every
+    <!-- ONE button, not the two this row carried until 2026-08-21. Golfers and
+         courses are both "the things rounds are recorded against", they were two
+         dialogs of the same shape, and adding a round often means adding one of
+         each — which meant closing one window to open the other. Sprint
+         Predictability and Flow Metrics keep every list of that kind behind a
+         single button, in one window with a section apiece, and this is that.
+
+         Courses and the method are settings for the whole app, shared by every
          golfer — they sat under the Rounds card, which read as though they
          belonged to the rounds on screen. Up here with the other things that
          apply everywhere, and the Rounds card is left with the one button it is
          actually asking you to press. -->
-    <button id="coursesBtn" title="Add or edit courses and their tees">Courses</button>
+    <button id="manageBtn" title="Add, rename or remove golfers, and add or edit courses and their tees">Golfers &amp; courses</button>
     <button id="methodBtn" title="Change how the league handicap is worked out">League rule</button>
     <label class="sr-only" for="themeSel">Theme</label>
     <!-- Themes are listed alphabetically; midnight is the default but is not listed
@@ -803,17 +896,6 @@ main:focus { outline: none; }
   </form>
 </dialog>
 
-<dialog id="courseDialog" aria-labelledby="courseDialogTitle">
-  <h2 id="courseDialogTitle">Courses and Tees</h2>
-  <p class="hint">A course needs a <strong>rating</strong> and a <strong>slope</strong> for each set of tees — both are printed on the scorecard. The rating is the score a scratch golfer is expected to shoot; the slope (55–155, usually near 113) is how much harder it plays for everyone else.</p>
-  <div id="courseList"></div>
-  <div class="row-actions">
-    <button type="button" id="addCourseBtn">+ Add course</button>
-    <span class="spacer"></span>
-    <button type="button" id="courseClose" class="primary">Done</button>
-  </div>
-</dialog>
-
 <dialog id="courseEditDialog" aria-labelledby="courseEditTitle">
   <form method="dialog" id="courseEditForm">
     <h2 id="courseEditTitle">Add Course</h2>
@@ -837,10 +919,6 @@ main:focus { outline: none; }
   <form method="dialog" id="methodForm">
     <h2 id="methodTitle">The League Handicap</h2>
     <p class="hint">The calculation the app shows first, and the one the leaderboard is ranked on. It applies to <strong>every golfer here</strong> — one rule, so the table compares like with like. The official World Handicap System figure is always worked out alongside it and never changes.</p>
-    <div class="field">
-      <label for="m_name">What to call it</label>
-      <input type="text" id="m_name" maxlength="40" placeholder="Rolling last 5">
-    </div>
     <div class="grid2">
       <div class="field">
         <label for="m_window">Look at the last … rounds</label>
@@ -885,19 +963,43 @@ main:focus { outline: none; }
   </form>
 </dialog>
 
-<dialog id="golferDialog" aria-labelledby="golferTitle">
-  <h2 id="golferTitle">Golfers</h2>
+<!-- ── Golfers & courses ──────────────────────────────────────────────────────
+     One window where there were two, modelled on Sprint Predictability's and Flow
+     Metrics' "Teams, ARTs & PIs": a section per list, each opening with its own
+     heading and the button that adds to it, a sentence of context under it, then
+     the table — and ONE Done at the foot for the pair.
+
+     The add buttons sit in the section HEADINGS rather than down beside Done,
+     which is the siblings' arrangement and the reason this reads as two lists
+     rather than one long form: the thing that adds to a list belongs at the top
+     of that list, not at the bottom of the window.
+
+     "Add a golfer" used to be a text field and a + Add button at the foot. It is
+     a prompt now, which is what RENAMING a golfer has always used here — so the
+     two ways of typing a golfer's name are the same gesture, and the section is
+     shaped like the courses one beside it, whose add button opens a window of
+     its own. -->
+<dialog id="manageDialog" aria-labelledby="manageDialogTitle">
+  <h2 id="manageDialogTitle">Golfers &amp; Courses</h2>
+
+  <div class="sec-hd">
+    <h3>Golfers</h3>
+    <button type="button" id="addGolferBtn">+ Add golfer</button>
+  </div>
   <p class="hint">Each golfer keeps their own rounds and their own handicap. Courses are shared between everyone.</p>
   <div id="golferList"></div>
-  <div class="field" style="margin-top:var(--sp-6)">
-    <label for="g_new">Add a golfer</label>
-    <input type="text" id="g_new" maxlength="60" placeholder="Name">
-  </div>
   <p class="warn" id="golferWarn" role="status"></p>
+
+  <div class="sec-hd">
+    <h3>Courses</h3>
+    <button type="button" id="addCourseBtn">+ Add course</button>
+  </div>
+  <p class="hint">A course needs a <strong>rating</strong> and a <strong>slope</strong> for each set of tees — both are printed on the scorecard. The rating is the score a scratch golfer is expected to shoot; the slope (55–155, usually near 113) is how much harder it plays for everyone else.</p>
+  <div id="courseList"></div>
+
   <div class="row-actions">
-    <button type="button" id="addGolferBtn">+ Add</button>
     <span class="spacer"></span>
-    <button type="button" id="golferClose" class="primary">Done</button>
+    <button type="button" id="manageClose" class="primary">Done</button>
   </div>
 </dialog>
 
@@ -1210,6 +1312,8 @@ function haltForNewerData(found) {
 }
 
 const DEFAULT_METHOD = {
+  /* Kept in step with `autoName(this)` by hand — it is the one place the derived
+     name is written out, because `autoName` cannot be called before it exists. */
   name: 'Rolling last 5',
   window: 5,
   use: 5,
@@ -1311,13 +1415,25 @@ function rollingSelection(values, method) {
   return { considered: win.length, use: take, kept: win.slice().sort((a, b) => a - b).slice(0, take) };
 }
 
+/* The method's name is DERIVED, never stored — `autoName` off the window and the
+   count, every time. It used to be a text field in the League rule window ("What
+   to call it"), kept in step with the numbers by an `auto` flag that a hand-typed
+   name cleared; the comment on that flag already said what was wrong with it,
+   which is that "Rolling last 5" sitting above a best-3-of-5 calculation is worse
+   than no label at all. Deriving it makes that unrepresentable.
+
+   `src.name` is still READ past — deliberately, and it does nothing. Saved data
+   and share links written before this change carry one, and the point is that it
+   is ignored rather than migrated: there is nothing to migrate to, since the name
+   is now a function of two numbers that are already there. */
 function normalizeMethod(m) {
   const src = m || {};
   const win = clampInt(src.window, 1, 60, DEFAULT_METHOD.window);
+  const use = clampInt(src.use, 1, win, win);
   return {
-    name: typeof src.name === 'string' && src.name.trim() ? src.name.trim().slice(0, 40) : DEFAULT_METHOD.name,
+    name: autoName({ window: win, use }),
     window: win,
-    use: clampInt(src.use, 1, win, win),
+    use,
     basis: src.basis === 'overPar' ? 'overPar' : 'differential',
     multiplier: clampNum(src.multiplier, 0.1, 2, DEFAULT_METHOD.multiplier),
     adjustment: clampNum(src.adjustment, -20, 20, DEFAULT_METHOD.adjustment),
@@ -2479,7 +2595,7 @@ document.getElementById('addRoundBtn').addEventListener('click', () => openRound
 
 /* ── Courses ────────────────────────────────────────────────────────────── */
 
-const courseDialog = document.getElementById('courseDialog');
+const manageDialog = document.getElementById('manageDialog');
 const courseEditDialog = document.getElementById('courseEditDialog');
 let editingCourse = null;
 
@@ -2489,16 +2605,29 @@ function renderCourseList() {
   box.innerHTML = `<div class="table-scroll"><table>
     <caption class="sr-only">Courses and their tees. Select a course name to edit it.</caption>
     <thead><tr>
-      <th scope="col">Course</th><th scope="col">Tees</th><th scope="col" class="num">Rounds</th>
+      <th scope="col">Course</th><th scope="col">Tees</th><th scope="col" class="num">Rounds</th><th scope="col"><span class="sr-only">Remove</span></th>
     </tr></thead><tbody>` + state.courses.map((c) => {
     const used = state.rounds.filter((r) => r.courseId === c.id).length;
     return `<tr>
       <th scope="row"><button type="button" class="rowbtn" data-course="${esc(c.id)}">${esc(c.name)}</button></th>
-      <td>${c.tees.map((t) => esc(`${t.name} (${t.rating}/${t.slope}/par ${t.par})`)).join('<br>')}</td>
+      <td><span class="tees">${c.tees.map((t) => `<span class="tee">${esc(`${t.name} (${t.rating}/${t.slope}/par ${t.par})`)}</span>`).join('')}</span></td>
       <td class="num">${used}</td>
+      <td><span class="rowacts"><button type="button" class="icon-btn danger" data-delcourse="${esc(c.id)}"
+        title="Remove this course" aria-label="Remove ${esc(c.name)}">&times;</button></span></td>
     </tr>`;
   }).join('') + '</tbody></table></div>';
   box.querySelectorAll('.rowbtn').forEach((b) => b.addEventListener('click', () => openCourseEdit(b.dataset.course)));
+  /* Never disabled, whatever the round count. A first attempt greyed these out
+     while rounds still pointed at the course, on the assumption that deleting it
+     would take those rounds with it — it does not. Rounds are KEPT and simply
+     stop counting (`orphan` in `rowsFor`), and the course dialog's own Delete has
+     always allowed it on exactly those terms. A button greyed out against the
+     app's actual behaviour is worse than no button.
+
+     Both routes call the same function, so the two cannot drift apart on the
+     wording of a warning that matters. */
+  box.querySelectorAll('[data-delcourse]').forEach((b) =>
+    b.addEventListener('click', () => deleteCourse(b.dataset.delcourse)));
 }
 
 function teeRowHtml(t) {
@@ -2525,7 +2654,7 @@ function openCourseEdit(id) {
   rows.innerHTML = (editingCourse ? editingCourse.tees : [null]).map(teeRowHtml).join('');
   document.getElementById('deleteCourseBtn').hidden = !editingCourse;
   document.getElementById('courseWarn').textContent = '';
-  if (courseDialog.open) courseDialog.close();
+  if (manageDialog.open) manageDialog.close();
   openModal(courseEditDialog);
 }
 
@@ -2587,29 +2716,43 @@ document.getElementById('courseEditSave').addEventListener('click', () => {
   save();
   courseEditDialog.close();
   renderCourseList();
-  openModal(courseDialog);
+  openModal(manageDialog);
   toast('Course saved');
 });
 
+/* Deleting a course, from either of the two places that offer it: the × on its
+   row in Golfers & Courses, and the Delete button inside the course itself. One
+   function, so the warning — which is the only thing standing between a press and
+   a set of rounds that stop counting — cannot say two different things.
+   Returns true if it went ahead, so a caller that opened a window can close it.
+   Looked up by id at write time rather than trusting an object found earlier: a
+   sync adoption or another tab can replace `state` while a list is on screen. */
+function deleteCourse(id) {
+  const c = state.courses.find((x) => x.id === id);
+  if (!c) { renderCourseList(); return false; }   // gone since the list was drawn
+  const used = state.rounds.filter((r) => r.courseId === id).length;
+  const msg = used
+    ? `Delete ${c.name}? ${used} round${used === 1 ? '' : 's'} used it — they'll be kept but won't count towards any handicap.`
+    : `Delete ${c.name}?`;
+  if (!confirm(msg)) return false;
+  state.courses = state.courses.filter((x) => x.id !== id);
+  save();
+  renderCourseList();
+  toast('Course deleted');
+  return true;
+}
+
 document.getElementById('deleteCourseBtn').addEventListener('click', () => {
   if (!editingCourse) return;
-  const used = state.rounds.filter((r) => r.courseId === editingCourse.id).length;
-  const msg = used
-    ? `Delete ${editingCourse.name}? ${used} round${used === 1 ? '' : 's'} used it — they'll be kept but won't count towards any handicap.`
-    : `Delete ${editingCourse.name}?`;
-  if (!confirm(msg)) return;
-  state.courses = state.courses.filter((c) => c.id !== editingCourse.id);
-  save();
+  if (!deleteCourse(editingCourse.id)) return;
   courseEditDialog.close();
-  renderCourseList();
-  openModal(courseDialog);
-  toast('Course deleted');
+  openModal(manageDialog);
 });
 
 document.getElementById('courseEditCancel').addEventListener('click', () => {
   courseEditDialog.close();
   renderCourseList();
-  openModal(courseDialog);
+  openModal(manageDialog);
 });
 /* Escape took the browser's own route out and closed this dialog flat, leaving
    the courses list it was opened from gone as well. It now backs out the same
@@ -2618,9 +2761,7 @@ courseEditDialog.addEventListener('cancel', (e) => {
   e.preventDefault();
   document.getElementById('courseEditCancel').click();
 });
-document.getElementById('coursesBtn').addEventListener('click', () => { renderCourseList(); openModal(courseDialog); });
 document.getElementById('addCourseBtn').addEventListener('click', () => openCourseEdit(null));
-document.getElementById('courseClose').addEventListener('click', () => courseDialog.close());
 
 /* ── Method dialog ──────────────────────────────────────────────────────── */
 
@@ -2633,12 +2774,6 @@ function autoName(m) {
 
 function openMethod() {
   const m = normalizeMethod(state.settings.method);
-  const nameBox = document.getElementById('m_name');
-  nameBox.value = m.name;
-  /* Marks the name as still ours, so changing the numbers re-labels the method
-     — "Rolling last 5" sitting above a best-3-of-5 calculation is worse than no
-     label at all. A hand-typed name clears the flag and survives. */
-  nameBox.dataset.auto = m.name === autoName(m) ? '1' : '';
   document.getElementById('m_window').value = m.window;
   document.getElementById('m_use').value = m.use;
   document.getElementById('m_basis').value = m.basis;
@@ -2652,7 +2787,6 @@ function openMethod() {
 
 function readMethodForm() {
   return normalizeMethod({
-    name: document.getElementById('m_name').value,
     window: document.getElementById('m_window').value,
     use: document.getElementById('m_use').value,
     basis: document.getElementById('m_basis').value,
@@ -2662,8 +2796,6 @@ function readMethodForm() {
 }
 
 function updateMethodPreview() {
-  const nameBox = document.getElementById('m_name');
-  if (nameBox.dataset.auto === '1') nameBox.value = autoName(readMethodForm());
   const m = readMethodForm();
   const basis = m.basis === 'overPar' ? 'shots over par' : 'score differentials';
   const best = m.use < m.window ? `the best ${m.use} of ` : 'all of ';
@@ -2673,11 +2805,6 @@ function updateMethodPreview() {
 }
 ['m_window', 'm_use', 'm_basis', 'm_mult', 'm_adj'].forEach((id) =>
   document.getElementById(id).addEventListener('input', updateMethodPreview));
-document.getElementById('m_name').addEventListener('input', function () {
-  this.dataset.auto = '';   // typed in by hand from here on — stop re-labelling it
-  updateMethodPreview();
-});
-
 document.getElementById('methodSave').addEventListener('click', () => {
   const m = readMethodForm();
   const rawUse = Math.round(Number(document.getElementById('m_use').value));
@@ -2703,7 +2830,7 @@ document.getElementById('methodBtn').addEventListener('click', openMethod);
 
 /* ── Golfers ────────────────────────────────────────────────────────────── */
 
-const golferDialog = document.getElementById('golferDialog');
+
 
 function renderGolferList() {
   const box = document.getElementById('golferList');
@@ -2716,7 +2843,8 @@ function renderGolferList() {
     return `<tr>
       <th scope="row"><button type="button" class="rowbtn" data-rename="${esc(g.id)}">${esc(g.name)}</button></th>
       <td class="num">${n}</td>
-      <td><button type="button" class="link" data-remove="${esc(g.id)}">Remove</button></td>
+      <td><span class="rowacts"><button type="button" class="icon-btn danger" data-remove="${esc(g.id)}"
+        title="Remove this golfer" aria-label="Remove ${esc(g.name)}">&times;</button></span></td>
     </tr>`;
   }).join('') + '</tbody></table></div>';
 
@@ -2745,24 +2873,30 @@ function renderGolferList() {
   }));
 }
 
+/* Asked for with a prompt, the same gesture renaming a golfer has always used —
+   see the note on the dialog. Cancelling, or a name that is only spaces, leaves
+   everything alone rather than reporting an error: nothing was typed, so there is
+   nothing to correct. The "Type a name first" warning went with the field. */
 document.getElementById('addGolferBtn').addEventListener('click', () => {
-  const input = document.getElementById('g_new');
-  const name = input.value.trim();
-  if (!name) { document.getElementById('golferWarn').textContent = 'Type a name first.'; return; }
-  const g = { id: uid(), name: name.slice(0, 60) };
+  const name = prompt('Name');
+  if (!name || !name.trim()) return;
+  const g = { id: uid(), name: name.trim().slice(0, 60) };
   state.golfers.push(g);
   state.activeGolfer = g.id;
-  input.value = '';
   document.getElementById('golferWarn').textContent = '';
   save();
   renderGolferList();
 });
-document.getElementById('golferClose').addEventListener('click', () => golferDialog.close());
-document.getElementById('golfersBtn').addEventListener('click', () => {
+/* One opener for both lists, where there were two buttons and two windows. Both
+   tables are drawn before the window is shown rather than on demand — they are
+   short, and drawing one after the open would grow the dialog under the reader. */
+document.getElementById('manageBtn').addEventListener('click', () => {
   document.getElementById('golferWarn').textContent = '';
   renderGolferList();
-  openModal(golferDialog);
+  renderCourseList();
+  openModal(manageDialog);
 });
+document.getElementById('manageClose').addEventListener('click', () => manageDialog.close());
 document.getElementById('golferSel').addEventListener('change', (e) => {
   state.activeGolfer = e.target.value;
   save();
@@ -2962,7 +3096,7 @@ document.getElementById('clearCancel').addEventListener('click', () => clearDial
    picking which copy of your rounds survives has to be a choice, not something
    you can click past by accident. `courseEditDialog` dismisses through its own
    Cancel button so it can never drift from what Cancel does. */
-[roundDialog, courseDialog, methodDialog, golferDialog, dataDialog, clearDialog, helpDialog]
+[roundDialog, manageDialog, methodDialog, dataDialog, clearDialog, helpDialog]
   .forEach((dlg) => closeOnBackdropClick(dlg));
 closeOnBackdropClick(courseEditDialog, () => document.getElementById('courseEditCancel').click());
 document.getElementById('clearConfirm').addEventListener('click', () => {
@@ -3715,7 +3849,7 @@ if (viewOnly) {
      move around the copy they were sent. syncBtn is hidden from here rather
      than left to the sync module, which is deferred — a visitor should not see
      a sign-in button appear and then vanish. */
-  ['golfersBtn', 'dataBtn', 'shareBtn', 'syncBtn', 'addRoundBtn', 'coursesBtn', 'methodBtn']
+  ['manageBtn', 'dataBtn', 'shareBtn', 'syncBtn', 'addRoundBtn', 'methodBtn']
     .forEach((id) => { document.getElementById(id).hidden = true; });
   document.getElementById('privacyNote').textContent = 'This is a read-only copy someone shared '
     + 'with you. It was read out of the link itself — nothing was uploaded or downloaded, and '
