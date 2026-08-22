@@ -84,6 +84,18 @@ function eq(a, b, msg) {
   if (A !== B) throw new Error(`${msg || ''} expected ${B}, got ${A}`);
 }
 function ok(v, msg) { if (!v) throw new Error(msg || 'expected truthy'); }
+
+/* ── The completeness floor ─────────────────────────────────────────────────
+   "Everything that ran passed" is only half an answer. Nothing else counts the
+   tests, so a `describe` block deleted by accident takes its `it`s out of the
+   suite silently and the page and CI both go on reporting green over whatever
+   is left — CI checks the words `All N tests pass` and has never cared what N
+   is. This is what makes the count itself an assertion.
+
+   It is the number the suite registers today, so ADDING a test never fails the
+   build; removing one does, which is the moment to ask whether it should have
+   gone. Lower it deliberately when a test is deliberately retired. */
+const EXPECTED = 228;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -1710,6 +1722,18 @@ function run() {
     return `<h2>${escape_(g.name)}</h2><ol>${items}</ol>`;
   }).join('');
   out.innerHTML = html;
+  /* The floor — see EXPECTED at the top of this file. Appended as its own group
+     so it reads like any other failure, and counted into `total` but not into
+     `pass`, so the summary goes red and CI's `All N tests pass` check does not
+     match. `li.bad` is the class CI collects failures by. */
+  if (total < EXPECTED) {
+    out.insertAdjacentHTML('beforeend', '<h2>the suite itself</h2><ol><li class="bad">'
+      + escape_('ran only ' + total + ' of at least ' + EXPECTED + ' tests \u2014 tests have '
+        + 'gone missing rather than failed, so a green result here would cover a fraction of '
+        + 'the suite. If they were retired on purpose, lower EXPECTED to match.')
+      + '</li></ol>');
+    total++;
+  }
   const s = document.getElementById('summary');
   s.className = pass === total ? 'pass' : 'fail';
   s.textContent = pass === total ? `All ${total} tests pass` : `${total - pass} of ${total} tests FAILED`;
