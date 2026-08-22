@@ -237,8 +237,12 @@ that emphasis.
   now, and inside a dialog they are full-size because there they ARE the action being asked
   for. The pickers sitting beside a header button are pinned to the same height, because a
   native `<select>` ignores line-height and would otherwise sit shorter. Full-size buttons
-  deliberately run a size above the 13px body text. `.link` and `.rowbtn`
+  deliberately run a size above body text. `.link` and `.rowbtn`
   take the body size back: they sit inside sentences and tables, not on their own.
+  **The header row alone is pinned to `--fs-xs`** (2026-08-22): it is 13px in every app
+  in the family and stays 13px, rather than scaling with this app's body when the pack's
+  base moved 13px → 16px. Chrome is the smaller of the two sizes here, and now that body
+  IS `--fs-base`, the step below it is where "smaller" lives.
   **A change to this block belongs in Sprint Velocity too, or the two drift.**
 - **The base field rule's TYPE LIST is the theme pack's own, and it has to be** (2026-08-22).
   `select, textarea, input[type=text|number|date|month|search|tel|url|email|password]` — the
