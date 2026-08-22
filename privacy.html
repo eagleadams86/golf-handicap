@@ -125,14 +125,23 @@
   and only if, you sign in. Their handling of that data is covered by
   <a href="https://firebase.google.com/support/privacy" rel="noopener noreferrer">Firebase's
   privacy documentation</a>.</p>
-  <p><strong>Google's code, though, loads on every visit</strong> — and this page said
-  otherwise until August 21, 2026. The app cannot know whether you are <em>already</em>
-  signed in on this device without asking Firebase, and it cannot ask without loading
-  Firebase first, so its scripts are fetched from <code>www.gstatic.com</code> and
-  <code>accounts.google.com</code> as the page opens. Those two requests tell Google your IP
-  address, your browser's user-agent and which page asked — the ordinary information any
-  request to any server carries. None of your rounds goes with them, and nothing is stored
-  or synced until you sign in; but the requests happen either way.</p>
+  <p><strong>Google's code is fetched only when you ask for it.</strong> Nothing of
+  Google's loads on an ordinary visit: open the app, log a round, close it, and your browser
+  never speaks to Google at all. The Firebase and sign-in scripts come from
+  <code>www.gstatic.com</code> and <code>accounts.google.com</code> the moment you reach for
+  the "Sign in to sync" button — pointer, keyboard or press — and not before.</p>
+  <p>There is one exception, and it is the only way this can work: if you are
+  <strong>already signed in on this device</strong>, the app loads Firebase as the page opens,
+  because asking Firebase whether your session is still good is the only way to find out. It
+  knows to do that from a note kept in your own browser and rewritten every time your sign-in
+  state changes — so <strong>signing out stops the requests too</strong>, not just the
+  syncing. A browser that has signed in at some point but has no such note yet gets one page
+  load that asks, once, and then settles.</p>
+  <p>When those requests do happen they tell Google your IP address, your browser's
+  user-agent and which page asked — the ordinary information any request to any server
+  carries. None of your rounds goes with them. Until August 22, 2026 this code loaded on
+  every visit and this page said otherwise, which was wrong; the app was changed rather than
+  the sentence softened.</p>
   <p>The page itself is served by GitHub Pages, which — like any web host — sees the same
   ordinary request information involved in serving a page.</p>
 
