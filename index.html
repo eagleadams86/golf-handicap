@@ -220,7 +220,7 @@ header {
 /* An <h1>, so the page has a top-level heading — hence the margin reset. The
    auto right margin is what pushes the controls to the far edge. */
 .brand {
-  margin: 0 auto 0 0; font-size: var(--fs-lg); font-weight: var(--fw-bold);
+  margin: 0 auto 0 0; font-size: var(--fs-md); font-weight: var(--fw-bold);
   letter-spacing: var(--ls-tight);
 }
 /* The strapline: muted and lighter than the name, behind a middle dot. Sprint
@@ -280,7 +280,7 @@ textarea { min-height: 60px; resize: vertical; width: 100%; }
 button {
   background: var(--surface-alt); color: var(--text-primary);
   border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
-  padding: 7px 12px; font-size: var(--fs-md); cursor: pointer;
+  padding: 7px 12px; font-size: var(--fs-base); cursor: pointer;
   min-height: var(--control-h); white-space: nowrap;
 }
 button:hover { border-color: var(--text-muted); }
@@ -349,12 +349,12 @@ th:has(.help-btn), td:has(.help-btn) { white-space: nowrap; }
   border-radius: var(--radius); padding: var(--sp-6); margin-bottom: var(--sp-6);
 }
 .card > h2 {
-  margin: 0 0 var(--sp-5); font-size: var(--fs-lg); font-weight: var(--fw-semibold);
+  margin: 0 0 var(--sp-5); font-size: var(--fs-md); font-weight: var(--fw-semibold);
   display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-3);
 }
 .card > h2 .spacer { flex: 1 1 auto; }
 .muted { color: var(--text-secondary); }
-.hint { color: var(--text-muted); font-size: var(--fs-sm); }
+.hint { color: var(--text-muted); font-size: var(--fs-xs); }
 .label { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: var(--ls-label); color: var(--text-muted); }
 
 /* ── The two handicap figures ───────────────────────────────────────────────
@@ -376,7 +376,7 @@ th:has(.help-btn), td:has(.help-btn) { white-space: nowrap; }
 .figure.is-primary { border-color: var(--accent); border-width: 2px; padding: calc(var(--sp-6) - 1px); }
 .figure .big { font-size: var(--fs-display); font-weight: var(--fw-bold); letter-spacing: var(--ls-tight); line-height: var(--lh-tight); }
 .figure .big.na { font-size: var(--fs-xl); color: var(--text-muted); font-weight: var(--fw-medium); }
-.figure .sub { color: var(--text-secondary); font-size: var(--fs-sm); margin-top: var(--sp-2); }
+.figure .sub { color: var(--text-secondary); font-size: var(--fs-xs); margin-top: var(--sp-2); }
 .figure .tag {
   position: absolute; top: var(--sp-4); right: var(--sp-4);
   font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: var(--ls-label);
@@ -470,7 +470,7 @@ td.rank, th.rank { text-align: right; font-variant-numeric: tabular-nums; color:
   .stat:nth-child(5) { grid-column: span 2; }
 }
 
-table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
+table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
 /* ── A scroll box has to be POSITIONED, or iOS lets the page scroll instead ──
    `overflow-x: auto` is the whole design here: a table too wide for a phone
    scrolls INSIDE its card and the page stays the width of the screen. On iOS
@@ -502,7 +502,7 @@ thead th {
 }
 /* Row-header cells are re-styled back: the th rules above are written for
    column headings, and a row header is body text. */
-tbody th { font-weight: var(--fw-normal); font-size: var(--fs-base); text-transform: none; letter-spacing: normal; color: var(--text-primary); }
+tbody th { font-weight: var(--fw-normal); font-size: var(--fs-sm); text-transform: none; letter-spacing: normal; color: var(--text-primary); }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 tbody tr:hover { background: var(--surface-alt); }
 tr.dropped td, tr.dropped th { color: var(--text-muted); }
@@ -555,13 +555,13 @@ tr.dropped td, tr.dropped th { color: var(--text-muted); }
 svg.spark { vertical-align: middle; margin-right: var(--sp-4); overflow: visible; }
 
 details { border-top: 1px solid var(--border); margin-top: var(--sp-5); padding-top: var(--sp-5); }
-details > summary { cursor: pointer; color: var(--accent); font-size: var(--fs-sm); }
+details > summary { cursor: pointer; color: var(--accent); font-size: var(--fs-xs); }
 details > summary:focus-visible { outline: 2px solid var(--focus-border); outline-offset: 2px; }
-.work { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-secondary); white-space: pre-wrap; margin-top: var(--sp-5); }
+.work { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-secondary); white-space: pre-wrap; margin-top: var(--sp-5); }
 
 .chart-wrap { overflow-x: auto; position: relative; }
 svg.chart { display: block; width: 100%; min-width: 320px; height: auto; }
-.legend { display: flex; flex-wrap: wrap; gap: var(--sp-6); margin-top: var(--sp-4); font-size: var(--fs-sm); color: var(--text-secondary); }
+.legend { display: flex; flex-wrap: wrap; gap: var(--sp-6); margin-top: var(--sp-4); font-size: var(--fs-xs); color: var(--text-secondary); }
 
 dialog {
   background: var(--surface); color: var(--text-primary); border: 1px solid var(--border-strong);
@@ -602,9 +602,9 @@ dialog {
 .checklist-head { display: flex; align-items: baseline; justify-content: space-between;
   gap: var(--sp-4); margin-bottom: var(--sp-4); }
 dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
-dialog h2 { margin: 0 0 var(--sp-5); font-size: var(--fs-lg); }
+dialog h2 { margin: 0 0 var(--sp-5); font-size: var(--fs-md); }
 .field { margin-bottom: var(--sp-5); }
-.field > label { display: block; font-size: var(--fs-sm); color: var(--text-secondary); margin-bottom: var(--sp-2); }
+.field > label { display: block; font-size: var(--fs-xs); color: var(--text-secondary); margin-bottom: var(--sp-2); }
 .field input, .field select { width: 100%; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-5); }
 /* Three across, for the one group that is genuinely three numbers off a
@@ -631,7 +631,7 @@ dialog h2 { margin: 0 0 var(--sp-5); font-size: var(--fs-lg); }
 .icon-btn { appearance: none; background: none; border: 1px solid var(--border-strong);
   color: var(--text-muted); border-radius: var(--radius-sm); cursor: pointer;
   width: var(--chrome-h); height: var(--chrome-h); min-height: 0;
-  font-size: var(--fs-base); line-height: 1; padding: 0; }
+  font-size: var(--fs-sm); line-height: 1; padding: 0; }
 .icon-btn:hover { color: var(--text-primary); border-color: var(--text-muted); }
 button.icon-btn.danger { color: var(--text-muted); border-color: var(--border-strong); background: none; }
 button.icon-btn.danger:hover { color: var(--err); border-color: var(--err); background: none; }
@@ -669,7 +669,7 @@ button.icon-btn.danger:hover { color: var(--err); border-color: var(--err); back
 .sec-hd { display: flex; align-items: center; justify-content: space-between;
           gap: var(--sp-4); flex-wrap: wrap; margin-top: var(--sp-7); }
 .sec-hd:first-of-type { margin-top: var(--sp-5); }
-.sec-hd h3 { font-size: var(--fs-base); margin: 0; }
+.sec-hd h3 { font-size: var(--fs-md); margin: 0; }
 .row-actions { display: flex; flex-wrap: wrap; gap: var(--sp-4); justify-content: flex-end; margin-top: var(--sp-6); }
 .row-actions .spacer { flex: 1 1 auto; }
 .checkline { display: flex; align-items: center; gap: var(--sp-4); }
@@ -681,12 +681,12 @@ button.icon-btn.danger:hover { color: var(--err); border-color: var(--err); back
 ─────────────────────────────────────────────────────────────────────────── */
 fieldset.formpanel { border: 1px solid var(--border); border-radius: var(--radius-sm);
   padding: var(--sp-5); margin: var(--sp-5) 0 0; background: var(--surface-alt); min-width: 0; }
-legend { font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: var(--ls-label);
+legend { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: var(--ls-label);
   color: var(--text-secondary); font-weight: var(--fw-bold); padding: 0 var(--sp-3); }
 /* overflow-x is spelled out because `overflow-y: auto` alone leaves the browser
    free to reserve a horizontal scrollbar it never needs. */
 .checklist { display: grid; gap: 7px; max-height: 220px; overflow: hidden auto; }
-.checklist .checkline { font-size: var(--fs-md); min-height: 24px; }
+.checklist .checkline { font-size: var(--fs-sm); min-height: 24px; }
 .checklist .checkline .hint { margin-left: var(--sp-3); }
 #shareLink { width: 100%; font-family: var(--font-mono); font-size: var(--fs-xs);
   color: var(--text-secondary); }
@@ -698,7 +698,7 @@ legend { font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: var
 .viewbar { display: flex; gap: 10px 14px; align-items: baseline; flex-wrap: wrap;
   border: 1px solid var(--border-strong); border-left: 4px solid var(--focus-border);
   border-radius: var(--radius); background: var(--surface-alt);
-  padding: 11px 14px; margin-bottom: var(--sp-6); font-size: var(--fs-base); }
+  padding: 11px 14px; margin-bottom: var(--sp-6); font-size: var(--fs-xs); }
 .viewbar strong { font-weight: var(--fw-bold); }
 .viewbar .muted { color: var(--text-secondary); }
 .viewbar .mine { margin-left: auto; color: var(--accent); }
@@ -706,7 +706,7 @@ legend { font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: var
 /* Live regions are emptied, never removed from the tree — an element toggled
    out with [hidden] announces nothing on the way back. .warn:empty collapses
    it visually instead. */
-.warn { color: var(--warn); font-size: var(--fs-sm); margin-top: var(--sp-4); }
+.warn { color: var(--warn); font-size: var(--fs-xs); margin-top: var(--sp-4); }
 .warn:empty { display: none; }
 .err-text { color: var(--err); }
 
@@ -726,7 +726,7 @@ legend { font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: var
 }
 #toast.show { opacity: 1; }
 
-footer { color: var(--text-muted); font-size: var(--fs-sm); margin-top: var(--sp-8); }
+footer { color: var(--text-muted); font-size: var(--fs-xs); margin-top: var(--sp-8); }
 footer a, .privacy-links a { color: var(--accent); }
 
 /* The skip link — visually gone until it takes focus, then the first thing on
@@ -773,6 +773,13 @@ main:focus { outline: none; }
    because setTab() writes that same property and would put them back. */
 .card > .empty { max-width: 80ch; margin-left: auto; margin-right: auto; }
 .card > .empty p { max-width: none; margin: 1em 0 0; }
+/* The welcome card's heading is the PAGE TITLE on the one screen it appears on,
+   so it takes the ramp's page-title step rather than the browser's own h2
+   default. All five apps rendered this at 24px — the same by accident, off
+   `1.5em` of a 16px root, which is not a step on the scale and would drift the
+   moment anything touched the root. Declared, and the same declaration in every
+   app. */
+.card > .empty h2 { font-size: var(--fs-xl); }
 html[data-welcome] .tabs,
 html[data-welcome] [role="tabpanel"] { display: none !important; }
 
@@ -786,7 +793,7 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
    empty states — a filtered list, a shared view with nothing in it — keep the
    quiet version, which is right for a message you land on mid-task. */
 .empty.first-run { padding: var(--sp-9) var(--sp-6); }
-.empty.first-run .lede { font-size: var(--fs-lg); max-width: 54ch; color: var(--text-primary);
+.empty.first-run .lede { font-size: var(--fs-md); max-width: 54ch; color: var(--text-primary);
                          margin-bottom: var(--sp-7); }
 .first-run-actions { display: flex; flex-wrap: wrap; gap: var(--sp-5);
                      align-items: center; justify-content: center; }
