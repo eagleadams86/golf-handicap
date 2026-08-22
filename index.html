@@ -142,6 +142,15 @@
 [data-theme="dark"]  { color-scheme: dark;  --c-roll: #8ab4ff; --c-whs: #e3b04b; }
 [data-theme="light"] { color-scheme: light; --c-roll: #1f5fb0; --c-whs: #7a5c0c; }
 [data-theme="sepia"] { color-scheme: light; --c-roll: #2c5a94; --c-whs: #6f5407; }
+/* Auto has no palette of its own — theme.css resolves it to Light or, under
+   prefers-color-scheme: dark, to Midnight. The two line colours and the color-scheme
+   have to resolve the same way, or an Auto page in light mode would draw its native
+   controls dark and its chart lines in the dark theme's blues. Same structure as the
+   pack's own auto block: the light values, then the dark ones in the media query. */
+[data-theme="auto"]  { color-scheme: light; --c-roll: #1f5fb0; --c-whs: #7a5c0c; }
+@media (prefers-color-scheme: dark) {
+  [data-theme="auto"] { color-scheme: dark; --c-roll: #8ab4ff; --c-whs: #e3b04b; }
+}
 
 * { box-sizing: border-box; }
 /* iOS text autosizing is turned off in theme.css (pack rule 9), not here. */
