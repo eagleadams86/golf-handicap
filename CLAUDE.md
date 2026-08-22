@@ -124,6 +124,70 @@ that emphasis.
 - **`computeAll()` is the only place either handicap is calculated.** Every figure, tile,
   table, chart and the working-out panel reads from it. A new number takes its value from
   there or the screen starts disagreeing with itself.
+- **`computeAll()` works in GAMES, not rounds, and the distinction is load-bearing**
+  (2026-08-22). `c.counted` is the ROUNDS that count; `c.games` is what the maths runs on,
+  after `pairNines()` has folded each pair of nines into one 18-hole record. Anything about
+  the OFFICIAL WINDOW — "3 counting rounds", "best 8 of 20", the best differential, the
+  per-course table — reads `c.games`; anything about what the golfer has LOGGED reads
+  `c.counted` or `c.all`. Reading the wrong one is not a crash, it is a figure that is
+  quietly out by one whenever a nine is in play. `c.pendingNine` is the odd nine still
+  waiting, and it is named on screen rather than dropped.
+- **A nine is scored against the NINE-hole rating, slope and par, or it is not scored at
+  all.** `tee.rating9`/`slope9`/`par9` are optional and all-or-nothing (the course dialog
+  refuses two of three). Never fall back to half the 18-hole figures: nine holes are not half
+  as hard, and a fallback would look like an answer. A nine on tees without them gets `no9`,
+  is excluded from `counted`, and says so in the rounds table and on the front page.
+  **The PCC is HALVED for a nine**, and that one is the app's own reading rather than a
+  quoted rule — PCC is published in strokes over a full round, so charging a nine the whole
+  of it would double-count the moment the pair is added. It is written that way round in the
+  README too; don't quietly promote it to a rule or quietly drop it.
+- **`pairNines()` is pure and pinned.** Chronological, oldest-first, the two differentials
+  ADDED, and the game dated to the SECOND nine — the games list has to come out in date
+  order, because `indexHistory` walks it forward and measures the low index's 365 days from
+  each entry's own date. A game carries `parts`, which is why `pickUsed()` credits both of a
+  pair's rounds; `parts || [item]` keeps it working for the plain entries the tests pass.
+- **The exceptional score reduction is the fourth part of the official calculation**, beside
+  the best-8-of-20 window, the reduced-scores table and the caps — it was missing until
+  2026-08-22, which made the README's "a faithful implementation of the published method"
+  not quite true. Three things about it that a tidy-up would break, all pinned:
+  - It is measured against the index the golfer **held before** the round (`out[i-1].whs`),
+    never the one the round produces.
+  - It does not stop with that round. `indexHistory` keeps a per-game `esrs` array and sums
+    the **last 20** of them, so a reduction stays in force for 19 more scores, falls away as
+    that round leaves the window, and two inside one window stack. One number adjusted and
+    forgotten would be a different rule.
+  - **Reduction first, cap second.** That is the published order, and it has a consequence
+    that reads like a bug: under a HARD cap the figure is pinned either way, so the
+    reduction can be swallowed. A test asserts the order explicitly and says so.
+  It has its own setting (`applyEsr`, default on) beside `applyCaps`, for the same reason
+  that one exists — to see the plain averaging underneath. Neither touches the league figure.
+- **The playing handicap is the course handicap times an allowance, and the ALLOWANCE IS A
+  DEVICE PREFERENCE.** `gh-allowance`, its own localStorage key beside the theme and the tab
+  — it is what you are playing today, not a fact about the golfers, so it never enters the
+  saved data, never travels in a share link, and needed no SCHEMA bump. Both places it
+  appears (the Course Handicap card and Strokes on the Day) read the one variable through
+  `setAllowance()`, so they cannot disagree. `playingHandicap()` rounds half AWAY from zero
+  for the same reason `round1` does: a plus handicap is negative, and `Math.round(-2.5)` is
+  `-2`, which would hand the better player a shot.
+- **The rounds filter never reaches the maths, and its markup is written once.** It filters
+  what is SHOWN and the line beside it says so out loud. The controls live in the HTML rather
+  than being redrawn by `render()` — a render that replaced them would replace the box being
+  typed in and throw away the caret, the same rule the name boxes follow. It appears only
+  past `FILTER_FROM` rounds.
+- **Adding a round offers every golfer, and nobody is ticked but the one on screen.** A
+  checkbox that starts ticked is a round logged for someone who did not play, and an
+  unnoticed extra round is far worse than an extra tap. A row's score box is disabled until
+  its row is ticked, and the validation NAMES the golfer whose score is missing — "enter a
+  score between 30 and 200" over four rows sends someone hunting. Editing an existing round
+  is always the single box it has always been. The active golfer's box keeps `id="f_score"`
+  whatever the shape, so the live differential hint has one field to read.
+- **`csvRounds()` is pure, and its quoting is the part that is ever actually wrong.** RFC
+  4180 quoting, CRLF line ends, a UTF-8 BOM at the download so Excel doesn't guess a code
+  page — and a leading `'` on anything starting `=`, `+`, `-` or `@`, which a spreadsheet
+  would otherwise run as a FORMULA. Nothing in the app can hold one today; a CSV is a file
+  that leaves the app, and a hand-edited backup is one restore away. Each line carries the
+  SINGLE round's differential, not a paired game's — that is the figure that reconciles with
+  the score beside it. Restore reads the JSON and never this.
 - **The official calculation must never be affected by the rolling-method settings.** That
   independence is the app's whole claim; it is stated in the UI and in the README, and a
   test pins it indirectly (`whsIndex` takes only differentials).
@@ -179,6 +243,15 @@ that emphasis.
 - **Help buttons (`.help-btn`) carry `margin-left: 7px`** and cells containing one are
   `nowrap`. An icon must never sit flush against the word it follows — a standing preference
   across every app in this family.
+- **The leaderboard's Trend cell is a sparkline PLUS the figure, and the figure is what
+  counts.** Flow Metrics' column, ported: the shape answers "which way is this going", the
+  number answers "by how much", and the number is what a screen reader reads and what a CSV
+  could carry — so the SVG is `aria-hidden` and never the only thing saying anything. It is
+  drawn with LOW at the top, because a lower handicap is better and an improving run has to
+  rise. It shares the existing "Change over 5" cell rather than adding a ninth column, which
+  an eight-column table at `--page-w: 1100` has no room for. `td.trend` is deliberately NOT
+  `display: flex` — that takes the cell out of the table's own layout and the column stops
+  lining up.
 - **The At-a-glance tiles are Sprint Velocity's tile, and their columns are counted by
   hand.** `.stat` shares `.stats`'s rows through `grid-template-rows: subgrid`, which is what
   keeps the label and the number lined up across a row when one label wraps and its
@@ -192,9 +265,12 @@ that emphasis.
   takes the full width, so the last-round *date* sits there — it is the only value that isn't
   a short number. Reordering the array moves that wide box to something that doesn't need it.
 - **Exclusions are never silent.** Every round that sits outside the numbers — course
-  deleted, or marked "don't count" — is named on the front page via `#handicapWarn`, and the
-  *Used in* column shows which rounds each method actually leaned on. A round quietly
-  missing from a handicap is worse than the bug that hiding it would avoid.
+  deleted, marked "don't count", a nine with no 9-hole rating, or a nine still waiting for a
+  partner — is named on the front page via `#handicapWarn`, and the *Used in* column shows
+  which rounds each method actually leaned on. A round quietly missing from a handicap is
+  worse than the bug that hiding it would avoid. The waiting nine gets `.pill.pending`, an
+  accent edge and neither status colour: it is not counting and it is not excluded, and
+  borrowing either colour would claim an outcome it hasn't got.
 - **Example data is per-golfer and additive.** `buildDemo()` (pure, pinned by tests) builds
   rounds for the golfer **on screen**, and the demo course is *added* to the list (never a
   replacement — someone may have typed real courses in). Its fixed `demo-course` id is what
@@ -208,12 +284,23 @@ that emphasis.
   course or round that demonstrates it, a line in the roster comment above
   `buildDemoLeague()`, a row in the README's demo table, and an assertion in tests.html.
   The same rule runs in Sprint Velocity and Flow Metrics; all three got it on 2026-08-19.
-  - **Every figure in the cast is load-bearing**: 26/24/22/20/14/4/2/0 rounds walks every
-    rung of the official calculation (past 20, exactly 20, under 20, the reduced-scores
-    table at 4, under the minimum at 2, never played at 0); Alex Nash's differentials go
-    NEGATIVE; Old Mill rates below par (the only place a course handicap comes out under
-    the index); Kilbryde is slope 142; Brookvale has one set of tees. Two "don't count"
-    rounds and one PCC give the exclusion line and the pills something to name.
+  - **Every figure in the cast is load-bearing**: 26/24/22/20/14/4/2/0 EIGHTEEN-HOLE rounds
+    walks every rung of the official calculation (past 20, exactly 20, under 20, the
+    reduced-scores table at 4, under the minimum at 2, never played at 0); Alex Nash's
+    differentials go NEGATIVE; Old Mill rates below par (the only place a course handicap
+    comes out under the index); Kilbryde is slope 142; Brookvale has one set of tees. Two
+    "don't count" rounds and one PCC give the exclusion line and the pills something to name.
+  - **The nine-hole and exceptional-score cases are in it too** (2026-08-22), and both are
+    easy to lose by accident. `DEMO_NINES` gives Joan a PAIR and Alex a single one left
+    WAITING — Alex holds the waiting one because his job is negative differentials rather
+    than a round count, and on Marcus, who is there to sit exactly on 20, an extra round
+    counting towards nothing would muddy the case he exists for. Only Ashfield's yellows and
+    Brookvale's tee carry 9-hole figures, so the "no 9-hole rating" state is reachable as
+    well. Joan's `esrAt` round is **15 shots** better than she usually plays, not a rounder
+    number: the threshold is measured against the INDEX, which is already a best-of average
+    several shots below her typical round, and 12 was tried and produced a very good day
+    rather than an exceptional score. A test asserts the reduction actually lands AND is
+    still in force today — the half of that rule a single good round can't show.
   - **It is ADDITIVE and destroys nothing**, the same promise `buildDemo()` makes. Stable
     `demo-` ids are what make that work: golfers and courses are upserted by id, the old
     example rounds are dropped by their `demo-r-` prefix, and the user's own golfer simply
@@ -370,12 +457,15 @@ that emphasis.
   blocked. `frame-src` needs only `accounts.google.com` — GIS sign-in never loads the
   Firebase `authDomain`, even if the project is repointed.
 - **`example-league.json` is a checked-in fixture, not data** — a backup anyone can restore,
-  and the way *Restore from backup* gets exercised with something real (8 golfers, 112
+  and the way *Restore from backup* gets exercised with something real (8 golfers, 115
   rounds, 6 courses). `make_example_league.py` writes it from a fixed seed, so re-running
   produces the identical file; regenerate it rather than hand-editing, and keep the awkward
   cases it deliberately holds — a near-scratch player with negative differentials, golfers
   either side of 20 rounds, one on 4 (the reduced-scores table), one on 2 (no official index
-  at all), one who has never played, and two rounds marked "don't count". Those are the same
+  at all), one who has never played, two rounds marked "don't count", a pair of nines, a
+  single nine left waiting, and one exceptional round still holding a reduction. **Its
+  `version` tracks SCHEMA** — it went to 2 with `holes`, or an older build would restore it
+  and score a nine as a full round. Those are the same
   cases `buildDemoLeague()` covers, and deliberately so: the two are kept in step by holding
   the same LIST OF CASES, not the same numbers. **The demo is the button, not this file** —
   see the demo rule above.
@@ -383,7 +473,8 @@ that emphasis.
 - **`tests.html` pins the pure functions — open it on a local server and check
   "All N tests pass"** whenever you touch `round1`, `scoreDifferential`, `averageLowest`,
   `whsIndex`/`whsSelection`, `rollingIndex`/`rollingSelection`, `normalizeMethod`,
-  `clampInt`/`clampNum`, `applyCaps`, `courseHandicap`, `indexHistory`, `pickUsed`,
+  `clampInt`/`clampNum`, `applyCaps`, `courseHandicap`, `playingHandicap`/`allowanceById`,
+  `esrFor`, `pairNines`, `courseStats`, `csvRounds`/`csvCell`, `indexHistory`, `pickUsed`,
   `syncDecision`, `buildDemo`, `buildDemoLeague`, `rankLeague`, `changeOverRounds`,
   `encodeShare`/`decodeShare`/`buildSharePayload`, `windowRounds`, `sanitizeIds` or
   `normalizeState`. It loads
@@ -417,10 +508,12 @@ that emphasis.
 - After changes: **browser-test locally first** (`python3 -m http.server 8014`), then commit,
   push, verify the Pages deploy, and spot-check live. Any local server + browser works —
   don't hunt for a specific tool.
-- **Scope: 18-hole rounds only**, deliberately. The WHS pairs 9-hole scores into 18-hole
-  differentials, which interacts awkwardly with a "last N games" method. The data model
-  carries what a 9-hole feature would need, so it wouldn't be a migration — but don't add it
-  without deciding first what a 9-hole round means to the rolling method.
+- **Scope: 9 or 18 holes, and nothing else.** Nine-hole rounds landed 2026-08-22, on the
+  answer this rule used to say had to be decided first: **a nine is not a game.** Two nines
+  are PAIRED into one 18-hole record — the official system's rule, applied to the league
+  handicap as well, because "the last 5 rounds" must not mean something different depending
+  on how many nines are in it. A twelve-hole round has nothing to pair with and is out.
+  See the nine-hole rule below.
 - Write commit subject lines in plain English a non-developer can read. The "Recent
   changes" box that made them user-facing was removed 2026-08-18, across the whole app
   family, and the GitHub API went out of the CSP with it — the habit stands anyway.

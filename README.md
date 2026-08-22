@@ -17,8 +17,13 @@ spreadsheet. This app does both, from exactly the same rounds, and shows them si
   anything you change about the league rule.
 
 Add everyone you play with and the **Leaderboard** tab ranks the lot of you on the same
-rule, from the same rounds. **Share** turns any of it into a read-only link you can send —
-the data rides inside the link, so nothing is uploaded anywhere.
+rule, from the same rounds — and **Strokes on the Day** turns those handicaps into the shots
+each of you gets at one course, in one format, which is the sheet a league actually wants
+before it tees off. One round of golf is logged once: tick everyone who played and give them
+their scores, and the date, course and tees are typed a single time.
+
+**Share** turns any of it into a read-only link you can send — the data rides inside the
+link, so nothing is uploaded anywhere.
 
 Everything works offline and without an account. Google sign-in is optional and only exists
 to put the same rounds on your phone and your laptop.
@@ -31,7 +36,9 @@ to put the same rounds on your phone and your laptop.
 - [The Leaderboard](#the-leaderboard)
 - [The League Handicap](#the-league-handicap)
 - [How the Official Index Is Worked Out](#how-the-official-index-is-worked-out)
-- [Course Handicap](#course-handicap)
+- [Nine-Hole Rounds](#nine-hole-rounds)
+- [Course Handicap and Playing Handicap](#course-handicap-and-playing-handicap)
+- [By Course](#by-course)
 - [Sharing a Read-Only Link](#sharing-a-read-only-link)
 - [Backups](#backups)
 - [Working Offline](#working-offline)
@@ -49,8 +56,10 @@ to put the same rounds on your phone and your laptop.
    scorecard. The rating is what a scratch golfer is expected to shoot (e.g. 69.4); the
    slope is how much harder it plays for everyone else (55–155, average 113). Add as many
    sets of tees as you play from.
-2. **Log a round.** *+ Add round.* Date, score, course, tees. The next round pre-fills with
-   whatever the last one used, so a regular fourball at the same club is four taps.
+2. **Log a round.** *+ Add round.* Date, holes, course, tees, then a score for everyone who
+   played — the whole fourball goes in through one window, with nobody ticked but you until
+   you say otherwise. The next round pre-fills with whatever the last one used, so a regular
+   game at the same club is a few taps.
 3. **Read the two numbers.** Both figures update as you type, and *How these are worked out*
    shows the actual arithmetic — which rounds were used, what they averaged to, and every
    step in between.
@@ -65,7 +74,9 @@ handicap. Courses and the league rule are shared between everyone, which is what
 leaderboard a fair comparison.
 
 Under **Rounds**, the *Used in* column shows which rounds each figure actually leaned on, so
-it is always visible why a number moved. A round can be marked *don't count* when you edit
+it is always visible why a number moved. Past eight rounds a filter appears above the table —
+by course, or by anything the row shows — and it changes only what is on screen, which the
+line beside it says out loud: both handicaps always use every round. A round can be marked *don't count* when you edit
 it — useful for a practice round or a scramble — and the app says so on the front page
 rather than quietly leaving it out.
 
@@ -78,11 +89,11 @@ figures have to handle, not just to fill the table.
 
 | Golfer | Rounds | What they're there to show |
 |---|---|---|
-| **Alex Nash** | 26 | Near scratch — the score differentials go **negative**, which is the case a spreadsheet usually gets wrong. |
+| **Alex Nash** | 26 + a nine | Near scratch — the score differentials go **negative**, which is the case a spreadsheet usually gets wrong. His nine-hole round is the one left **waiting for a partner**. |
 | **Priya Raman** | 24 | A solid single figure, with one round marked *don't count*. |
 | **Dad** | 22 | The mid handicapper the app was built for, and the golfer it lands on. Past 20 rounds, so the official index is a true best-8-of-20. |
 | **Marcus Bell** | 20 | Exactly **on** the 20-round WHS window, and also carries a *don't count* round. |
-| **Joan Whitlock** | 14 | Improving, and under 20 rounds, so the window is short. |
+| **Joan Whitlock** | 14 + two nines | Improving, and under 20 rounds, so the window is short. Her two nines **pair** into one 18-hole record, and one round of hers is exceptional enough to earn a **reduction that is still in force**. |
 | **Sam Okafor** | 4 | Four rounds: an index from the **reduced-scores table**. |
 | **Ruth Carey** | 2 | Two rounds: under the minimum, so **no official index is issued**. |
 | **New Member** | 0 | Has never played, so neither figure exists. |
@@ -92,7 +103,9 @@ par — the one place a course handicap comes out lower than the index. **Kilbry
 Championship tee is slope 142, near the 155 ceiling, where the 113/slope factor visibly
 pulls a differential down. **Brookvale Municipal** has a single set of tees, so the tee
 picker has its no-choice case. There's a round with a conditions adjustment too, so PCC
-isn't a setting nobody has seen take effect.
+isn't a setting nobody has seen take effect. **Ashfield Park's yellows and Brookvale's only
+tee carry nine-hole ratings** and the other four deliberately do not — so both nine-hole
+answers are reachable: a nine that scores, and a nine the app says it cannot score yet.
 
 **It adds, and destroys nothing.** Your own golfer, courses and rounds are left exactly
 where they were — your golfer simply joins the leaderboard. The `demo-` ids are stable, so
@@ -139,7 +152,7 @@ The **Leaderboard** tab puts every golfer in one table, lowest handicap first:
 | **Official** | Their World Handicap System index. |
 | **Rounds** | How many of their rounds count towards the figures. |
 | **Best diff** | Their lowest score differential ever logged. |
-| **Change over 5** | How far their handicap has moved over their last 5 counting rounds. ▼ is improving. |
+| **Change over 5** | A sparkline of their last few games, and how far their handicap has moved over their last 5 counting rounds. ▼ is improving — and the figure, not the line, is what a screen reader reads and what the CSV carries. |
 | **Last round** | When they last played. |
 
 **Rank by** chooses which of the two figures decides the order — the same setting as *Show
@@ -151,6 +164,13 @@ can never disagree. A golfer with no figure yet — fewer than 3 counting rounds
 official index, and someone who has never played gets neither — sits at the foot with no
 position, rather than being ranked first for having no number. Rounds left out of the
 figures are counted up underneath the table, as they are on the front page.
+
+Underneath it, **Strokes on the Day** turns those handicaps into shots at one course, off one
+set of tees, in one format: each golfer's course handicap, what they play off after the
+format's allowance, and how many shots they receive from the lowest player in the field, who
+plays off scratch. It reads the same rows the table above it does, so an index can never
+disagree between the two. See [Course Handicap and Playing
+Handicap](#course-handicap-and-playing-handicap).
 
 ---
 
@@ -220,6 +240,22 @@ rounds. With fewer than 20 rounds, the official reduced-scores table applies:
 Below **3 rounds the app shows no official index at all**, because the system does not issue
 one — inventing a number there would be worse than saying so. The result is capped at 54.0.
 
+**Exceptional score reduction.** Play far better than your index says you can and the index
+comes down by more than the averaging alone would bring it. A differential **7.0 to 9.9**
+below your index takes an extra **1.0** off; **10.0 or more** below takes **2.0**. Two things
+about it are easy to get wrong, and both are pinned by tests:
+
+- it is measured against the index you **held when you played**, not the one the round
+  produces — measuring against the new index would compare the score with a number it has
+  already pulled down, and nothing would ever look exceptional;
+- it does **not stop with that round**. It stays in force for the next 19 scores and falls
+  away as that round drops out of the last 20, so two exceptional rounds close together
+  stack. The app names the date of each one in *How these are worked out*, and says on the
+  front page how much is currently being taken off.
+
+It can be switched off under *League Rules*, beside the caps, and it never touches the league
+handicap.
+
 **Soft cap and hard cap.** Once 20 rounds exist, a rise is measured against the lowest index
 held in the previous 365 days: anything more than **3.0** above it counts half, and it can
 never sit more than **5.0** above it. These can be switched off under *League Rules* to see the
@@ -232,12 +268,42 @@ both pinned by tests:
 - A real Low Handicap Index is maintained by your golf association from the day your index
   was first issued. The app can only work from the history you have typed in.
 
+**The reduction is applied before the caps**, which is the order the published method uses:
+the cap procedure runs on the index the reduction produced. That has a consequence worth
+stating, because it reads like a bug and is not — under a *hard* cap the figure is pinned to
+5.0 above the low index either way, so the reduction can be swallowed by it.
+
 ---
 
-## Course Handicap
+## Nine-Hole Rounds
+
+Both handicaps count *games*, and a game is 18 holes — so a nine is not a round on its own.
+The official system adds two nine-hole score differentials together to make one 18-hole
+differential, and this app does the same, **for the league handicap as well**. That is what
+stops "the last 5 rounds" quietly meaning something different depending on how many nines
+are in it.
+
+- Nines are paired **in the order you played them**, oldest first. One left over waits for
+  the next nine you log, and the app says so — on the front page, in the rounds table and in
+  the working-out — rather than quietly ignoring it.
+- A nine is scored against the **9-hole rating, slope and par** for those tees, which are
+  printed on the scorecard and are typed in under *Golfers & Courses* (they are optional, and
+  all three or none). Without them the round is kept but not scored: half the 18-hole figures
+  would be a guess, not an answer, and this app does not put a guess into a differential.
+- The conditions adjustment is **halved** for a nine. This one is the app's own reading rather
+  than a quoted rule: PCC is published in strokes over a full round, so charging a nine the
+  whole of it would double-count the moment the pair is added up. Two nines on +1 days combine
+  to exactly the +1 an 18 would get.
+- A paired game takes the **later** of the two dates — it was not a game until the second nine
+  was played — and both of its rounds are marked as counting, since they earned that
+  differential together.
+
+---
+
+## Course Handicap and Playing Handicap
 
 Your index is portable; the **course handicap** is what it becomes on one course off one set
-of tees — the shots you actually take off on the day:
+of tees — the shots those tees give you:
 
 ```
 index × (slope ÷ 113) + (course rating − par)
@@ -245,6 +311,36 @@ index × (slope ÷ 113) + (course rating − par)
 
 rounded to a whole number. It follows whichever figure you have set as primary, so switching
 between the league handicap and the official one changes it.
+
+What a competition actually gives you is a **percentage of that**, and the percentage depends
+on the format — the more balls a side plays, the more the best of them flatters a high
+handicap. Pick the format and the card shows what you play off, with the full course handicap
+still written out underneath:
+
+| Format | Allowance |
+|---|---:|
+| Full course handicap | 100% |
+| Individual stroke play | 95% |
+| Individual Stableford | 95% |
+| Singles match play | 100% |
+| Four-ball | 90% |
+| Foursomes (each partner, added) | 50% |
+
+These are the recommended allowances; a club can and does set its own. The chosen format is
+remembered in this browser and shared by both places it appears — the Course Handicap card
+and **Strokes on the Day** on the Leaderboard tab, which does the same arithmetic for
+everybody at once and shows how many shots each golfer receives from the lowest player in the
+field.
+
+---
+
+## By Course
+
+Where you actually play well, which neither handicap will tell you: both are built to be
+comparable *across* courses on purpose, so a course that happens to suit you disappears into
+them by design. One row per course played, best average differential first, with the raw best
+and average scores beside it — the differential columns are the fair comparison, the score
+columns are the numbers you remember. It appears once you have played more than one course.
 
 ---
 
@@ -293,6 +389,12 @@ shared, with a link back to their own data.
 **Download backup (JSON)** writes everything — golfers, courses, rounds,
 settings — to a file. **Restore from backup** reads one back, replacing what is in the
 browser after a confirmation that names the counts.
+
+**Download rounds (CSV)** is the other direction out: every round of every golfer as a
+spreadsheet, with the differential the app worked out beside each score, for anyone who keeps
+their handicap in one. It is a one-way door — *Restore* reads the JSON, never the CSV — and a
+nine-hole round carries its own nine-hole differential rather than the combined figure, so
+each line reconciles with the score beside it.
 
 This matters more than it does in most apps: with no account, clearing your browser data is
 the one thing that will lose your history. Take a backup now and then, or turn sync on.
@@ -472,7 +574,7 @@ To go back to fully-local, set `FIREBASE_CONFIG` to `null` again.
 | `firestore.rules` | A checked-in copy of the security rules to deploy in the Firebase console. |
 | `favicon.ico` | The app's icon — the fallback a browser fetches from the site root on its own. |
 | `make_favicon.py` | Draws `favicon.ico` to match the inline SVG icon in `index.html`. |
-| `example-league.json` | A checked-in **backup file**, for exercising Restore: a league of 8 golfers, 112 rounds, 6 courses, frozen at a fixed date. The in-app **example league** button is the demo — see [Trying It Out](#trying-it-out--the-example-league). |
+| `example-league.json` | A checked-in **backup file**, for exercising Restore: a league of 8 golfers, 115 rounds, 6 courses, frozen at a fixed date. The in-app **example league** button is the demo — see [Trying It Out](#trying-it-out--the-example-league). |
 | `make_example_league.py` | Writes `example-league.json` from a fixed seed, so re-running it produces the identical file. |
 | `LICENSE` | MIT. |
 
@@ -535,12 +637,15 @@ Commit subject lines are written in plain English for a reader, not for a diff. 
 
 ## Scope and Known Limits
 
-- **18-hole rounds only.** The World Handicap System combines 9-hole scores in pairs into
-  18-hole differentials, which interacts awkwardly with a "last N *games*" method — is half a
-  round a game? Rather than guess, the app takes 18-hole rounds and says so. The data model
-  carries what a later 9-hole feature would need, so adding it would not be a migration.
 - **One score per round, not a hole-by-hole card.** That means the net-double-bogey cap is
-  applied by you, not by the app.
+  applied by you, not by the app — and there is no Stableford or net scoring, which would
+  need the card and a stroke index per hole.
+- **Nine-hole rounds are paired, never half-counted** (see [Nine-Hole
+  Rounds](#nine-hole-rounds)). A nine on tees with no 9-hole rating is kept but not scored,
+  and one nine on its own counts towards nothing until you play another. Anything other than
+  9 or 18 holes is out of scope: there is nothing sensible to pair a twelve with.
+- **Playing-handicap allowances are the recommended ones**, not your club's. If your club
+  sets its own, the course handicap on the card is the number to apply it to yourself.
 - **The caps are as good as your history.** See the caveats under
   [the official index](#how-the-official-index-is-worked-out).
 - Not affiliated with, endorsed by, or a substitute for your club or golf association. The

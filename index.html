@@ -461,6 +461,41 @@ tr.dropped td, tr.dropped th { color: var(--text-muted); }
    the border is what actually carries the signal. Never a fill alone. */
 .pill.counts { border-color: var(--ok); background: var(--ok-bg); color: var(--text-primary); }
 .pill.excluded { border-color: var(--err); background: var(--err-bg); color: var(--text-primary); }
+/* Neither counting nor excluded — a nine still waiting for its partner, and a
+   plain fact about a round rather than a verdict on it. The accent edge marks
+   it as "the app has something to say here" without borrowing either status
+   colour, which would claim an outcome it hasn't got. */
+.pill.pending { border-color: var(--accent); color: var(--text-primary); }
+
+/* One golfer's score line in the round dialog. The name takes the slack and the
+   number box is a fixed width, so a column of them lines up however long the
+   names are — four boxes at four different widths reads as four different
+   questions. */
+.scorerows { display: grid; gap: var(--sp-4); }
+.scorerow { display: flex; align-items: center; gap: var(--sp-5); }
+.scorerow > label { flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scorerow input[type="number"] { width: 8ch; flex: none; }
+/* `width: auto` is load-bearing: these rows live inside a `.field`, whose
+   `.field input` rule makes every input 100% wide — right for a stacked form,
+   and here it gave each checkbox the whole row and pushed the name and the
+   score box off the edge of the dialog. The number box escapes it on its own
+   because it sets a width; a checkbox has none to set. */
+.scorerow input[type="checkbox"] { flex: none; width: auto; }
+.scorerow input:disabled { opacity: 0.5; }
+
+/* The rounds filter. A row of controls above a table, sized like the table
+   rather than like a dialog — the labels are small and the whole thing gets out
+   of the way, because it is a way of looking at the list and not a form. */
+.filterbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-5); margin-bottom: var(--sp-5); }
+.filterbar .field { margin: 0; min-width: 0; }
+.filterbar select, .filterbar input { min-width: 12ch; }
+.filterbar .hint { margin: 0 0 var(--sp-4) auto; }
+
+/* Sparkline and its figure share a cell. Deliberately NOT a flex container: a
+   `display:flex` on a <td> takes the cell out of the table's own layout, and
+   this column has to keep lining up with the numbers above and below it. Inline
+   alignment does the job and costs nothing. */
+svg.spark { vertical-align: middle; margin-right: var(--sp-4); overflow: visible; }
 
 details { border-top: 1px solid var(--border); margin-top: var(--sp-5); padding-top: var(--sp-5); }
 details > summary { cursor: pointer; color: var(--accent); font-size: var(--fs-sm); }
@@ -515,6 +550,10 @@ dialog h2 { margin: 0 0 var(--sp-5); font-size: var(--fs-lg); }
 .field > label { display: block; font-size: var(--fs-sm); color: var(--text-secondary); margin-bottom: var(--sp-2); }
 .field input, .field select { width: 100%; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-5); }
+/* Three across, for the one group that is genuinely three numbers off a
+   scorecard — par, rating and slope for a nine. Splitting them 2 + 1 across
+   two .grid2 rows would leave the third box beside dead space. */
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-5); }
 /* ── The square icon button, ported from Sprint Predictability ───────────────
    A row in Golfers & Courses ends in one of these. It replaced a worded "Remove"
    link per golfer, which down a list of four was four words of chrome for an
@@ -682,7 +721,7 @@ main:focus { outline: none; }
 @media (max-width: 560px) {
   .wrap { padding: 0 var(--sp-5) var(--sp-8); }
   .headbar { padding: 0 var(--sp-5); }
-  .grid2 { grid-template-columns: 1fr; }
+  .grid2, .grid3 { grid-template-columns: 1fr; }
   /* With the courses and method buttons up here the row wraps to four lines on
      a phone, and a sticky bar that deep eats half the screen the moment you
      scroll — on the one view (the rounds table) you scroll most. Below this
@@ -827,7 +866,7 @@ main:focus { outline: none; }
     <h2>Course Handicap
       <button class="help-btn" type="button" data-help="coursehcp" aria-label="About the course handicap">?</button>
     </h2>
-    <div class="grid2">
+    <div class="grid3">
       <div class="field">
         <label for="chCourse">Course</label>
         <select id="chCourse"></select>
@@ -835,6 +874,10 @@ main:focus { outline: none; }
       <div class="field">
         <label for="chTee">Tee</label>
         <select id="chTee"></select>
+      </div>
+      <div class="field">
+        <label for="chFormat">Format</label>
+        <select id="chFormat"></select>
       </div>
     </div>
     <div class="figure">
@@ -844,12 +887,39 @@ main:focus { outline: none; }
     </div>
   </section>
 
+  <!-- Sits between the course handicap and the rounds list because that is the
+       order the questions come in: what do I play off here, how do I actually
+       go round here, and then the rounds themselves. -->
+  <section class="card" id="courseStatsCard">
+    <h2>By Course
+      <button class="help-btn" type="button" data-help="bycourse" aria-label="About the per-course figures">?</button>
+    </h2>
+    <div class="table-scroll" id="courseStatsTable"></div>
+  </section>
+
   <section class="card" id="roundsCard">
     <h2>
       Rounds
       <span class="spacer"></span>
       <button class="primary" id="addRoundBtn">+ Add round</button>
     </h2>
+    <!-- Built once in the markup and never redrawn, unlike the table below it:
+         a render that replaced this row would replace the box being typed in and
+         throw away the caret with it. render() only refreshes the course
+         options and the count line. It filters what is SHOWN and nothing else —
+         both handicaps are always worked out from every round. -->
+    <div class="filterbar" id="roundsFilter" hidden>
+      <div class="field">
+        <label for="fltCourse">Course</label>
+        <select id="fltCourse"></select>
+      </div>
+      <div class="field">
+        <label for="fltText">Find</label>
+        <input type="search" id="fltText" maxlength="60" placeholder="score, note, tee, year…" data-keep-caret>
+      </div>
+      <button type="button" class="link" id="fltClear">Clear</button>
+      <p class="hint" id="fltCount" role="status"></p>
+    </div>
     <div class="table-scroll" id="roundsTable"></div>
   </section>
   </div><!-- /playerPanel -->
@@ -869,6 +939,35 @@ main:focus { outline: none; }
       <div class="table-scroll" id="leagueTable"></div>
       <p class="warn" id="leagueWarn" role="status"></p>
       <p class="hint" id="leagueNote"></p>
+    </section>
+
+    <!-- The leaderboard ranks handicaps; this turns them into shots at one
+         particular course, for everybody at once. The Course Handicap card on
+         the other tab answers the same question for one golfer — this is the one
+         a league actually wants on a Saturday morning, and the reason it is a
+         card of its own rather than three more columns on the table above: that
+         table is already eight columns at 1100px. -->
+    <section class="card" id="strokesCard">
+      <h2>Strokes on the Day
+        <button class="help-btn" type="button" data-help="strokes" aria-label="About playing handicaps and shots given">?</button>
+      </h2>
+      <p class="hint">What everyone's handicap comes to at one course, off one set of tees, in
+        one format — the sheet you write out before you tee off.</p>
+      <div class="grid3">
+        <div class="field">
+          <label for="lbCourse">Course</label>
+          <select id="lbCourse"></select>
+        </div>
+        <div class="field">
+          <label for="lbTee">Tee</label>
+          <select id="lbTee"></select>
+        </div>
+        <div class="field">
+          <label for="lbFormat">Format</label>
+          <select id="lbFormat"></select>
+        </div>
+      </div>
+      <div class="table-scroll" id="strokesTable"></div>
     </section>
   </div><!-- /leaguePanel -->
 </main>
@@ -897,8 +996,11 @@ main:focus { outline: none; }
         <input type="date" id="f_date" required>
       </div>
       <div class="field">
-        <label for="f_score">Adjusted gross score</label>
-        <input type="number" id="f_score" min="30" max="200" step="1" required inputmode="numeric">
+        <label for="f_holes">Holes played <button class="help-btn" type="button" data-help="nine" aria-label="About nine-hole rounds">?</button></label>
+        <select id="f_holes">
+          <option value="18" selected>18 holes</option>
+          <option value="9">9 holes</option>
+        </select>
       </div>
     </div>
     <div class="grid2">
@@ -910,6 +1012,16 @@ main:focus { outline: none; }
         <label for="f_tee">Tee</label>
         <select id="f_tee" required></select>
       </div>
+    </div>
+    <!-- One row per golfer, built by openRound(). With a single golfer it is the
+         one score box this dialog has always had; with several it becomes the
+         fourball, which is the whole point — the date, course and tee are typed
+         once for everybody. The row for the golfer on screen always carries
+         id="f_score", so the live differential hint below has one field to read
+         however many rows there are. -->
+    <div class="field">
+      <span class="label" id="scoresLabel">Adjusted gross score</span>
+      <div id="roundScores"></div>
     </div>
     <div class="grid2">
       <div class="field">
@@ -1001,6 +1113,14 @@ main:focus { outline: none; }
       <input type="checkbox" id="m_caps">
       <label for="m_caps" style="margin:0">Apply the official soft cap and hard cap</label>
       <button class="help-btn" type="button" data-help="caps" aria-label="About the caps">?</button>
+    </div>
+    <!-- Beside the caps, because the two are the same kind of thing: parts of
+         the OFFICIAL calculation that can be switched off to see the plain
+         averaging underneath. Neither touches the league handicap. -->
+    <div class="field checkline">
+      <input type="checkbox" id="m_esr">
+      <label for="m_esr" style="margin:0">Apply the official exceptional score reduction</label>
+      <button class="help-btn" type="button" data-help="esr" aria-label="About exceptional scores">?</button>
     </div>
     <p class="warn" id="methodWarn" role="status"></p>
     <div class="row-actions">
@@ -1139,6 +1259,13 @@ main:focus { outline: none; }
     <button type="button" id="importBtn"><span aria-hidden="true">⬆︎</span> Restore from backup</button>
     <input type="file" id="importFile" accept="application/json,.json" class="sr-only" aria-hidden="true" tabindex="-1">
   </div>
+  <p class="hint" style="margin-top:var(--sp-5)">Every round as a spreadsheet, for anyone who
+    keeps their handicap in one — every golfer, with the differential the app worked out
+    beside each score. It is a one-way door: the CSV is for reading and charting elsewhere,
+    and <strong>Restore reads the JSON above, never this</strong>.</p>
+  <div class="row-actions" style="justify-content:flex-start">
+    <button type="button" id="csvBtn"><span aria-hidden="true">⬇︎</span> Download rounds (CSV)</button>
+  </div>
   <p class="hint" style="margin-top:var(--sp-5)">Restoring <strong>replaces everything in this
     browser</strong>. You are shown what the file holds and asked to confirm first — and if you
     are signed in, the restored copy becomes the one your other devices get.</p>
@@ -1248,8 +1375,14 @@ const UPDATED_KEY = 'gh-updated';
    BUMP IT whenever a saved field is added, renamed, or given a new meaning —
    and teach normalizeState() the field in the SAME commit, or the boundary will
    strip the very field the bump exists to protect. Nothing that stays on this
-   device (theme, which tab is open) needs a bump. */
-const SCHEMA = 1;
+   device (theme, which tab is open, the chosen allowance) needs a bump.
+
+   2 (2026-08-22): a round carries `holes` (9 or 18), a tee carries the optional
+   `rating9`/`slope9`/`par9`, and settings carry `applyEsr`. All three are the
+   same failure if an older build reads them: it would drop `holes` and score a
+   nine as though it were a full round, which is a wrong figure rather than a
+   missing one. */
+const SCHEMA = 2;
 const THEME_KEY = 'gh-theme';
 const THEMES = ['midnight', 'dark', 'light', 'sepia'];
 /* Which view is open. Its own key, alongside the theme rather than inside the
@@ -1257,9 +1390,18 @@ const THEMES = ['midnight', 'dark', 'light', 'sepia'];
    golfers, so it has no business travelling to another device. */
 const TAB_KEY = 'gh-tab';
 const TABS = ['player', 'league'];
+/* The competition format the two course-handicap panels are set to. Its own
+   key, beside the theme and the tab rather than inside the saved data, and for
+   the same reason: it is how this browser is looking at the figures, not a fact
+   about the golfers, and it has no business travelling to another device or
+   riding along in a share link. It also means it needs no SCHEMA bump. */
+const ALLOWANCE_KEY = 'gh-allowance';
 /* How far back the "change over N rounds" figure looks — the at-a-glance tile
    and the league column are the same number, so it is written once. */
 const TREND_ROUNDS = 5;
+/* How many points the leaderboard's sparkline draws. Ten is enough to show a
+   shape and short enough that the line is not a smudge in a 64px cell. */
+const SPARK_POINTS = 10;
 
 /* ── The copy-from-the-future check ─────────────────────────────────────────
    Run here, at the top level and a long way above the first event listener,
@@ -1397,6 +1539,45 @@ function scoreDifferential(score, rating, slope, pcc) {
   return round1((113 / s) * (Number(score) - Number(rating) - (Number(pcc) || 0)));
 }
 
+/* ── Nine-hole rounds ────────────────────────────────────────────────────────
+   Both methods count GAMES — "best 8 of the last 20", "the last 5" — and a game
+   is 18 holes. So a nine is not a game on its own: the official system combines
+   two 9-hole score differentials into one 18-hole differential by adding them,
+   and that combined figure is what everything downstream sees. The league rule
+   gets the same treatment, which is what stops "the last 5 rounds" quietly
+   meaning something different depending on how many nines are in it.
+
+   Pairing is chronological and oldest-first — the first unpaired nine waits for
+   the next one, whenever that comes. A nine left over at the end is `pending`:
+   it counts towards nothing yet, and the app SAYS so rather than dropping it,
+   because a round that has been logged and is doing nothing is exactly the kind
+   of silence this app doesn't allow.
+
+   `entries` is oldest-first and already filtered to the ones that count. Pure,
+   and pinned by tests: the pairing order, the addition, and the fact that the
+   combined game takes the LATER date (it did not exist as a game until the
+   second nine was played, so that is when it enters the history).
+─────────────────────────────────────────────────────────────────────────── */
+function pairNines(entries) {
+  const games = [];
+  let held = null;
+  entries.forEach((e) => {
+    if (e.round.holes !== 9) {
+      games.push({ date: e.date, diff: e.diff, overPar: e.overPar, parts: [e] });
+      return;
+    }
+    if (!held) { held = e; return; }
+    games.push({
+      date: e.date,
+      diff: round1(held.diff + e.diff),
+      overPar: (held.overPar == null || e.overPar == null) ? null : round1(held.overPar + e.overPar),
+      parts: [held, e],
+    });
+    held = null;
+  });
+  return { games, pending: held };
+}
+
 /* Mean of the `count` lowest values. Used by both methods — the WHS is "best 8
    of 20" and the rolling method is "best N of the last M", which is the same
    shape with different numbers. */
@@ -1442,6 +1623,40 @@ function whsSelection(diffs) {
   const cfg = WHS_TABLE[win.length];
   const kept = win.slice().sort((a, b) => a - b).slice(0, cfg.use);
   return { considered: win.length, use: cfg.use, adj: cfg.adj, kept };
+}
+
+/* ── Exceptional Score Reduction ─────────────────────────────────────────────
+   The fourth moving part of the official calculation, alongside the best-8-of-20
+   window, the reduced-scores table and the caps. Play a round far better than
+   your index says you can and the index comes down by more than the averaging
+   alone would bring it: 7.0 to 9.9 strokes below takes an extra 1.0 off, 10.0 or
+   more takes 2.0.
+
+   Two things about it are easy to get wrong and are pinned by tests:
+
+   • The comparison is against the index you HELD when you played, not the one
+     the round produces. Measuring against the new index would compare the score
+     to a number it has already pulled down, and no round would ever look
+     exceptional enough.
+   • The reduction does not stop with that round. It stays in force for the next
+     19 scores and then falls away as the round rolls out of the 20-score window,
+     so a second exceptional round inside the window stacks with the first. That
+     is why this returns a per-round adjustment and `indexHistory` sums the last
+     20 of them, rather than adjusting one index and forgetting.
+
+   Returns 0 rather than null when nothing applies, so the sum is arithmetic and
+   never a null check. A golfer with no index yet — under three rounds — cannot
+   have an exceptional score, because there is nothing to be exceptional against.
+─────────────────────────────────────────────────────────────────────────── */
+const ESR_AT = 7.0;         // strokes below the index for a 1.0 reduction
+const ESR_BIG_AT = 10.0;    // …and for 2.0
+const ESR_LASTS = 20;       // scores it stays in force for, including its own
+function esrFor(diff, indexBefore) {
+  if (diff == null || indexBefore == null) return 0;
+  const gap = indexBefore - diff;
+  if (gap >= ESR_BIG_AT) return -2.0;
+  if (gap >= ESR_AT) return -1.0;
+  return 0;
 }
 
 /* The configurable rolling method. `values` is newest-first and is either score
@@ -1529,6 +1744,40 @@ function courseHandicap(index, slope, rating, par) {
   return Math.round(raw);
 }
 
+/* ── Playing handicap ────────────────────────────────────────────────────────
+   The course handicap is the full number of shots the tees say you get. What a
+   competition actually gives you is a percentage of it, and the percentage
+   depends on the format — because the more balls a side plays, the more the best
+   of them flatters a high handicapper. These are the WHS recommended
+   allowances; a club can and does set its own, which is why the list says what
+   each one is FOR rather than pretending to be a rule.
+
+   `pct` is passed in rather than looked up, so the arithmetic is one line and
+   the table is data. `full` exists and is 100% on purpose: it is the honest
+   default for someone who just wants the shots, and it is not the same thing as
+   singles match play, which is also 100% but is an answer to a question.
+─────────────────────────────────────────────────────────────────────────── */
+const ALLOWANCES = [
+  { id: 'full',      pct: 100, label: 'Full course handicap (100%)' },
+  { id: 'stroke',    pct: 95,  label: 'Individual stroke play (95%)' },
+  { id: 'stableford', pct: 95, label: 'Individual Stableford (95%)' },
+  { id: 'match',     pct: 100, label: 'Singles match play (100%)' },
+  { id: 'fourball',  pct: 90,  label: 'Four-ball (90%)' },
+  { id: 'foursomes', pct: 50,  label: 'Foursomes — 50% each, added (50%)' },
+];
+const DEFAULT_ALLOWANCE = 'full';
+function allowanceById(id) {
+  return ALLOWANCES.find((a) => a.id === id) || ALLOWANCES[0];
+}
+/* Rounded half AWAY from zero, not with Math.round, for the same reason round1
+   is: a plus handicap is negative, and Math.round(-2.5) is -2, which would hand
+   the better player a shot they have not earned while rounding +2.5 up to 3. */
+function playingHandicap(courseHcp, pct) {
+  if (courseHcp == null) return null;
+  const raw = courseHcp * ((Number(pct) || 0) / 100);
+  return raw < 0 ? -Math.round(-raw) : Math.round(raw);
+}
+
 /* ── Sync decision ───────────────────────────────────────────────────────────
    Which copy wins when a sign-in finds both a local and a cloud copy. Pure so
    tests.html can pin the two rules learned the hard way in the sibling apps:
@@ -1578,24 +1827,44 @@ function daysBefore(iso, n) {
    O(n²) on the number of rounds, which is nothing at the scale of one golfer's
    career (a 40-round season is 1,600 cheap operations). */
 const LOW_INDEX_MIN_ROUNDS = 20;
-function indexHistory(entries, method, useCaps) {
+function indexHistory(entries, method, useCaps, useEsr) {
   const out = [];
   const past = [];
+  /* One reduction per game, oldest-first and index-aligned with `out`, because
+     a reduction is not spent when it is earned — it stays in force for the next
+     19 games and then falls out of the window. Summing a slice of this is what
+     lets two exceptional rounds inside one window stack. */
+  const esrs = [];
   for (let i = 0; i < entries.length; i++) {
     const upto = entries.slice(0, i + 1);
     const newestFirst = upto.slice().reverse();
     const raw = whsIndex(newestFirst.map((e) => e.diff));
+
+    /* Measured against the index held BEFORE this game, which is the previous
+       row of this very list — the one place it is knowable. */
+    const before = i > 0 ? out[i - 1].whs : null;
+    esrs.push(useEsr === false ? 0 : esrFor(entries[i].diff, before));
+    const esrHeld = esrs.slice(Math.max(0, i - (ESR_LASTS - 1)), i + 1)
+      .reduce((a, b) => a + b, 0);
+    const reduced = raw == null ? null : round1(raw + esrHeld);
+
     let lowIndex = null;
     if (useCaps && upto.length >= LOW_INDEX_MIN_ROUNDS) {
       const cutoff = daysBefore(entries[i].date, 365);
       const recent = past.filter((p) => p.date >= cutoff && p.whs != null).map((p) => p.whs);
       if (recent.length) lowIndex = Math.min.apply(null, recent);
     }
-    const capped = applyCaps(raw, lowIndex);
+    /* Reduction first, cap second. The cap exists to stop an index RISING away
+       from the golfer's demonstrated ability; a reduction is that ability being
+       demonstrated, so capping it first would let the cap swallow the very
+       thing it is measured against. */
+    const capped = applyCaps(reduced, lowIndex);
     out.push({
       date: entries[i].date,
       whs: capped.value,
       whsUncapped: raw,
+      esr: esrs[i],
+      esrHeld,
       cap: capped.cap,
       lowIndex,
       rolling: rollingIndex(newestFirst.map((e) => e.value), method),
@@ -1739,6 +2008,10 @@ function normalizeState(raw) {
     settings: {
       method: normalizeMethod(s.settings && s.settings.method),
       applyCaps: !(s.settings && s.settings.applyCaps === false),
+      /* On unless it says otherwise, like the caps beside it: a reduction is
+         part of the official calculation, so a copy of the data that has never
+         heard of the setting should get the official answer. */
+      applyEsr: !(s.settings && s.settings.applyEsr === false),
       primary: (s.settings && s.settings.primary === 'whs') ? 'whs' : 'rolling',
     },
   };
@@ -1773,6 +2046,16 @@ function normalizeState(raw) {
         rating: clampNum(t && t.rating, 40, 90, 72),
         slope: clampInt(t && t.slope, 55, 155, 113),
         par: clampInt(t && t.par, 27, 90, 72),
+        /* The 9-hole figures are OPTIONAL and stay null until somebody types
+           the scorecard in. A default would be the worst possible answer here:
+           these feed a differential, so a guessed 34.6/113 would not look like
+           a gap, it would look like a number. `clampNum`/`clampInt` already
+           return their default for null and '', so passing null gets exactly
+           the "absent" this needs. A 9-hole round on a tee without them is
+           flagged in the rounds table, never scored. */
+        rating9: clampNum(t && t.rating9, 25, 50, null),
+        slope9: clampInt(t && t.slope9, 55, 155, null),
+        par9: clampInt(t && t.par9, 27, 45, null),
       });
     });
     if (!tees.length) return;
@@ -1796,6 +2079,11 @@ function normalizeState(raw) {
       pcc: clampInt(r.pcc, -1, 3, 0),
       note: String(r.note || '').slice(0, 120),
       counts: r.counts !== false,
+      /* 18 unless it says 9, so every round written before this field existed
+         is what it always was. Two values and no third: the whole point of
+         pairing nines is that a "game" is 18 holes, and a 12-hole entry would
+         have nothing to pair with. */
+      holes: Number(r.holes) === 9 ? 9 : 18,
     });
   });
   /* A round whose golfer no longer exists must not become invisible — no view
@@ -1872,9 +2160,25 @@ function golferEntries(golferId) {
     .map((r) => {
       const course = courseById(r.courseId);
       const tee = teeOf(course, r.teeId);
-      const diff = tee ? scoreDifferential(r.score, tee.rating, tee.slope, r.pcc) : null;
-      const overPar = tee ? round1(r.score - tee.par) : null;
-      return { round: r, course, tee, date: r.date, diff, overPar, orphan: !tee };
+      const nine = r.holes === 9;
+      /* A nine is scored against the NINE-hole rating, slope and par off the
+         same scorecard — not against half the 18-hole figures, which are not
+         half as hard. Those three are optional, so a nine played off tees whose
+         9-hole figures have never been typed in has no differential: `no9`, and
+         the rounds table names it. Never a fallback to the 18-hole numbers,
+         which would look like an answer.
+
+         HALF the PCC, and this is the app's reading rather than a quoted rule:
+         the conditions adjustment is published in strokes over a full round, so
+         charging a nine the whole of it would double-count the moment the pair
+         is added up. Two nines on +1 days combine to the +1 an 18 would get. */
+      const missing9 = nine && !(tee && tee.rating9 != null && tee.slope9 != null && tee.par9 != null);
+      const diff = (tee && !missing9)
+        ? (nine ? scoreDifferential(r.score, tee.rating9, tee.slope9, (r.pcc || 0) / 2)
+                : scoreDifferential(r.score, tee.rating, tee.slope, r.pcc))
+        : null;
+      const overPar = (tee && !missing9) ? round1(r.score - (nine ? tee.par9 : tee.par)) : null;
+      return { round: r, course, tee, date: r.date, nine, diff, overPar, orphan: !tee, no9: missing9 };
     });
 }
 
@@ -1885,21 +2189,30 @@ function golferEntries(golferId) {
    to the golfer on screen. */
 function computeAll(golferId) {
   const all = golferEntries(golferId);
-  const counted = all.filter((e) => e.round.counts && !e.orphan);
+  const counted = all.filter((e) => e.round.counts && !e.orphan && !e.no9);
   const method = normalizeMethod(state.settings.method);
   const useCaps = state.settings.applyCaps !== false;
+  const useEsr = state.settings.applyEsr !== false;
 
-  const forHistory = counted.map((e) => ({
-    date: e.date,
-    diff: e.diff,
-    value: method.basis === 'overPar' ? e.overPar : e.diff,
+  /* Everything below this line works in GAMES, not rounds. For a card of 18
+     they are the same thing; two nines are one game, and a nine still waiting
+     for its partner is no game at all. Doing the pairing here, once, is what
+     keeps the figures, the chart, the pills and the working-out counting the
+     same things. */
+  const paired = pairNines(counted);
+  const games = paired.games;
+
+  const forHistory = games.map((g) => ({
+    date: g.date,
+    diff: g.diff,
+    value: method.basis === 'overPar' ? g.overPar : g.diff,
   }));
-  const history = indexHistory(forHistory, method, useCaps);
+  const history = indexHistory(forHistory, method, useCaps, useEsr);
   const latest = history.length ? history[history.length - 1] : null;
 
-  const newestFirst = counted.slice().reverse();
-  const diffs = newestFirst.map((e) => e.diff);
-  const values = newestFirst.map((e) => (method.basis === 'overPar' ? e.overPar : e.diff));
+  const newestFirst = games.slice().reverse();
+  const diffs = newestFirst.map((g) => g.diff);
+  const values = newestFirst.map((g) => (method.basis === 'overPar' ? g.overPar : g.diff));
 
   const whsPick = whsSelection(diffs);
   const rollPick = rollingSelection(values, method);
@@ -1913,10 +2226,11 @@ function computeAll(golferId) {
   const usedRoll = pickUsed(newestFirst, values, rollPick);
 
   return {
-    all, counted, method, useCaps, history, latest,
+    all, counted, games, pendingNine: paired.pending, method, useCaps, useEsr, history, latest,
     whs: {
       value: latest ? latest.whs : null,
       uncapped: latest ? latest.whsUncapped : null,
+      esr: latest ? latest.esrHeld : 0,
       cap: latest ? latest.cap : null,
       lowIndex: latest ? latest.lowIndex : null,
       pick: whsPick, used: usedWhs,
@@ -1935,7 +2249,15 @@ function pickUsed(newestFirst, vals, pick) {
   for (let i = 0; i < Math.min(newestFirst.length, pick.considered); i++) {
     const v = vals[i];
     const at = quota.indexOf(v);
-    if (at !== -1) { quota.splice(at, 1); used.add(newestFirst[i].round.id); }
+    /* A game made of two nines credits BOTH of its rounds — they earned that
+       differential together, so highlighting one and not the other would say
+       the other did nothing. `parts || [item]` because this is also called with
+       plain entries in the tests, where an item is its own only part. */
+    if (at !== -1) {
+      quota.splice(at, 1);
+      const item = newestFirst[i];
+      (item.parts || [item]).forEach((p) => used.add(p.round.id));
+    }
   }
   return used;
 }
@@ -1976,6 +2298,7 @@ function render() {
   renderStats(c);
   renderChart(c);
   renderCourseHandicap(c);
+  renderCourseStats(c);
   renderRounds(c);
   renderWorking(c);
   renderLeague();
@@ -1985,7 +2308,13 @@ function render() {
 function renderEmptyState() {
   if (window.ghViewOnly) return;
   const bare = state.rounds.length === 0;
-  ['handicapCard', 'statsCard', 'trendCard', 'playingCard'].forEach((id) => {
+  /* `strokesCard` joins them for the same reason: with no rounds there are no
+     handicaps to turn into shots, so it is a course picker above a column of
+     dashes. `leagueCard` stays — it is the tab's whole content, and its own note
+     explains an empty table. `courseStatsCard` is deliberately NOT here: it
+     decides its own visibility on how many courses have been played, and this
+     loop would then un-hide it a moment later on every render with rounds in. */
+  ['handicapCard', 'statsCard', 'trendCard', 'playingCard', 'strokesCard'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.hidden = bare;
   });
@@ -2034,8 +2363,15 @@ function renderFigures(c) {
   const notes = [];
   const orphans = c.all.filter((e) => e.orphan).length;
   const skipped = c.all.filter((e) => !e.round.counts && !e.orphan).length;
+  const no9 = c.all.filter((e) => e.no9 && !e.orphan && e.round.counts).length;
   if (orphans) notes.push(`${orphans} round${orphans === 1 ? '' : 's'} can't be counted — the course or tee they used has been deleted.`);
   if (skipped) notes.push(`${skipped} round${skipped === 1 ? '' : 's'} marked "don't count" ${skipped === 1 ? 'is' : 'are'} left out of both figures.`);
+  if (no9) notes.push(`${no9} nine-hole round${no9 === 1 ? '' : 's'} can't be scored yet — add the 9-hole rating, slope and par to those tees in Golfers & Courses.`);
+  /* A nine waiting for a partner is the one exclusion a golfer can fix by
+     playing, so it says what it is waiting for rather than sounding like a
+     fault. */
+  if (c.pendingNine) notes.push('One nine-hole round is waiting to be paired — it counts as soon as you log another nine.');
+  if (c.whs.esr) notes.push(`Exceptional score reduction in force: ${Math.abs(c.whs.esr).toFixed(1)} taken off the official index, and it stays until those rounds drop out of the last ${ESR_LASTS}.`);
   if (c.whs.cap === 'soft') notes.push(`Soft cap applied: the official index would be ${fmtIndex(c.whs.uncapped)}, but rises more than 3.0 above the lowest index of the past year only count half.`);
   if (c.whs.cap === 'hard') notes.push(`Hard cap applied: the official index would be ${fmtIndex(c.whs.uncapped)}, but it can't sit more than 5.0 above the lowest index of the past year.`);
   document.getElementById('handicapWarn').textContent = notes.join(' ');
@@ -2043,7 +2379,7 @@ function renderFigures(c) {
 
 function describeRolling(c) {
   const m = c.method;
-  if (!c.rolling.pick) return c.counted.length ? 'No usable rounds yet.' : 'Add some rounds to get started.';
+  if (!c.rolling.pick) return c.games.length ? 'No usable rounds yet.' : 'Add some rounds to get started.';
   const p = c.rolling.pick;
   const basis = m.basis === 'overPar' ? 'shots over par' : 'score differentials';
   const lead = p.use < p.considered ? `the best ${p.use} of the last ${p.considered}` : `the last ${p.considered}`;
@@ -2052,7 +2388,10 @@ function describeRolling(c) {
 }
 
 function describeWhs(c) {
-  const n = c.counted.length;
+  /* Games, not rounds: the minimum is three 18-hole records, and two nines are
+     one of them. Counting rounds here would promise an index at three that the
+     arithmetic then refuses to produce. */
+  const n = c.games.length;
   if (n < WHS_MIN_ROUNDS) return `Needs ${WHS_MIN_ROUNDS} counting rounds — ${n} so far.`;
   const p = c.whs.pick;
   const adj = p.adj ? `, then ${p.adj} applied` : '';
@@ -2060,8 +2399,10 @@ function describeWhs(c) {
 }
 
 function renderStats(c) {
-  const entries = c.counted;
-  const diffs = entries.map((e) => e.diff).filter((d) => d != null);
+  /* The best differential comes off the GAMES, not the rounds: a single nine's
+     differential is roughly half an 18-hole one, so it would win this tile every
+     time it appeared and mean nothing. */
+  const diffs = c.games.map((g) => g.diff).filter((d) => d != null);
   const last = c.all.length ? c.all[c.all.length - 1] : null;
   const best = diffs.length ? Math.min.apply(null, diffs) : null;
 
@@ -2076,7 +2417,7 @@ function renderStats(c) {
      last unless something longer arrives. */
   const tiles = [
     ['Rounds logged', String(c.all.length)],
-    ['Counting towards handicap', String(entries.length)],
+    ['Counting towards handicap', String(c.counted.length)],
     ['Best differential', best == null ? '—' : best.toFixed(1)],
     [`Change over ${TREND_ROUNDS} rounds`, trendLabel(trend)],
     ['Last round', last ? `${last.round.score} on ${fmtDate(last.date)}` : '—'],
@@ -2166,6 +2507,14 @@ function renderCourseHandicap(c) {
   if (keepT && course && course.tees.some((t) => t.id === keepT)) tSel.value = keepT;
   const tee = teeOf(course, tSel.value);
 
+  const fSel = document.getElementById('chFormat');
+  if (!fSel.options.length) fSel.innerHTML = ALLOWANCES.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}</option>`).join('');
+  /* Set on EVERY render, not just when the options are built — the two format
+     pickers are one setting, and the other one writing it has to move this one
+     even when this panel was not the thing that changed. */
+  fSel.value = chosenAllowance;
+  const allow = allowanceById(fSel.value);
+
   const index = state.settings.primary === 'whs' ? c.whs.value : c.rolling.value;
   const which = state.settings.primary === 'whs' ? 'the official index' : c.method.name;
   const el = document.getElementById('chValue');
@@ -2181,13 +2530,23 @@ function renderCourseHandicap(c) {
     sub.textContent = `No handicap yet to convert — ${which} needs more rounds.`;
     return;
   }
-  el.textContent = String(ch); el.classList.remove('na');
-  sub.textContent = `${fmtIndex(index)} (${which}) × ${tee.slope} ÷ 113 + (${tee.rating} − ${tee.par}) = ${ch} shots off the tee at ${course.name}, ${tee.name}.`;
+  const ph = playingHandicap(ch, allow.pct);
+  el.textContent = String(ph); el.classList.remove('na');
+  /* The full course handicap is always in the sentence, even when the allowance
+     is 100% and the two numbers are the same. The big figure is what you play
+     off; the line under it is where it came from, and a percentage that silently
+     takes shots away is the one thing here that has to be visible. */
+  const cut = allow.pct === 100 ? '' :
+    ` Then ${allow.pct}% for ${allow.label.replace(/\s*\(\d+%\)$/, '').toLowerCase()} = ${ph}.`;
+  sub.textContent = `${fmtIndex(index)} (${which}) × ${tee.slope} ÷ 113 + (${tee.rating} − ${tee.par}) = ${ch} shots off the tee at ${course.name}, ${tee.name}.${cut}`;
 }
 
 function renderRounds(c) {
   const box = document.getElementById('roundsTable');
   if (!c.all.length) {
+    /* Before the early returns below, or a filter left set on a golfer who then
+       has no rounds keeps its controls above an empty state. */
+    document.getElementById('roundsFilter').hidden = true;
     /* A visitor gets the plain fact, not the two buttons that would start
        building data in a copy that can never be saved. */
     if (viewOnly) {
@@ -2217,19 +2576,23 @@ function renderRounds(c) {
     return;
   }
   /* Newest first: the last round played is the one you came to look at. */
-  const rows = c.all.slice().reverse().map((e) => {
+  const shown = applyRoundsFilter(c.all).slice().reverse();
+  const rows = shown.map((e) => {
     const r = e.round;
     const inRoll = c.rolling.used.has(r.id);
     const inWhs = c.whs.used.has(r.id);
+    const waiting = c.pendingNine && c.pendingNine.round.id === r.id;
     const flags = [];
     if (e.orphan) flags.push('<span class="pill excluded">course deleted</span>');
     else if (!r.counts) flags.push('<span class="pill excluded">not counted</span>');
+    else if (e.no9) flags.push('<span class="pill excluded">no 9-hole rating</span>');
+    else if (waiting) flags.push('<span class="pill pending">waiting for a second nine</span>');
     else {
       if (inRoll) flags.push(`<span class="pill counts">${esc(c.method.name)}</span>`);
       if (inWhs) flags.push('<span class="pill counts">official</span>');
       if (!inRoll && !inWhs) flags.push('<span class="pill">not used</span>');
     }
-    const dropped = e.orphan || !r.counts;
+    const dropped = e.orphan || !r.counts || e.no9;
     /* In a shared view the date is text: a control that opens an editor whose
        Save can never save is worse than no control at all. */
     const dateCell = viewOnly
@@ -2238,7 +2601,7 @@ function renderRounds(c) {
     return `<tr class="${dropped ? 'dropped' : ''}">
       <th scope="row">${dateCell}</th>
       <td>${esc(e.course ? e.course.name : '—')}</td>
-      <td>${esc(e.tee ? e.tee.name : '—')}</td>
+      <td>${esc(e.tee ? e.tee.name : '—')}${e.nine ? ' <span class="pill">9 holes</span>' : ''}</td>
       <td class="num">${esc(String(r.score))}</td>
       <td class="num">${e.diff == null ? '—' : e.diff.toFixed(1)}</td>
       <td class="num">${e.overPar == null ? '—' : (e.overPar > 0 ? '+' : '') + e.overPar.toFixed(0)}</td>
@@ -2246,6 +2609,12 @@ function renderRounds(c) {
       <td>${esc(r.note || '')}</td>
     </tr>`;
   }).join('');
+
+  renderRoundsFilter(c, shown.length);
+  if (!rows) {
+    box.innerHTML = '<div class="empty"><p>No rounds match that filter.</p></div>';
+    return;
+  }
 
   box.innerHTML = `<table>
     <caption class="sr-only">Every round logged, newest first. Select a date to edit that round.</caption>
@@ -2265,9 +2634,162 @@ function renderRounds(c) {
   });
 }
 
+/* ── By course ───────────────────────────────────────────────────────────────
+   Where you actually play well, which neither handicap can tell you: both are
+   built to be portable across courses on purpose, so a course that suits you
+   disappears into them by design.
+
+   Grouped by COURSE and not by course-and-tee. Tees split a modest record into
+   several tiny ones, and the question this answers — "how do I go round
+   Ashfield?" — is not usually asked per tee. The differential is what the
+   columns lead on rather than the raw score, because a score off the yellows and
+   a score off the whites are not the same achievement; the raw best is there
+   too, since that is the number people actually remember.
+
+   It reads GAMES, so a pair of nines counts once, at the course of the second
+   nine. A pair split across two courses is credited to where it was completed —
+   arbitrary, but it has to be one of them, and any other answer would count one
+   game twice.
+─────────────────────────────────────────────────────────────────────────── */
+const COURSE_STATS_FROM = 2;      // courses played, below which this says nothing
+function courseStats(games) {
+  const by = new Map();
+  games.forEach((g) => {
+    const last = g.parts[g.parts.length - 1];
+    if (!last.course) return;
+    const row = by.get(last.course.id) || { id: last.course.id, name: last.course.name, n: 0, diffs: [], scores: [], last: '' };
+    row.n += 1;
+    if (g.diff != null) row.diffs.push(g.diff);
+    /* The score of a paired game is the two nines added up, which is the number
+       that belongs beside an 18-hole score. */
+    row.scores.push(g.parts.reduce((a, p) => a + p.round.score, 0));
+    if (g.date > row.last) row.last = g.date;
+    by.set(row.id, row);
+  });
+  const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+  return Array.from(by.values()).map((r) => ({
+    id: r.id, name: r.name, n: r.n, last: r.last,
+    bestDiff: r.diffs.length ? Math.min.apply(null, r.diffs) : null,
+    avgDiff: round1(mean(r.diffs)),
+    bestScore: r.scores.length ? Math.min.apply(null, r.scores) : null,
+    avgScore: r.scores.length ? Math.round(mean(r.scores)) : null,
+  })).sort((a, b) => {
+    /* Best average differential first — the course you go round best, which is
+       the thing this card is for. A course with no differential at all (every
+       round orphaned) sorts to the foot rather than to the top. */
+    if (a.avgDiff == null && b.avgDiff == null) return String(a.name).localeCompare(String(b.name));
+    if (a.avgDiff == null) return 1;
+    if (b.avgDiff == null) return -1;
+    return a.avgDiff - b.avgDiff || String(a.name).localeCompare(String(b.name));
+  });
+}
+
+function renderCourseStats(c) {
+  const card = document.getElementById('courseStatsCard');
+  const rows = courseStats(c.games);
+  /* One course is not a comparison, it is the same figures the cards above
+     already show. */
+  card.hidden = rows.length < COURSE_STATS_FROM;
+  if (card.hidden) return;
+  document.getElementById('courseStatsTable').innerHTML = `<table>
+    <caption class="sr-only">Every course played, best average score differential first.</caption>
+    <thead><tr>
+      <th scope="col">Course</th>
+      <th scope="col" class="num">Rounds</th>
+      <th scope="col" class="num">Best diff<button class="help-btn" type="button" data-help="diff" aria-label="What is a score differential?">?</button></th>
+      <th scope="col" class="num">Average diff</th>
+      <th scope="col" class="num">Best score</th>
+      <th scope="col" class="num">Average score</th>
+      <th scope="col">Last played</th>
+    </tr></thead><tbody>` + rows.map((r) => `<tr>
+      <th scope="row">${esc(r.name)}</th>
+      <td class="num">${r.n}</td>
+      <td class="num">${r.bestDiff == null ? '—' : r.bestDiff.toFixed(1)}</td>
+      <td class="num">${r.avgDiff == null ? '—' : r.avgDiff.toFixed(1)}</td>
+      <td class="num">${r.bestScore == null ? '—' : r.bestScore}</td>
+      <td class="num">${r.avgScore == null ? '—' : r.avgScore}</td>
+      <td>${r.last ? esc(fmtDate(r.last)) : '—'}</td>
+    </tr>`).join('') + '</tbody></table>';
+}
+
+/* ── The rounds filter ───────────────────────────────────────────────────────
+   A way of LOOKING at the list, and nothing more: it never reaches the maths,
+   which always runs over every round. Held in a plain variable rather than in
+   the saved data — it is where this browser is looking, like the open tab, and
+   a filter that survived a reload would hide rounds from someone who had
+   forgotten they set it.
+
+   It only appears once the list is long enough to need it. Below that it is
+   chrome above a table you can already read in one go.
+─────────────────────────────────────────────────────────────────────────── */
+const FILTER_FROM = 8;
+let roundsFilter = { course: '', text: '' };
+
+/* The chosen format, read once at boot and written back whenever either picker
+   moves. An unknown value — an older key, or a hand-edited one — falls back to
+   the full handicap, which is the answer that takes nothing away from anybody. */
+let chosenAllowance = DEFAULT_ALLOWANCE;
+try {
+  const saved = localStorage.getItem(ALLOWANCE_KEY);
+  if (saved && ALLOWANCES.some((a) => a.id === saved)) chosenAllowance = saved;
+} catch (e) { /* storage refused — the default is a fine answer */ }
+function setAllowance(id) {
+  chosenAllowance = allowanceById(id).id;
+  try { localStorage.setItem(ALLOWANCE_KEY, chosenAllowance); }
+  catch (e) { /* the format just won't be remembered */ }
+  /* Both panels read the same variable, so setting it in one moves the other —
+     which is the point: it is one question ("what are we playing?") asked in two
+     places, not two settings that can disagree. */
+  document.getElementById('chFormat').value = chosenAllowance;
+  const lb = document.getElementById('lbFormat');
+  if (lb) lb.value = chosenAllowance;
+  render();
+}
+
+function applyRoundsFilter(entries) {
+  const f = roundsFilter;
+  const needle = f.text.trim().toLowerCase();
+  if (!f.course && !needle) return entries;
+  return entries.filter((e) => {
+    if (f.course && e.round.courseId !== f.course) return false;
+    if (!needle) return true;
+    /* Everything the row actually shows, so what you type is matched against
+       what you can see — including the date as written and the score as a
+       number, which is how people look for "that 82". */
+    const hay = [fmtDate(e.date), e.date, String(e.round.score),
+      e.course ? e.course.name : '', e.tee ? e.tee.name : '',
+      e.round.note || '', e.round.holes === 9 ? '9 holes' : '']
+      .join(' ').toLowerCase();
+    return hay.indexOf(needle) !== -1;
+  });
+}
+
+function renderRoundsFilter(c, showing) {
+  const bar = document.getElementById('roundsFilter');
+  const sel = document.getElementById('fltCourse');
+  bar.hidden = c.all.length < FILTER_FROM;
+  if (bar.hidden) return;
+  /* Only the courses this golfer has actually played. A filter offering a
+     course with no rounds behind it is a control that can only ever empty the
+     table. */
+  const played = state.courses.filter((x) => c.all.some((e) => e.round.courseId === x.id));
+  sel.innerHTML = '<option value="">All courses</option>'
+    + played.map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('');
+  /* The chosen course can disappear under the filter — deleted, or the golfer
+     switched to someone who has never played it. Fall back to all rather than
+     leaving a select showing a value it no longer holds. */
+  if (roundsFilter.course && played.some((x) => x.id === roundsFilter.course)) sel.value = roundsFilter.course;
+  else { roundsFilter.course = ''; sel.value = ''; }
+  const filtered = showing !== c.all.length;
+  document.getElementById('fltCount').textContent = filtered
+    ? `Showing ${showing} of ${c.all.length} rounds — both handicaps still use all of them.`
+    : '';
+  document.getElementById('fltClear').hidden = !filtered;
+}
+
 function renderWorking(c) {
   const el = document.getElementById('working');
-  if (!c.counted.length) { el.textContent = 'Nothing to work out yet.'; return; }
+  if (!c.games.length) { el.textContent = 'Nothing to work out yet.'; return; }
   const m = c.method;
   const lines = [];
 
@@ -2295,19 +2817,48 @@ function renderWorking(c) {
     const mean = p.kept.reduce((a, b) => a + b, 0) / p.kept.length;
     lines.push(`  Average = ${mean.toFixed(3)}${p.adj ? ` ${p.adj > 0 ? '+' : '−'} ${Math.abs(p.adj)} = ${(mean + p.adj).toFixed(3)}` : ''}`);
     lines.push(`  Rounded to 1 decimal = ${fmtIndex(c.whs.uncapped)}`);
+    /* Written out round by round rather than as one total: the whole difficulty
+       of a reduction is that it outlives the round that earned it, and a single
+       "−2.0" line says nothing about which rounds are still holding it up or
+       when it will fall away. */
+    if (c.whs.esr) {
+      const held = c.history.slice(-ESR_LASTS).filter((h) => h.esr);
+      /* The app writes a minus as U+2212 everywhere else it writes one out;
+         toFixed gives a hyphen, which is a different character and sits at a
+         different height beside the figures above it. */
+      const neg = (n) => '\u2212' + Math.abs(n).toFixed(1);
+      held.forEach((h) => lines.push(`  Exceptional score on ${h.date}: ${neg(h.esr)}`));
+      lines.push(`  Reduction in force = ${neg(c.whs.esr)} → ${fmtIndex(round1(c.whs.uncapped + c.whs.esr))}`);
+    }
     if (c.whs.lowIndex != null) lines.push(`  Lowest index in the past year = ${fmtIndex(c.whs.lowIndex)}`);
     if (c.whs.cap === 'soft') lines.push(`  Soft cap: rise above 3.0 halved → ${fmtIndex(c.whs.value)}`);
     if (c.whs.cap === 'hard') lines.push(`  Hard cap: held at 5.0 above the low index → ${fmtIndex(c.whs.value)}`);
   } else {
-    lines.push(`  Needs at least ${WHS_MIN_ROUNDS} counting rounds — ${c.counted.length} so far.`);
+    lines.push(`  Needs at least ${WHS_MIN_ROUNDS} counting rounds — ${c.games.length} so far.`);
   }
 
   lines.push('');
   lines.push('EACH ROUND — newest first');
-  c.counted.slice().reverse().slice(0, Math.max(20, m.window)).forEach((e) => {
-    lines.push(`  ${e.date}  ${String(e.round.score).padStart(3)}  at ${e.course.name} (${e.tee.name}, CR ${e.tee.rating} / SR ${e.tee.slope})`);
-    lines.push(`            (113 ÷ ${e.tee.slope}) × (${e.round.score} − ${e.tee.rating}${e.round.pcc ? ` − ${e.round.pcc}` : ''}) = ${e.diff.toFixed(1)}`);
+  /* Walks GAMES, so a pair of nines is shown as the one record the maths used,
+     with both cards under it and the addition written out. Showing the two
+     nines as separate rows here would contradict every figure above. */
+  c.games.slice().reverse().slice(0, Math.max(20, m.window)).forEach((g) => {
+    const nine = g.parts.length > 1;
+    if (nine) lines.push(`  ${g.date}  two nines, combined = ${g.diff.toFixed(1)}`);
+    g.parts.forEach((e) => {
+      const cr = e.nine ? e.tee.rating9 : e.tee.rating;
+      const sr = e.nine ? e.tee.slope9 : e.tee.slope;
+      const pcc = e.nine ? (e.round.pcc || 0) / 2 : e.round.pcc;
+      const pad = nine ? '    ' : '';
+      lines.push(`  ${pad}${e.date}  ${String(e.round.score).padStart(3)}  at ${e.course.name} (${e.tee.name}${e.nine ? ', 9 holes' : ''}, CR ${cr} / SR ${sr})`);
+      lines.push(`  ${pad}          (113 ÷ ${sr}) × (${e.round.score} − ${cr}${pcc ? ` − ${pcc}` : ''}) = ${e.diff.toFixed(1)}`);
+    });
+    if (nine) lines.push(`            ${g.parts.map((e) => e.diff.toFixed(1)).join(' + ')} = ${g.diff.toFixed(1)}`);
   });
+  if (c.pendingNine) {
+    lines.push('');
+    lines.push(`  ${c.pendingNine.date}  ${String(c.pendingNine.round.score).padStart(3)}  nine holes, waiting to be paired — counts towards nothing yet.`);
+  }
   el.textContent = lines.join('\n');
 }
 
@@ -2323,8 +2874,9 @@ function renderWorking(c) {
 function leagueRows() {
   return state.golfers.map((g) => {
     const c = computeAll(g.id);
-    const diffs = c.counted.map((e) => e.diff).filter((d) => d != null);
+    const diffs = c.games.map((x) => x.diff).filter((d) => d != null);
     const last = c.all.length ? c.all[c.all.length - 1] : null;
+    const key = state.settings.primary === 'whs' ? 'whs' : 'rolling';
     return {
       id: g.id,
       name: g.name,
@@ -2335,9 +2887,121 @@ function leagueRows() {
       excluded: c.all.length - c.counted.length,
       best: diffs.length ? Math.min.apply(null, diffs) : null,
       change: changeOverRounds(c.history, state.settings.primary, TREND_ROUNDS),
+      /* The last stretch of the primary figure, for the row's sparkline. Read
+         off the same history the chart and the change column use, so a rising
+         line and a positive change can never disagree. */
+      spark: c.history.map((h) => h[key]).filter((v) => v != null).slice(-SPARK_POINTS),
       lastDate: last ? last.date : null,
     };
   });
+}
+
+/* A row's handicap over its last few games, as an inline SVG. Flow Metrics'
+   Trend column, ported: the shape answers "which way is this going", the number
+   beside it answers "by how much", and the number is what makes the row
+   readable to a screen reader and exportable to a spreadsheet — so the sparkline
+   is `aria-hidden` and never the only thing saying anything.
+
+   Colour follows the primary figure's own series colour, so a row's line is the
+   same hue as that golfer's line on the chart above. */
+function sparkSvg(values) {
+  if (!values || values.length < 2) return '';
+  const W = 62, H = 16, pad = 1.5;
+  let lo = Math.min.apply(null, values), hi = Math.max.apply(null, values);
+  if (hi - lo < 0.2) { const mid = (hi + lo) / 2; lo = mid - 0.1; hi = mid + 0.1; }
+  /* Lower is better in golf, so the line is drawn with LOW at the top — an
+     improving handicap rises. Inverting it would make every good run look like
+     a decline. */
+  const x = (i) => pad + (i * (W - pad * 2)) / (values.length - 1);
+  const y = (v) => pad + ((v - lo) / (hi - lo)) * (H - pad * 2);
+  const d = values.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const stroke = state.settings.primary === 'whs' ? 'var(--c-whs)' : 'var(--c-roll)';
+  return `<svg class="spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true" focusable="false">`
+    + `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>`
+    + `<circle cx="${x(values.length - 1).toFixed(1)}" cy="${y(values[values.length - 1]).toFixed(1)}" r="1.8" fill="${stroke}"></circle></svg>`;
+}
+
+/* ── Strokes on the day ──────────────────────────────────────────────────────
+   Every golfer's handicap turned into shots at one course, off one set of tees,
+   under one format. It reads `leagueRows()` — the same rows the leaderboard is
+   built from, so a golfer's index here can never disagree with the index one
+   card above.
+
+   The shots-received column is measured against the LOWEST playing handicap in
+   the field, which is how a match is actually set up: the best player plays off
+   scratch and everyone else receives the difference. Measured against zero it
+   would just repeat the playing-handicap column.
+─────────────────────────────────────────────────────────────────────────── */
+function renderStrokes(rows) {
+  const cSel = document.getElementById('lbCourse');
+  const tSel = document.getElementById('lbTee');
+  const fSel = document.getElementById('lbFormat');
+  const keepC = cSel.value, keepT = tSel.value;
+  cSel.innerHTML = state.courses.length
+    ? state.courses.map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')
+    : '<option value="">No courses yet</option>';
+  if (keepC && state.courses.some((x) => x.id === keepC)) cSel.value = keepC;
+  const course = courseById(cSel.value);
+  tSel.innerHTML = course
+    ? course.tees.map((t) => `<option value="${esc(t.id)}">${esc(t.name)} — CR ${t.rating}, SR ${t.slope}, par ${t.par}</option>`).join('')
+    : '<option value="">—</option>';
+  if (keepT && course && course.tees.some((t) => t.id === keepT)) tSel.value = keepT;
+  if (!fSel.options.length) fSel.innerHTML = ALLOWANCES.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}</option>`).join('');
+  fSel.value = chosenAllowance;
+
+  const box = document.getElementById('strokesTable');
+  const tee = teeOf(course, tSel.value);
+  if (!tee) {
+    box.innerHTML = '<div class="empty"><p>' + (state.courses.length
+      ? 'Pick a course and a set of tees.'
+      : 'Add a course first — Golfers &amp; Courses is in the header.') + '</p></div>';
+    return;
+  }
+  const allow = allowanceById(fSel.value);
+  const primary = state.settings.primary === 'whs' ? 'whs' : 'rolling';
+  const method = normalizeMethod(state.settings.method);
+
+  const out = rows.map((r) => {
+    const index = primary === 'whs' ? r.whs : r.rolling;
+    const ch = courseHandicap(index, tee.slope, tee.rating, tee.par);
+    return { id: r.id, name: r.name, index, ch, ph: playingHandicap(ch, allow.pct) };
+  });
+  /* Ordered by what they play off, not by index: at one set of tees those
+     agree, but the column people read down is the shots column. A golfer with
+     no handicap yet sorts to the foot, as they do on the leaderboard. */
+  out.sort((a, b) => {
+    if (a.ph == null && b.ph == null) return String(a.name).localeCompare(String(b.name));
+    if (a.ph == null) return 1;
+    if (b.ph == null) return -1;
+    return a.ph - b.ph || String(a.name).localeCompare(String(b.name));
+  });
+  const playing = out.filter((x) => x.ph != null);
+  const lowest = playing.length ? playing[0].ph : null;
+
+  const body = out.map((x) => {
+    const gives = (x.ph == null || lowest == null) ? null : x.ph - lowest;
+    return `<tr class="${x.id === state.activeGolfer ? 'is-you' : ''}">
+      <th scope="row">${esc(x.name)}</th>
+      <td class="num">${fmtIndex(x.index)}</td>
+      <td class="num">${x.ch == null ? '—' : x.ch}</td>
+      <td class="num">${x.ph == null ? '—' : x.ph}</td>
+      <td class="num">${gives == null ? '—' : (gives === 0 ? 'scratch' : '+' + gives)}</td>
+    </tr>`;
+  }).join('');
+
+  box.innerHTML = `<table>
+    <caption class="sr-only">Every golfer's playing handicap at ${esc(course.name)}, ${esc(tee.name)} tees, for ${esc(allow.label)}.</caption>
+    <thead><tr>
+      <th scope="col">Golfer</th>
+      <th scope="col" class="num">${esc(primary === 'whs' ? 'Official' : method.name)}</th>
+      <th scope="col" class="num">Course handicap</th>
+      <th scope="col" class="num">Plays off</th>
+      <th scope="col" class="num">Receives</th>
+    </tr></thead><tbody>${body}</tbody></table>
+    <p class="hint">${allow.pct === 100
+      ? 'Full handicaps — nothing taken off.'
+      : `${esc(String(allow.pct))}% of the course handicap, the recommended allowance for ${esc(allow.label.replace(/\s*\(\d+%\)$/, '').toLowerCase())}.`}
+      <em>Receives</em> is measured from the lowest player in the field${lowest == null ? '' : `, who plays off ${esc(String(lowest))}`}.</p>`;
 }
 
 function renderLeague() {
@@ -2375,7 +3039,7 @@ function renderLeague() {
       <td class="num">${fmtIndex(r.whs)}</td>
       <td class="num">${r.counted}</td>
       <td class="num">${r.best == null ? '—' : r.best.toFixed(1)}</td>
-      <td class="num">${esc(trendLabel(r.change))}</td>
+      <td class="num trend">${sparkSvg(r.spark)}<span>${esc(trendLabel(r.change))}</span></td>
       <td>${r.lastDate ? esc(fmtDate(r.lastDate)) : '—'}</td>
     </tr>`;
   }).join('');
@@ -2430,6 +3094,12 @@ function renderLeague() {
     notes.push('A leaderboard of one so far — add the people you play with with the Golfers button in the header. Courses and the league rule are shared by everyone, so their rounds slot straight in.');
   }
   document.getElementById('leagueNote').textContent = notes.join(' ');
+
+  /* Handed the rows this function already built, rather than calling
+     leagueRows() again: that runs computeAll() once per golfer, and two calls
+     would be two chances for the two tables to disagree as well as twice the
+     work. */
+  renderStrokes(rows);
 }
 
 /* ── Dismissing a dialog ────────────────────────────────────────────────── */
@@ -2609,6 +3279,43 @@ function fillCourseSelects(courseSel, teeSel, courseId, teeId) {
   if (teeId && course && course.tees.some((t) => t.id === teeId)) teeSel.value = teeId;
 }
 
+/* The score rows. One golfer, or an edit, gets exactly the single box this
+   dialog has always had — the group case must not make the common case heavier.
+   With more than one golfer, ADDING a round offers everybody, because a round
+   of golf is usually played with other people and logging a fourball used to
+   mean opening this window four times and retyping the date, course and tee on
+   each.
+
+   Nobody is ticked but the golfer on screen: a checkbox that starts ticked is a
+   round logged for someone who did not play, and an unnoticed extra round is far
+   worse than an extra tap. A row's box is enabled only while its checkbox is
+   ticked, so a number typed and then unticked cannot be saved by accident. */
+function renderScoreRows() {
+  const box = document.getElementById('roundScores');
+  const r = editingRound;
+  const solo = !!r || state.golfers.length < 2;
+  const forGolfer = r ? r.golferId : state.activeGolfer;
+  document.getElementById('scoresLabel').textContent = solo
+    ? 'Adjusted gross score' : 'Adjusted gross scores';
+  if (solo) {
+    const g = state.golfers.find((x) => x.id === forGolfer);
+    box.innerHTML = `<input type="number" id="f_score" data-g="${esc(forGolfer)}" min="30" max="200"
+      step="1" required inputmode="numeric" aria-label="Adjusted gross score${g ? ' for ' + esc(g.name) : ''}">`;
+  } else {
+    box.innerHTML = `<div class="scorerows">` + state.golfers.map((g) => {
+      const on = g.id === state.activeGolfer;
+      return `<div class="scorerow">
+        <input type="checkbox" class="s-on" data-g="${esc(g.id)}" id="s-on-${esc(g.id)}"${on ? ' checked' : ''}>
+        <label for="s-on-${esc(g.id)}">${esc(g.name)}</label>
+        <input type="number" class="s-score"${on ? ' id="f_score"' : ''} data-g="${esc(g.id)}" min="30" max="200"
+          step="1" inputmode="numeric" aria-label="Score for ${esc(g.name)}"${on ? '' : ' disabled'}>
+      </div>`;
+    }).join('') + `</div>
+    <p class="hint">Tick whoever else played and give them their score — one round each, all
+      off the same date, course and tee.</p>`;
+  }
+}
+
 function openRound(id) {
   if (!state.courses.length) {
     toast('Add a course first — it needs the rating and slope.');
@@ -2619,7 +3326,13 @@ function openRound(id) {
   const r = editingRound;
   document.getElementById('roundTitle').textContent = r ? 'Edit Round' : 'Add Round';
   document.getElementById('f_date').value = r ? r.date : todayISO();
-  document.getElementById('f_score').value = r ? r.score : '';
+  document.getElementById('f_holes').value = String(r ? r.holes : (lastUsed('holes') || 18));
+  renderScoreRows();
+  /* Guarded rather than assumed: the box carrying this id is the row for the
+     golfer on screen, and a state where that golfer is not in the list is a
+     boot the rest of the app survives. Losing the dialog to it would not be. */
+  const scoreEl = document.getElementById('f_score');
+  if (scoreEl) scoreEl.value = r ? r.score : '';
   fillCourseSelects(document.getElementById('f_course'), document.getElementById('f_tee'), r ? r.courseId : lastUsed('courseId'), r ? r.teeId : lastUsed('teeId'));
   document.getElementById('f_pcc').value = String(r ? r.pcc : 0);
   document.getElementById('f_note').value = r ? r.note : '';
@@ -2640,18 +3353,50 @@ function lastUsed(field) {
 function updateRoundHint() {
   const course = courseById(document.getElementById('f_course').value);
   const tee = teeOf(course, document.getElementById('f_tee').value);
-  const score = Number(document.getElementById('f_score').value);
-  const pcc = Number(document.getElementById('f_pcc').value) || 0;
+  const scoreEl = document.getElementById('f_score');
+  const score = Number(scoreEl ? scoreEl.value : '');
+  const rawPcc = Number(document.getElementById('f_pcc').value) || 0;
+  const nine = document.getElementById('f_holes').value === '9';
   const el = document.getElementById('roundHint');
-  if (!tee || !isFinite(score) || !score) {
-    el.textContent = 'Enter the score you would return to the club — hole scores capped at net double bogey.';
+  /* A nine off tees with no 9-hole figures is the one case where the hint has
+     to stop being a calculation and become an instruction — the round can still
+     be saved, and it will sit in the table saying what it is waiting for. */
+  if (nine && tee && !(tee.rating9 != null && tee.slope9 != null && tee.par9 != null)) {
+    el.textContent = `${tee.name} has no 9-hole rating, slope and par yet — add them in Golfers & Courses and this round starts counting. It will be saved either way.`;
     return;
   }
-  const d = scoreDifferential(score, tee.rating, tee.slope, pcc);
-  el.textContent = `Score differential for this round: ${d == null ? '—' : d.toFixed(1)}  ·  (113 ÷ ${tee.slope}) × (${score} − ${tee.rating}${pcc ? ` − ${pcc}` : ''})`;
+  if (!tee || !isFinite(score) || !score) {
+    el.textContent = nine
+      ? 'Enter the nine-hole score you would return to the club. Two nines are added together to make one 18-hole record.'
+      : 'Enter the score you would return to the club — hole scores capped at net double bogey.';
+    return;
+  }
+  const cr = nine ? tee.rating9 : tee.rating;
+  const sr = nine ? tee.slope9 : tee.slope;
+  const pcc = nine ? rawPcc / 2 : rawPcc;
+  const d = scoreDifferential(score, cr, sr, pcc);
+  /* The note about halving only earns its place when there IS an adjustment to
+     halve — on the 0 that PCC almost always is, it explains an absent term. */
+  const tail = (nine && rawPcc) ? '  ·  half the conditions adjustment, since it is published over 18 holes' : '';
+  el.textContent = `Score differential for this round: ${d == null ? '—' : d.toFixed(1)}  ·  (113 ÷ ${sr}) × (${score} − ${cr}${pcc ? ` − ${pcc}` : ''})${tail}`;
 }
 
-['f_score', 'f_pcc'].forEach((id) => document.getElementById(id).addEventListener('input', updateRoundHint));
+/* Delegated, because the score boxes are rebuilt every time the dialog opens —
+   wiring them individually in renderScoreRows would stack a fresh handler per
+   open on a listener list that never gets cleared. */
+document.getElementById('roundScores').addEventListener('input', updateRoundHint);
+document.getElementById('roundScores').addEventListener('change', (e) => {
+  const box = e.target.closest('.s-on');
+  if (!box) return;
+  /* A row's score box follows its tick, so a number typed and then unticked
+     cannot be saved by an oversight. */
+  const field = document.querySelector(`.s-score[data-g="${CSS.escape(box.dataset.g)}"]`);
+  if (!field) return;
+  field.disabled = !box.checked;
+  if (box.checked) field.focus();
+});
+document.getElementById('f_pcc').addEventListener('input', updateRoundHint);
+document.getElementById('f_holes').addEventListener('change', updateRoundHint);
 document.getElementById('f_course').addEventListener('change', () => {
   fillCourseSelects(document.getElementById('f_course'), document.getElementById('f_tee'), document.getElementById('f_course').value, null);
   updateRoundHint();
@@ -2660,31 +3405,55 @@ document.getElementById('f_tee').addEventListener('change', updateRoundHint);
 
 document.getElementById('roundSave').addEventListener('click', () => {
   const date = document.getElementById('f_date').value;
-  const score = Number(document.getElementById('f_score').value);
   const courseId = document.getElementById('f_course').value;
   const teeId = document.getElementById('f_tee').value;
+  const holes = document.getElementById('f_holes').value === '9' ? 9 : 18;
   const warn = document.getElementById('roundWarn');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { warn.textContent = 'Pick a date.'; return; }
-  if (!(score >= 30 && score <= 200)) { warn.textContent = 'Enter a score between 30 and 200.'; return; }
   if (!teeOf(courseById(courseId), teeId)) { warn.textContent = 'Pick a course and a set of tees.'; return; }
 
-  const rec = {
-    id: editingRound ? editingRound.id : uid(),
-    golferId: editingRound ? editingRound.golferId : state.activeGolfer,
-    date, courseId, teeId,
-    score: Math.round(score),
+  /* One entry per score box that is in play: the single box when editing or
+     when there is one golfer, and every ticked row otherwise. Read as a list
+     even in the single case, so there is one code path and the validation below
+     cannot be right for one shape and wrong for the other. */
+  const boxes = Array.prototype.slice.call(document.querySelectorAll('#roundScores input[type="number"]'))
+    .filter((el) => !el.disabled);
+  const entries = boxes.map((el) => ({ golferId: el.dataset.g, score: Number(el.value), el }));
+  if (!entries.length) { warn.textContent = 'Tick at least one golfer.'; return; }
+  /* Named, not counted. "Enter a score between 30 and 200" over four rows sends
+     someone hunting for which one. */
+  const bad = entries.find((x) => !(x.score >= 30 && x.score <= 200));
+  if (bad) {
+    const g = state.golfers.find((x) => x.id === bad.golferId);
+    warn.textContent = entries.length > 1
+      ? `Enter a score between 30 and 200 for ${g ? g.name : 'that golfer'} — or untick them.`
+      : 'Enter a score between 30 and 200.';
+    if (bad.el.focus) bad.el.focus();
+    return;
+  }
+
+  const shared = {
+    date, courseId, teeId, holes,
     pcc: clampInt(document.getElementById('f_pcc').value, -1, 3, 0),
     note: document.getElementById('f_note').value.slice(0, 120),
     counts: document.getElementById('f_counts').checked,
   };
-  /* Upsert by id rather than trusting findIndex: the round being edited can
-     vanish mid-edit (deleted in another tab, or replaced by a sync), and a -1
-     would silently assign to a "-1" property and lose the save. */
-  const at = state.rounds.findIndex((r) => r.id === rec.id);
-  if (at === -1) state.rounds.push(rec); else state.rounds[at] = rec;
+  entries.forEach((x) => {
+    const rec = Object.assign({
+      id: editingRound ? editingRound.id : uid(),
+      golferId: editingRound ? editingRound.golferId : x.golferId,
+      score: Math.round(x.score),
+    }, shared);
+    /* Upsert by id rather than trusting findIndex: the round being edited can
+       vanish mid-edit (deleted in another tab, or replaced by a sync), and a -1
+       would silently assign to a "-1" property and lose the save. */
+    const at = state.rounds.findIndex((r) => r.id === rec.id);
+    if (at === -1) state.rounds.push(rec); else state.rounds[at] = rec;
+  });
   save();
   roundDialog.close();
-  toast(editingRound ? 'Round updated' : 'Round saved');
+  toast(editingRound ? 'Round updated'
+    : entries.length > 1 ? `${entries.length} rounds saved` : 'Round saved');
 });
 
 document.getElementById('deleteRoundBtn').addEventListener('click', () => {
@@ -2756,6 +3525,15 @@ function renderCourseList() {
 
 function teeRowHtml(t) {
   const v = t || { name: '', rating: 72, slope: 113, par: 72 };
+  const has9 = v.rating9 != null && v.slope9 != null && v.par9 != null;
+  const num = (x) => (x == null ? '' : esc(x));
+  /* The 9-hole figures sit behind a <details> because most people never play a
+     counting nine, and three more boxes in front of everybody would make the
+     common case look harder than it is. Open when they are already filled in —
+     a collapsed panel hiding numbers you typed reads as though they were lost.
+     Its own line rather than the grid2 pairs above: three boxes do not divide
+     into two columns without one of them being orphaned, which is exactly the
+     dead space the dialog rules forbid. */
   return `<fieldset style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:var(--sp-5);margin-bottom:var(--sp-5)" data-tee="${esc(v.id || '')}">
     <legend class="label">Tees</legend>
     <div class="grid2">
@@ -2766,6 +3544,17 @@ function teeRowHtml(t) {
       <div class="field"><label>Course rating<input type="number" class="t-rating" min="40" max="90" step="0.1" value="${esc(v.rating)}"></label></div>
       <div class="field"><label>Slope rating<input type="number" class="t-slope" min="55" max="155" step="1" value="${esc(v.slope)}"></label></div>
     </div>
+    <details${has9 ? ' open' : ''}>
+      <summary>Nine-Hole Figures (Optional)</summary>
+      <p class="hint" style="margin-top:var(--sp-5)">Only needed if you log nine-hole rounds off these tees. They are
+        printed on the scorecard beside the 18-hole ones, for the nine you play. Leave them
+        empty and a nine-hole round here is kept but not scored — never guessed at.</p>
+      <div class="grid3">
+        <div class="field"><label>9-hole par<input type="number" class="t-par9" min="27" max="45" step="1" value="${num(v.par9)}" placeholder="—"></label></div>
+        <div class="field"><label>9-hole rating<input type="number" class="t-rating9" min="25" max="50" step="0.1" value="${num(v.rating9)}" placeholder="—"></label></div>
+        <div class="field"><label>9-hole slope<input type="number" class="t-slope9" min="55" max="155" step="1" value="${num(v.slope9)}" placeholder="—"></label></div>
+      </div>
+    </details>
     <button type="button" class="link removeTee">Remove these tees</button>
   </fieldset>`;
 }
@@ -2810,10 +3599,23 @@ document.getElementById('courseEditSave').addEventListener('click', () => {
     const rating = Number(fs.querySelector('.t-rating').value);
     const slope = Number(fs.querySelector('.t-slope').value);
     const par = Number(fs.querySelector('.t-par').value);
+    /* The nine-hole trio is all-or-nothing. Two of the three is not a partial
+       answer — a differential needs every one of them, so a tee saved with a
+       rating and no slope would look filled in and still refuse to score a
+       round. Empty is a legitimate answer and the common one. */
+    const raw9 = ['par9', 'rating9', 'slope9'].map((k) => fs.querySelector('.t-' + k).value.trim());
+    const filled9 = raw9.filter((x) => x !== '').length;
+    const [par9, rating9, slope9] = raw9.map((x) => (x === '' ? null : Number(x)));
+
     if (!(rating >= 40 && rating <= 90)) bad = `Course rating for "${nm}" should be between 40 and 90 — it's on the scorecard, usually close to par.`;
     else if (!(slope >= 55 && slope <= 155)) bad = `Slope rating for "${nm}" should be between 55 and 155 — 113 is average.`;
     else if (!(par >= 27 && par <= 90)) bad = `Par for "${nm}" should be between 27 and 90.`;
-    tees.push({ id: fs.dataset.tee || uid(), name: nm, rating, slope, par });
+    else if (filled9 && filled9 < 3) bad = `The nine-hole figures for "${nm}" need all three — par, rating and slope — or none at all.`;
+    else if (filled9 && !(par9 >= 27 && par9 <= 45)) bad = `9-hole par for "${nm}" should be between 27 and 45.`;
+    else if (filled9 && !(rating9 >= 25 && rating9 <= 50)) bad = `9-hole rating for "${nm}" should be between 25 and 50 — about half the 18-hole one.`;
+    else if (filled9 && !(slope9 >= 55 && slope9 <= 155)) bad = `9-hole slope for "${nm}" should be between 55 and 155.`;
+    tees.push({ id: fs.dataset.tee || uid(), name: nm, rating, slope, par,
+      par9: filled9 ? par9 : null, rating9: filled9 ? rating9 : null, slope9: filled9 ? slope9 : null });
   });
   if (bad) { warn.textContent = bad; return; }
   if (!tees.length) { warn.textContent = 'A course needs at least one set of tees.'; return; }
@@ -2904,6 +3706,7 @@ function openMethod() {
   document.getElementById('m_mult').value = m.multiplier;
   document.getElementById('m_adj').value = m.adjustment;
   document.getElementById('m_caps').checked = state.settings.applyCaps !== false;
+  document.getElementById('m_esr').checked = state.settings.applyEsr !== false;
   document.getElementById('methodWarn').textContent = '';
   updateMethodPreview();
   openModal(methodDialog);
@@ -2939,6 +3742,7 @@ document.getElementById('methodSave').addEventListener('click', () => {
   }
   state.settings.method = m;
   state.settings.applyCaps = document.getElementById('m_caps').checked;
+  state.settings.applyEsr = document.getElementById('m_esr').checked;
   save();
   methodDialog.close();
   toast('Method updated');
@@ -3126,7 +3930,20 @@ const HELP = {
     <p>Courses and the league rule are shared by everyone in the app, which is what makes the comparison fair: the same calculation, applied to different rounds.</p>`],
   coursehcp: ['Course Handicap', `<p>Your handicap index is portable. The course handicap is what it becomes on one particular course off one particular set of tees — the actual number of shots you take off on the day:</p>
     <p><code>index × (slope ÷ 113) + (course rating − par)</code>, rounded to a whole number.</p>
-    <p>It follows whichever figure you have set as primary, so switching between the league handicap and the official one changes it.</p>`],
+    <p>It follows whichever figure you have set as primary, so switching between the league handicap and the official one changes it.</p>
+    <p><strong>Format</strong> applies a competition allowance: a percentage of the course handicap, which is what you actually play off. The more balls a side plays, the more the best of them flatters a high handicap — so a four-ball gives 90% and foursomes 50%, while singles match play gives the lot. These are the recommended allowances; your club may set its own. The line under the figure always shows the full course handicap it started from.</p>`],
+  strokes: ['Strokes on the Day', `<p>Everyone's handicap turned into shots at one course, off one set of tees, in one format — the sheet you write out before you tee off.</p>
+    <p><strong>Course handicap</strong> is the full number of shots those tees give that golfer. <strong>Plays off</strong> is what is left after the format's allowance. <strong>Receives</strong> is the difference from the lowest player in the field, who plays off scratch and gives the shots — which is how a match is actually set up.</p>
+    <p>The index column follows whichever figure is set as primary, so this table and the leaderboard above it are always ranked on the same thing.</p>`],
+  bycourse: ['By Course', `<p>How you actually go round each course, which neither handicap will tell you — both are built to be comparable across courses on purpose, so a course that happens to suit you disappears into them by design.</p>
+    <p>The <strong>differential</strong> columns are the fair comparison, because they already account for rating and slope; the <strong>score</strong> columns are the numbers you remember. Best average differential first.</p>
+    <p>Rounds are grouped by course, not by tee, and a pair of nine-hole rounds counts once — at the course where the second nine was played.</p>`],
+  nine: ['Nine-Hole Rounds', `<p>Both handicaps count <em>games</em>, and a game is 18 holes — so a nine is not a round on its own. The official system adds two nine-hole score differentials together to make one 18-hole differential, and this app does the same, for the league handicap as well.</p>
+    <p>Nines are paired in the order you played them, oldest first. One left over waits for the next nine you log, and the app says so rather than quietly ignoring it.</p>
+    <p>A nine is scored against the <strong>9-hole</strong> rating, slope and par for those tees, which are printed on the scorecard and are typed in under Golfers &amp; Courses. Without them the round is kept but not scored — half the 18-hole figures would be a guess, not an answer. The conditions adjustment is halved, since it is published over a full round.</p>`],
+  esr: ['Exceptional Score Reduction', `<p>Play far better than your index says you can and the official index comes down by more than the averaging alone would bring it. A score differential <strong>7.0 to 9.9</strong> below your index takes an extra 1.0 off; <strong>10.0 or more</strong> below takes 2.0.</p>
+    <p>It is measured against the index you held when you played, not the one the round produces. And it does not stop with that round — it stays in force for the next 19 scores and then falls away as that round drops out of the last 20, so two exceptional rounds close together stack.</p>
+    <p>The league handicap is never affected: it averages whatever rounds its rule selects, and this is part of the official calculation only.</p>`],
 };
 
 const helpDialog = document.getElementById('helpDialog');
@@ -3143,6 +3960,31 @@ document.getElementById('helpClose').addEventListener('click', () => helpDialog.
 
 document.getElementById('chCourse').addEventListener('change', () => render());
 document.getElementById('chTee').addEventListener('change', () => render());
+document.getElementById('chFormat').addEventListener('change', (e) => setAllowance(e.target.value));
+document.getElementById('lbCourse').addEventListener('change', () => {
+  /* The tee list belongs to the course, so a course change has to drop the tee
+     it was holding rather than carry a tee that is now somebody else's. */
+  document.getElementById('lbTee').value = '';
+  render();
+});
+document.getElementById('lbTee').addEventListener('change', () => render());
+document.getElementById('lbFormat').addEventListener('change', (e) => setAllowance(e.target.value));
+
+/* ── The rounds filter's controls ───────────────────────────────────────── */
+document.getElementById('fltCourse').addEventListener('change', (e) => {
+  roundsFilter.course = e.target.value;
+  render();
+});
+document.getElementById('fltText').addEventListener('input', (e) => {
+  roundsFilter.text = e.target.value;
+  render();
+});
+document.getElementById('fltClear').addEventListener('click', () => {
+  roundsFilter = { course: '', text: '' };
+  document.getElementById('fltText').value = '';
+  document.getElementById('fltCourse').value = '';
+  render();
+});
 
 /* ── Backup ─────────────────────────────────────────────────────────────── */
 
@@ -3161,6 +4003,83 @@ function downloadBackup() {
   toast('Backup downloaded');
 }
 document.getElementById('exportBtn').addEventListener('click', downloadBackup);
+
+/* ── Rounds as a spreadsheet ─────────────────────────────────────────────────
+   The app was built for somebody who kept his handicap in Excel, so getting the
+   rounds back OUT as a spreadsheet is not an afterthought. Every golfer, not
+   just the one on screen: the file is the record, and a per-golfer export would
+   mean eight files to stitch together.
+
+   Pure so tests can pin the quoting, which is the only part of a CSV that is
+   ever actually wrong. RFC 4180: a field containing a comma, a quote or a
+   newline is wrapped in quotes and its own quotes are doubled — a course called
+   `The "Old" Course, Ashfield` is one field, not three.
+
+   A leading apostrophe, minus, plus or equals is prefixed with a single quote:
+   a spreadsheet reads those as the start of a FORMULA, so a note beginning "="
+   is executed rather than read. Nothing here can hold one today — notes are the
+   only free text and they are the user's own — but a CSV is a file that leaves
+   this app and gets opened somewhere with no such guarantee, and the day
+   somebody restores a hand-edited backup is the day it matters.
+─────────────────────────────────────────────────────────────────────────── */
+function csvCell(v) {
+  let s = v == null ? '' : String(v);
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function csvRounds(src) {
+  const head = ['Golfer', 'Date', 'Course', 'Tee', 'Holes', 'Score', 'PCC',
+    'Score differential', 'vs par', 'Counts', 'Note'];
+  const golfers = new Map((src.golfers || []).map((g) => [g.id, g.name]));
+  const rows = (src.rounds || []).slice().sort((a, b) =>
+    (a.date === b.date ? String(a.id).localeCompare(String(b.id)) : a.date.localeCompare(b.date)));
+  const lines = [head.map(csvCell).join(',')];
+  rows.forEach((r) => {
+    const course = (src.courses || []).find((x) => x.id === r.courseId) || null;
+    const tee = course ? (course.tees.find((t) => t.id === r.teeId) || null) : null;
+    const nine = r.holes === 9;
+    const has9 = tee && tee.rating9 != null && tee.slope9 != null && tee.par9 != null;
+    /* The same arithmetic golferEntries does, and deliberately the SINGLE
+       round's figure — a paired game's combined differential belongs to two
+       rows and would have to be repeated or attributed to one of them. The
+       per-round number is the one that reconciles with the score beside it. */
+    const diff = (tee && (!nine || has9))
+      ? (nine ? scoreDifferential(r.score, tee.rating9, tee.slope9, (r.pcc || 0) / 2)
+              : scoreDifferential(r.score, tee.rating, tee.slope, r.pcc))
+      : null;
+    const overPar = (tee && (!nine || has9)) ? round1(r.score - (nine ? tee.par9 : tee.par)) : null;
+    lines.push([
+      golfers.get(r.golferId) || 'Unknown golfer',
+      r.date,
+      course ? course.name : '(course deleted)',
+      tee ? tee.name : '(tees deleted)',
+      nine ? 9 : 18,
+      r.score,
+      r.pcc || 0,
+      diff == null ? '' : diff.toFixed(1),
+      overPar == null ? '' : overPar,
+      r.counts === false ? 'no' : 'yes',
+      r.note || '',
+    ].map(csvCell).join(','));
+  });
+  /* CRLF, which is what RFC 4180 says and what keeps Excel on Windows from
+     running the whole file onto one line. */
+  return lines.join('\r\n') + '\r\n';
+}
+document.getElementById('csvBtn').addEventListener('click', () => {
+  /* A BOM, so Excel reads it as UTF-8 rather than guessing at a code page and
+     turning a golfer's name into mojibake. Everything else ignores it. */
+  const blob = new Blob(['﻿' + csvRounds(state)], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `golf-rounds-${todayISO()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast(`${state.rounds.length} round${state.rounds.length === 1 ? '' : 's'} downloaded as CSV`);
+});
 const dataDialog = document.getElementById('dataDialog');
 document.getElementById('dataBtn').addEventListener('click', () => openModal(dataDialog));
 document.getElementById('dataClose').addEventListener('click', () => dataDialog.close());
@@ -3351,8 +4270,12 @@ function demoRandom(seed) {
 }
 
 const DEMO_COURSES = [
+  /* Ashfield's yellows and Brookvale's only tee carry NINE-HOLE figures, which
+     is what makes a nine-hole round scoreable at all. The other four courses
+     deliberately have none, so the "no 9-hole rating" case is reachable too —
+     log a nine at Carrick and the app says exactly what is missing. */
   { id: 'demo-c-parkland', name: 'Ashfield Park', tees: [
-    { id: 'demo-t-ash-yellow', name: 'Yellow', rating: 69.4, slope: 122, par: 71 },
+    { id: 'demo-t-ash-yellow', name: 'Yellow', rating: 69.4, slope: 122, par: 71, rating9: 34.6, slope9: 120, par9: 35 },
     { id: 'demo-t-ash-white',  name: 'White',  rating: 71.2, slope: 129, par: 71 },
     { id: 'demo-t-ash-red',    name: 'Red',    rating: 67.8, slope: 118, par: 71 }] },
   { id: 'demo-c-links', name: 'Carrick Links', tees: [
@@ -3374,19 +4297,41 @@ const DEMO_COURSES = [
     { id: 'demo-t-dunes-forward',      name: 'Forward',      rating: 68.9, slope: 119, par: 72 }] },
   /* One set of tees, so the tee picker has its single-option case. */
   { id: 'demo-c-brookvale', name: 'Brookvale Municipal', tees: [
-    { id: 'demo-t-brook-main', name: 'Main', rating: 70.1, slope: 115, par: 70 }] }
+    { id: 'demo-t-brook-main', name: 'Main', rating: 70.1, slope: 115, par: 70, rating9: 35.0, slope9: 113, par9: 35 }] }
 ];
 
-/* name, rounds to log, average shots over the course rating, how streaky. */
+/* name, rounds to log, average shots over the course rating, how streaky, and
+   optionally which round of theirs is the exceptional one (`esrAt`, an index
+   into their own run of rounds). */
 const DEMO_GOLFERS = [
   { id: 'demo-g-1', name: 'Alex Nash',     rounds: 26, over: 2.5,  spread: 2.0 },
   { id: 'demo-g-2', name: 'Priya Raman',   rounds: 24, over: 8.0,  spread: 2.6 },
   { id: 'demo-g-3', name: 'Dad',           rounds: 22, over: 13.0, spread: 3.0 },
   { id: 'demo-g-4', name: 'Marcus Bell',   rounds: 20, over: 18.5, spread: 3.4 },
-  { id: 'demo-g-5', name: 'Joan Whitlock', rounds: 14, over: 24.0, spread: 4.0 },
+  /* The round of her life, ten rounds ago: far enough below the index she held
+     to earn an exceptional score reduction, and recent enough that it is still
+     in force today — which is the half of that rule a single good round can't
+     show on its own. */
+  { id: 'demo-g-5', name: 'Joan Whitlock', rounds: 14, over: 24.0, spread: 4.0, esrAt: 10 },
   { id: 'demo-g-6', name: 'Sam Okafor',    rounds: 4,  over: 30.0, spread: 5.0 },
   { id: 'demo-g-7', name: 'Ruth Carey',    rounds: 2,  over: 32.0, spread: 5.0 },
   { id: 'demo-g-8', name: 'New Member',    rounds: 0,  over: 0,    spread: 0 }
+];
+
+/* The nine-hole rounds, added after the main run so the figures above stay the
+   figures the README describes. Two cases, and the app has no way to show
+   either without them: Joan's two nines PAIR into one 18-hole record, and
+   Alex's single nine is left WAITING for a partner. Alex holds the waiting one
+   deliberately — his job in the cast is negative differentials, not a round
+   count, so an extra round that counts towards nothing disturbs nothing. On
+   Marcus, who is there to sit exactly on the 20-round window, it would. Both are at tees that
+   carry 9-hole figures, or they would demonstrate the third case instead.
+   `daysAgo` is counted from the day the league is loaded, like everything else
+   here — Joan's pair has to sit in date order to pair in the intended one. */
+const DEMO_NINES = [
+  { id: 'demo-r-n01', golferId: 'demo-g-5', courseId: 'demo-c-brookvale', teeId: 'demo-t-brook-main', daysAgo: 9,  score: 47, note: 'quick nine after work' },
+  { id: 'demo-r-n02', golferId: 'demo-g-5', courseId: 'demo-c-brookvale', teeId: 'demo-t-brook-main', daysAgo: 4,  score: 45, note: '' },
+  { id: 'demo-r-n03', golferId: 'demo-g-1', courseId: 'demo-c-parkland',  teeId: 'demo-t-ash-yellow', daysAgo: 2,  score: 37, note: 'nine before the light went' }
 ];
 
 const DEMO_NOTES = ['', '', '', 'windy', 'society day', 'medal', '', 'back nine fell apart',
@@ -3409,6 +4354,15 @@ function buildDemoLeague() {
       const tee = tees[(gi + i * 3) % tees.length];
       /* A gentle improvement across the season, plus round-to-round scatter. */
       const drift = (g.rounds - i) / Math.max(g.rounds, 1) * 2;
+      /* The exceptional round, if this golfer has one. Written as an adjustment
+         to `over` rather than as a fixed score, so it stays exceptional FOR THIS
+         GOLFER if the cast is ever retuned — and the number is 15 rather than
+         something rounder because the threshold is measured against the INDEX,
+         which is already a best-of average several shots below what she usually
+         goes round in. Twelve was tried and produced a differential 4.9 below
+         her index: a very good day, and not an exceptional score. A test pins
+         that the reduction actually lands, so a retune cannot quietly lose it. */
+      const over = g.esrAt === i ? g.over - 15 : g.over;
       rounds.push({
         id: 'demo-r-' + String(++rid).padStart(3, '0'),
         golferId: g.id,
@@ -3417,17 +4371,28 @@ function buildDemoLeague() {
            ago. The demo says it ends today and has to. */
         date: isoOf(new Date(today.getTime() - ((g.rounds - 1 - i) * 8 + (gi % 3)) * DAY)),
         courseId: tee.courseId, teeId: tee.teeId,
-        score: Math.round(tee.rating + g.over + drift + rnd.gauss(g.spread)),
+        score: Math.round(tee.rating + over + drift + rnd.gauss(g.esrAt === i ? 0 : g.spread)),
         /* One round with a conditions adjustment, so PCC is not a setting nobody
            has ever seen take effect. */
         pcc: i === 5 ? 1 : 0,
         note: DEMO_NOTES[(gi + i) % DEMO_NOTES.length],
         /* A scramble and a practice round: the "left out" line under the figures
            and the pills in the rounds table need something to name. */
-        counts: !(i === 2 && (gi === 1 || gi === 3))
+        counts: !(i === 2 && (gi === 1 || gi === 3)),
+        holes: 18
       });
     }
   });
+
+  /* The nines go on the end of the list, but their DATES put them in among the
+     season — `golferEntries` sorts by date, so where they sit in this array
+     never mattered. */
+  DEMO_NINES.forEach(n => rounds.push({
+    id: n.id, golferId: n.golferId,
+    date: isoOf(new Date(today.getTime() - n.daysAgo * DAY)),
+    courseId: n.courseId, teeId: n.teeId,
+    score: n.score, pcc: 0, note: n.note, counts: true, holes: 9
+  }));
 
   return { golfers: DEMO_GOLFERS.map(g => ({ id: g.id, name: g.name })),
            courses: DEMO_COURSES, rounds };
@@ -3550,7 +4515,13 @@ const SHARE_FORMAT = 1;
    link from a newer build should say so rather than render as a view quietly
    missing whatever that build added. Nothing is stored and nothing halts: a
    link is a borrowed read. */
-const SHARE_PAYLOAD_V = 1;
+const SHARE_PAYLOAD_V = 2;
+/* 2 (2026-08-22): the rounds inside carry `holes`, and the tees carry the
+   optional 9-hole figures. The payload's own keys did not change, which is
+   exactly why this had to be bumped by hand — an older build would decode this
+   link perfectly, drop `holes` at its boundary, and show a nine as a full round.
+   A wrong figure with no warning is the one outcome the version marker exists
+   to prevent, and "the keys are the same" is not the test. */
 /* Long URLs survive browsers fine but not always the trip through a mail
    client, so the warning sits well below any hard limit rather than at it. */
 const SHARE_WARN_AT = 8000;
@@ -3968,6 +4939,7 @@ window.addEventListener('storage', (e) => {
    `const` values, which are not. */
 window.__ghTestHooks = { raisesKeyboard,
   DEFAULT_METHOD, WHS_TABLE, WHS_MIN_ROUNDS, WHS_MAX_INDEX, SOFT_CAP_AT, HARD_CAP_AT,
+  ESR_AT, ESR_BIG_AT, ESR_LASTS, ALLOWANCES, DEFAULT_ALLOWANCE, SPARK_POINTS,
   /* Both declared above this line, which is the only reason they can be read
      here: a `const` referenced before its declaration is a temporal-dead-zone
      error that would take the whole app down at boot. */
