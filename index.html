@@ -370,6 +370,12 @@ th:has(.help-btn), td:has(.help-btn) { white-space: nowrap; }
    fill; the word "you" beside the name is what actually carries it, since a
    tint alone is not a distinction everyone can see. */
 tr.is-you th, tr.is-you td { background: var(--accent-bg); }
+/* The whole row opens that golfer, so the whole row says so. The tinted row keeps
+   its own colour on hover — it is already the row you are on, and lighting it up
+   as though it were a destination is the one place this could mislead. */
+tr.rowlink { cursor: pointer; }
+tr.rowlink:hover th, tr.rowlink:hover td { background: var(--surface-alt); }
+tr.rowlink.is-you:hover th, tr.rowlink.is-you:hover td { background: var(--accent-bg); }
 td.rank, th.rank { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
 
 /* At-a-glance tiles. Column counts are spelled out rather than left to auto-fit,
@@ -549,6 +555,11 @@ button.icon-btn.danger:hover { color: var(--err); border-color: var(--err); back
    is one fact, and letting it break after the name would put a bare number at the
    start of a line looking like the next tee. The column gap is wider than the row
    gap so that where they DO wrap, the rows still read as rows. */
+/* A name edited in place. Capped so the box does not eat the row — the other
+   columns still have to line up down the table, which is the same reason Sprint
+   Predictability caps its own at 320px. Full width below that, so it shrinks on a
+   phone rather than forcing the table to scroll. */
+.namebox { width: 100%; max-width: 320px; }
 .tees { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-6); }
 .tee { white-space: nowrap; }
 
@@ -2347,13 +2358,19 @@ function renderLeague() {
   const sortedOn = (which) => (which === primary ? ' aria-sort="ascending"' : '');
 
   const body = rows.map((r) => {
-    /* The tint marks the golfer whose page you would land on. The word "you"
-       only belongs on your own copy — in a shared view nobody in the table is
-       the person reading it. */
+    /* The tint marks the golfer whose page you would land on. It used to be
+       joined by a "you" pill beside the name; the tint already says it, and on a
+       shared view — where nobody in the table is the person reading — the word
+       was wrong as well as redundant. */
     const open = r.id === state.activeGolfer;
-    return `<tr class="${open ? 'is-you' : ''}">
+    /* THE WHOLE ROW opens that golfer, not just the underlined name. The name is
+       still the real control — a <tr> cannot be focused or pressed from a
+       keyboard, so the button is what keeps this reachable and is what the row's
+       click handler delegates to. The row is the target for a pointer, which is
+       what a table of eight names is actually being aimed at. */
+    return `<tr class="${open ? 'is-you' : ''} rowlink" data-golfer="${esc(r.id)}">
       <td class="rank">${r.rank == null ? '—' : r.rank}</td>
-      <th scope="row"><button type="button" class="rowbtn" data-golfer="${esc(r.id)}" title="Show this golfer's handicap">${esc(r.name)}</button>${open && !viewOnly ? ' <span class="pill">you</span>' : ''}</th>
+      <th scope="row"><button type="button" class="rowbtn" data-golfer="${esc(r.id)}" title="Show this golfer's handicap">${esc(r.name)}</button></th>
       <td class="num">${fmtIndex(r.rolling)}</td>
       <td class="num">${fmtIndex(r.whs)}</td>
       <td class="num">${r.counted}</td>
@@ -2376,13 +2393,22 @@ function renderLeague() {
       <th scope="col">Last round</th>
     </tr></thead><tbody>${body}</tbody></table>`;
 
-  /* A clickable row needs a real control in it, as in the rounds table. */
-  document.getElementById('leagueTable').querySelectorAll('.rowbtn').forEach((b) => {
-    b.addEventListener('click', () => {
-      state.activeGolfer = b.dataset.golfer;
-      save();
-      setTab('player');
-    });
+  /* One delegated listener on the table rather than one per name button: the row
+     and the name are the same action, and delegating is what stops them being two
+     handlers that could drift. `closest('[data-golfer]')` finds whichever was
+     pressed — the button carries the id as well, so a keyboard press on the name
+     lands here identically.
+
+     Anything else interactive inside the row wins, because it stopped here first:
+     there is nothing else in these rows today, but the rounds table's is the same
+     shape and does have per-row controls, and a row-wide click that swallows them
+     is exactly how that goes wrong. */
+  document.getElementById('leagueTable').addEventListener('click', (e) => {
+    const el = e.target.closest('[data-golfer]');
+    if (!el) return;
+    state.activeGolfer = el.dataset.golfer;
+    save();
+    setTab('player');
   });
 
   /* Exclusions are never silent here either: a round left out of a figure is
@@ -2682,20 +2708,39 @@ function renderCourseList() {
   const box = document.getElementById('courseList');
   if (!state.courses.length) { box.innerHTML = '<p class="hint">No courses yet.</p>'; return; }
   box.innerHTML = `<div class="table-scroll"><table>
-    <caption class="sr-only">Courses and their tees. Select a course name to edit it.</caption>
+    <caption class="sr-only">Courses and their tees. Type in a name to rename a course; the pencil edits its tees and the × removes it.</caption>
     <thead><tr>
-      <th scope="col">Course</th><th scope="col">Tees</th><th scope="col" class="num">Rounds</th><th scope="col"><span class="sr-only">Remove</span></th>
-    </tr></thead><tbody>` + state.courses.map((c) => {
+      <th scope="col">Course</th><th scope="col">Tees</th><th scope="col" class="num">Rounds</th><th scope="col"><span class="sr-only">Edit and remove</span></th>
+    </tr></thead><tbody>` + state.courses.map((c, i) => {
     const used = state.rounds.filter((r) => r.courseId === c.id).length;
     return `<tr>
-      <th scope="row"><button type="button" class="rowbtn" data-course="${esc(c.id)}">${esc(c.name)}</button></th>
+      <th scope="row"><input type="text" class="namebox" data-name="${esc(c.id)}" maxlength="80"
+        value="${esc(c.name)}" aria-label="Name of course, row ${i + 1}"></th>
       <td><span class="tees">${c.tees.map((t) => `<span class="tee">${esc(`${t.name} (${t.rating}/${t.slope}/par ${t.par})`)}</span>`).join('')}</span></td>
       <td class="num">${used}</td>
-      <td><span class="rowacts"><button type="button" class="icon-btn danger" data-delcourse="${esc(c.id)}"
+      <td><span class="rowacts"><button type="button" class="icon-btn" data-course="${esc(c.id)}"
+        title="Edit this course's tees" aria-label="Edit tees for ${esc(c.name)}">&#9998;</button><button
+        type="button" class="icon-btn danger" data-delcourse="${esc(c.id)}"
         title="Remove this course" aria-label="Remove ${esc(c.name)}">&times;</button></span></td>
     </tr>`;
   }).join('') + '</tbody></table></div>';
-  box.querySelectorAll('.rowbtn').forEach((b) => b.addEventListener('click', () => openCourseEdit(b.dataset.course)));
+  /* The name is a box now, so the way into the tee editor had to move — it was the
+     underlined name, which is the one thing that can no longer be a link. A pencil
+     beside the × in the row actions, which is where every other per-row action in
+     this window already lives. Neutral, not `.danger`: editing tees is not
+     destructive and must not light up as though it were.
+
+     Renaming is in the box, on the same three rules as the golfer list above it:
+     re-found by id every keystroke, the cap applied in code as well as in
+     `maxlength` because a paste ignores the attribute, and `render()` WITHOUT
+     redrawing this list — which would replace the input being typed in. */
+  box.querySelectorAll('[data-name]').forEach((el) => el.addEventListener('input', () => {
+    const live = state.courses.find((x) => x.id === el.dataset.name);
+    if (!live) return;   // gone since the list was drawn (sync, other tab)
+    live.name = el.value.slice(0, 80);
+    save();
+  }));
+  box.querySelectorAll('[data-course]').forEach((b) => b.addEventListener('click', () => openCourseEdit(b.dataset.course)));
   /* Never disabled, whatever the round count. A first attempt greyed these out
      while rounds still pointed at the course, on the assumption that deleting it
      would take those rounds with it — it does not. Rounds are KEPT and simply
@@ -2914,30 +2959,39 @@ document.getElementById('methodBtn').addEventListener('click', openMethod);
 function renderGolferList() {
   const box = document.getElementById('golferList');
   box.innerHTML = `<div class="table-scroll"><table>
-    <caption class="sr-only">Golfers. Select a name to rename that golfer; Remove deletes them and their rounds.</caption>
+    <caption class="sr-only">Golfers. Type in a name to rename that golfer; the × deletes them and their rounds.</caption>
     <thead><tr>
       <th scope="col">Name</th><th scope="col" class="num">Rounds</th><th scope="col"><span class="sr-only">Remove</span></th>
-    </tr></thead><tbody>` + state.golfers.map((g) => {
+    </tr></thead><tbody>` + state.golfers.map((g, i) => {
     const n = state.rounds.filter((r) => r.golferId === g.id).length;
     return `<tr>
-      <th scope="row"><button type="button" class="rowbtn" data-rename="${esc(g.id)}">${esc(g.name)}</button></th>
+      <th scope="row"><input type="text" class="namebox" data-name="${esc(g.id)}" maxlength="60"
+        value="${esc(g.name)}" aria-label="Name of golfer, row ${i + 1}"></th>
       <td class="num">${n}</td>
       <td><span class="rowacts"><button type="button" class="icon-btn danger" data-remove="${esc(g.id)}"
         title="Remove this golfer" aria-label="Remove ${esc(g.name)}">&times;</button></span></td>
     </tr>`;
   }).join('') + '</tbody></table></div>';
 
-  box.querySelectorAll('[data-rename]').forEach((b) => b.addEventListener('click', () => {
-    const g = state.golfers.find((x) => x.id === b.dataset.rename);
-    if (!g) { renderGolferList(); return; }   // gone since the list was drawn (sync, other tab)
-    const name = prompt('Name', g.name);
-    /* Re-found by id at save time rather than written to the object found
-       above — the same rule as the round and course dialogs' saves. A sync
-       adoption or another tab's write can replace `state` while the list is on
-       screen, and a rename written onto a detached copy would be silently
-       lost. */
-    const live = name && name.trim() ? state.golfers.find((x) => x.id === b.dataset.rename) : null;
-    if (live) { live.name = name.trim().slice(0, 60); save(); renderGolferList(); }
+  /* Renaming happens IN THE BOX, as it does in Sprint Predictability's and Flow
+     Metrics' equivalent window — it was a `prompt()` behind an underlined name.
+     Three things this has to get right, all of them the siblings' rules:
+
+     • Re-found by id on every keystroke rather than written to an object captured
+       when the list was drawn. A sync adoption or another tab's write can replace
+       `state` while the dialog is open, and a rename onto a detached copy is lost
+       without a sound.
+     • `maxlength` stops typing past 60 but not a PASTE, so the cap is applied here
+       as well — the same belt-and-braces the boundary sanitiser uses.
+     • `render()` but NOT `renderGolferList()`: redrawing this list would replace
+       the very input being typed in and throw away the caret. The rest of the page
+       — the picker, the leaderboard — is what needs the new name, and that is what
+       render() covers. */
+  box.querySelectorAll('[data-name]').forEach((el) => el.addEventListener('input', () => {
+    const live = state.golfers.find((x) => x.id === el.dataset.name);
+    if (!live) return;   // gone since the list was drawn (sync, other tab)
+    live.name = el.value.slice(0, 60);
+    save();
   }));
   box.querySelectorAll('[data-remove]').forEach((b) => b.addEventListener('click', () => {
     const id = b.dataset.remove;
