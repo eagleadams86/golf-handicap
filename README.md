@@ -51,6 +51,26 @@ to put the same rounds on your phone and your laptop.
 
 ## Using It
 
+A browser with nothing in it opens on one card — no tabs, no panels:
+
+> **Welcome to Golf Handicap**
+>
+> A handicap tracker for golfers who keep their own number. Log a round and it works out both
+> figures from the same cards — the league handicap, an average of your last few rounds, and
+> the official World Handicap System index beside it…
+>
+> **Start Fresh** · **Load Sample Data** · **Restore a Backup**
+
+**Start Fresh** opens the course editor, because a score means nothing until the app knows the
+rating and slope it was shot against. **Load Sample Data** loads
+[the example league](#trying-it-out--the-example-league). **Restore a Backup** opens the same
+[*Back Up & Restore*](#backups) window the ⇩ button does.
+
+The card is up only while the app is completely bare. Save a course and it steps aside for the
+Rounds card's own first-run state, which knows you have somewhere to play and offers the round
+rather than the course again. Every app in the family opens on this same card, in the same
+words and the same order.
+
 1. **Add a course.** *Courses → Add course* in the header. A course needs, for each set of tees,
    a **course rating**, a **slope rating** and a **par** — all three are printed on the
    scorecard. The rating is what a scratch golfer is expected to shoot (e.g. 69.4); the
@@ -82,8 +102,9 @@ rather than quietly leaving it out.
 
 ### Trying It Out — The Example League
 
-The empty state offers **load the example league**: eight golfers, six courses and a season
-of rounds ending today, in one tap. It's the app's demo, and the rule is that **every
+**Load Sample Data** on the welcome card loads the example league: eight golfers, six courses
+and a season of rounds ending today, in one tap. (A single golfer's season is a link inside the
+same sentence, for anyone who only wants to see one populated page.) It's the app's demo, and the rule is that **every
 feature has to be reachable from it** — so the cast is chosen to cover every case the
 figures have to handle, not just to fill the table.
 

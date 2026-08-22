@@ -1533,6 +1533,53 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
     });
   });
 
+  /* ── The welcome card ───────────────────────────────────────────────────────
+     The first screen (2026-08-22). Every app in the family opens on this same
+     card, in the same words and the same order — what the app is, where the
+     figures go, the three ways in, then a line for each button.
+
+     Read off the SOURCE rather than the booted frame, because the frame boots
+     against whatever this browser already holds: the card is up only while the
+     app is bare, and a suite that had ever loaded the demo would test the wrong
+     screen. What matters here is what the markup promises. */
+  describe('the welcome card — the first screen');
+
+  const welcomeHtml = (APP_SRC.match(/<div class="card" id="welcomeCard"[\s\S]*?<\/div><\/div>/) || [])[0] || '';
+
+  it('exists, as a .empty nested in a card — the family\u2019s shape', () =>
+    ok(/<div class="card" id="welcomeCard" hidden><div class="empty">/.test(welcomeHtml),
+       'no #welcomeCard in the expected shape'));
+  it('names the app in the family\u2019s words', () =>
+    ok(/<h2>Welcome to Golf Handicap<\/h2>/.test(welcomeHtml), welcomeHtml.slice(0, 120)));
+  it('offers the family\u2019s three buttons, in the family\u2019s order and Title Case', () =>
+    eq([...welcomeHtml.matchAll(/id="welcome(Fresh|Sample|Restore)Btn">([^<]+)</g)]
+         .map((m) => m[2]).join(' \u00b7 '),
+       'Start Fresh \u00b7 Load Sample Data \u00b7 Restore a Backup'));
+  /* THE claim on the screen, and the one that must never disagree with the
+     footer three inches below it. This app has optional sign-in, so a flat
+     "nothing is uploaded anywhere" would be a lie to anyone who has used it. */
+  it('makes the footer\u2019s privacy claim, conditional on sign-in', () =>
+    ok(/stays in this browser[\s\S]*Nothing is uploaded unless you sign in/.test(welcomeHtml),
+       welcomeHtml));
+  /* It is the whole page while it is up, and that gate is CSS on an attribute
+     rather than `hidden` on each panel: setTab() writes that same property and
+     would put them back a tick later. */
+  it('takes the tab strip and both panels with it, in CSS', () =>
+    ok(/html\[data-welcome\] \.tabs,\s*\n\s*html\[data-welcome\] \[role="tabpanel"\] \{ display: none/.test(APP_SRC),
+       'the data-welcome gate is not in the stylesheet'));
+  /* NOT just "no rounds": a saved course means the Rounds card's own first-run
+     state is the right next instruction, and it offers the round rather than
+     the course again. */
+  it('steps aside as soon as there is a course, not only once a round exists', () =>
+    ok(/const virgin = state\.rounds\.length === 0 && state\.courses\.length === 0;/.test(APP_SRC),
+       'the virgin test no longer asks about courses'));
+  /* A visitor must never be offered three buttons that write to their own
+     browser: renderEmptyState leaves before any of this in a shared view. */
+  it('never appears over a shared link', () =>
+    ok(APP_SRC.indexOf('if (window.ghViewOnly) return;')
+       < APP_SRC.indexOf('const virgin = state.rounds.length'),
+       'the shared-view guard must come first in renderEmptyState'));
+
   run();
 }
 

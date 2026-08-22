@@ -750,6 +750,23 @@ main:focus { outline: none; }
 }
 .empty { text-align: center; padding: var(--sp-8) var(--sp-6); color: var(--text-secondary); }
 .empty p { max-width: 46ch; margin: 0 auto var(--sp-5); }
+/* ── The welcome card, and only it ───────────────────────────────────────────
+   Every other empty state here is a `.empty` inside a card that already has a
+   heading and a table under it; this nested form is the first screen, and it is
+   the whole page. Money Map's rule and its number: an empty state is nothing
+   but centred sentences — there is no table under it whose position a wrapped
+   line would cost — and a CENTRED line is the hard one to read back, because
+   both ends move and the eye has nothing to return to. 80ch, centred in the
+   card, with the 46ch measure above lifted: that one is for a one-line "no
+   rounds match that filter", not for four paragraphs.
+
+   While the card is up it IS the app — the tab strip and both panels go. Done
+   in CSS off an attribute rather than by setting `hidden` on each of them,
+   because setTab() writes that same property and would put them back. */
+.card > .empty { max-width: 80ch; margin-left: auto; margin-right: auto; }
+.card > .empty p { max-width: none; margin: 1em 0 0; }
+html[data-welcome] .tabs,
+html[data-welcome] [role="tabpanel"] { display: none !important; }
 
 /* The first thing anyone sees, and until 2026-08-21 it was a 46ch column of body
    text adrift in a card the full width of the page — the four cards that used to
@@ -797,6 +814,22 @@ main:focus { outline: none; }
          the calculation rather than the app and put the name somewhere nobody
          would look for it. -->
     <h1 class="brand"><img class="mark" src="favicon.ico?v=1" width="22" height="22" alt="">Golf&nbsp;Handicap <span>&middot; Charlie&rsquo;s Epic League Tracker</span></h1>
+    <!-- ── The family's header order ───────────────────────────────────────────
+         Every app in the family lays this row out the same way, so a control is
+         in the same place whichever one you have open. Right to left, because
+         the row is right-aligned and the right-hand end is the fixed one:
+
+           theme · Share · Back up · ⚙ settings · ☰ manage · the record picker ·
+           zoom · find · everything else
+
+         An app skips whatever it hasn't got and the rest close up. The THEME
+         PICKER IS ALWAYS LAST — it is the one control that changes nothing but
+         how the page looks, so it sits at the far end, out of the way of the
+         controls that do something. Sync is "everything else" and goes to the
+         other end: its label changes width the moment Firebase reports who you
+         are, and at the left-hand end of a right-aligned row that growth pushes
+         into space rather than shoving five controls sideways. -->
+    <button id="syncBtn" title="Sign in with Google to see the same data on all your devices">☁️ Sign in to sync</button>
     <label class="sr-only" for="golferSel">Golfer</label>
     <select id="golferSel" title="Which golfer you're looking at" style="min-width:130px"><option>—————</option></select>
     <!-- ONE button, not the two this row carried until 2026-08-21. Golfers and
@@ -824,6 +857,11 @@ main:focus { outline: none; }
          state changes, and it is the one control here about somewhere else. -->
     <button id="manageBtn" title="Add, rename or remove golfers, and add or edit courses and their tees"><span aria-hidden="true">☰</span> Golfers &amp; Courses</button>
     <button id="methodBtn" title="Change how the league handicap is worked out"><span aria-hidden="true">⚙</span> League Rules</button>
+    <!-- Back up sits in the header, as it does in Team Dashboard and Sprint
+         Velocity: it belongs with the other things you do to the data as a
+         whole, not tucked away at the foot of the page where it used to live. -->
+    <button id="dataBtn" title="Back up, restore or clear your data"><span aria-hidden="true">⇩</span> Back up</button>
+    <button id="shareBtn" title="Create a read-only link to show someone these handicaps"><span aria-hidden="true">↗</span> Share</button>
     <label class="sr-only" for="themeSel">Theme</label>
     <!-- Themes are listed alphabetically; midnight is the default but is not listed
          first. It carries `selected` so the picker never reads one theme while the
@@ -835,12 +873,6 @@ main:focus { outline: none; }
       <option value="midnight" selected>✦ Midnight</option>
       <option value="sepia">📜 Sepia</option>
     </select>
-    <!-- Back up sits in the header, as it does in Team Dashboard and Sprint
-         Velocity: it belongs with the other things you do to the data as a
-         whole, not tucked away at the foot of the page where it used to live. -->
-    <button id="dataBtn" title="Back up, restore or clear your data"><span aria-hidden="true">⇩</span> Back up</button>
-    <button id="shareBtn" title="Create a read-only link to show someone these handicaps"><span aria-hidden="true">↗</span> Share</button>
-    <button id="syncBtn" title="Sign in with Google to see the same data on all your devices">☁️ Sign in to sync</button>
   </div>
 </header>
 
@@ -860,6 +892,43 @@ main:focus { outline: none; }
     <button class="tab" role="tab" id="tab-player" aria-controls="playerPanel" data-tab="player" aria-selected="true"  tabindex="0">My handicap</button>
     <button class="tab" role="tab" id="tab-league" aria-controls="leaguePanel" data-tab="league" aria-selected="false" tabindex="-1">Leaderboard</button>
   </div>
+
+  <!-- ══════════════════ THE FIRST SCREEN ══════════════════
+       The family's welcome card, to the shape Money Map settled on: what the app
+       IS, then where the rounds go, then the three ways in, then a line for each
+       of them in the button's own words. A reader deciding whether this is the
+       thing they want is deciding off the first paragraph, so it says what gets
+       worked out rather than promising "insight"; the second is the privacy
+       claim the footer three inches below already makes, and the two must never
+       disagree — this app HAS optional sign-in, so "unless you sign in" is the
+       whole of the exception, exactly as the README and privacy.html put it.
+
+       Up only while the app is completely bare — no rounds and no courses. Add
+       a course and it steps aside for the Rounds card's own first-run state,
+       which is written for "you have somewhere to play and nothing logged yet"
+       and is the right next instruction at that point. -->
+  <div class="card" id="welcomeCard" hidden><div class="empty">
+    <h2>Welcome to Golf Handicap</h2>
+    <p>A handicap tracker for golfers who keep their own number. Log a round and it works out
+      both figures from the same cards — the league handicap, an average of your last few
+      rounds, and the official World Handicap System index beside it — turns either into the
+      shots you get at a given course and tee, and ranks everyone you play with on the
+      leaderboard.</p>
+    <p>Everything you enter stays in this browser. Nothing is uploaded unless you sign in,
+      which syncs it privately to your own account.</p>
+    <p style="margin-top:16px">
+      <button type="button" class="btn primary" id="welcomeFreshBtn">Start Fresh</button>
+      <button type="button" class="btn" id="welcomeSampleBtn">Load Sample Data</button>
+      <button type="button" class="btn" id="welcomeRestoreBtn">Restore a Backup</button></p>
+    <p><strong>Start Fresh</strong> adds your first course — its tees, and the rating and slope
+      on each — because a score means nothing until the app knows where it was shot. Rounds go
+      in against it from there.</p>
+    <p><strong>Load Sample Data</strong> fills every tab with an invented league: eight golfers,
+      six courses and a season of rounds, so every figure and the whole leaderboard have
+      something behind them. Just want one populated page?
+      <button type="button" class="link" id="welcomeSoloBtn">Load a single golfer's season</button></p>
+    <p><strong>Restore a Backup</strong> reads a Golf Handicap export.</p>
+  </div></div>
 
   <!-- The tabpanel role goes on an inner div, not on <main>: putting it on the
        element IS its role, so it would silently replace the main landmark. -->
@@ -2364,6 +2433,18 @@ function render() {
 
 function renderEmptyState() {
   if (window.ghViewOnly) return;
+  /* ── The welcome card ──────────────────────────────────────────────────────
+     Up only while the app is completely bare. NOT just "no rounds": add a
+     course and the Rounds card's own first-run state is the right next
+     instruction — it knows you have somewhere to play and offers the round
+     rather than the course again — so this steps aside at exactly that point.
+
+     What it hides is hidden in CSS off `data-welcome`; setTab() writes the
+     panels' `hidden` property and would put them back a tick later. */
+  const virgin = state.rounds.length === 0 && state.courses.length === 0;
+  document.getElementById('welcomeCard').hidden = !virgin;
+  document.documentElement.toggleAttribute('data-welcome', virgin);
+
   const bare = state.rounds.length === 0;
   /* `strokesCard` joins them for the same reason: with no rounds there are no
      handicaps to turn into shots, so it is a course picker above a column of
@@ -4163,6 +4244,20 @@ document.getElementById('csvBtn').addEventListener('click', () => {
 });
 const dataDialog = document.getElementById('dataDialog');
 document.getElementById('dataBtn').addEventListener('click', () => openModal(dataDialog));
+
+/* The welcome card's four. Start Fresh opens the course editor, because a score
+   means nothing until the app knows the rating and slope it was shot against —
+   and the Rounds card takes over from there. Restore opens the same Back Up &
+   Restore window the ⇩ button does; it was reachable only from there, which is a
+   strange thing to hunt for on the screen whose whole job is "how do I start".
+   The single-golfer demo keeps its place inside the sample-data sentence: it
+   answers a different question from the league — "what does one populated page
+   look like" rather than "what does the app do" — and is the reason the league
+   is the button and this is a link. */
+document.getElementById('welcomeFreshBtn').addEventListener('click', () => openCourseEdit(null));
+document.getElementById('welcomeSampleBtn').addEventListener('click', loadDemoLeague);
+document.getElementById('welcomeSoloBtn').addEventListener('click', loadDemo);
+document.getElementById('welcomeRestoreBtn').addEventListener('click', () => openModal(dataDialog));
 document.getElementById('dataClose').addEventListener('click', () => dataDialog.close());
 
 document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
