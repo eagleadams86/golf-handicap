@@ -102,7 +102,7 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'expected truthy'); }
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 233;
+const EXPECTED = 236;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -1128,6 +1128,59 @@ describe('The theme a reader who has never chosen one gets');
       1, 'exactly one theme option may carry `selected`');
     ok(/getAttribute\('data-theme'\) \|\| 'auto'/.test(strip(APP_SRC)),
       "and the picker's own initial value must fall back to auto too");
+  });
+
+  /* ── the chart series come from the pack, not from this page ──────────── */
+describe('the two chart lines are the pack\u2019s series ramp');
+  it('--c-roll and --c-whs are ALIASES now, holding no colour of their own', () => {
+    /* Until 2026-08-23 these were eight hand-picked hexes, two colours across
+       four themes, sitting outside check_contrast.py's gate — the pack gates
+       --series-1..5 pairwise at deltaE 18 under both dichromacies and can only
+       gate what it can see. The tokens already existed; nothing had to be taught
+       anything. This is the check that they do not come back. */
+    const code = strip(APP_SRC);
+    ok(/--c-roll:\s*var\(--series-1\)/.test(code), '--c-roll must alias --series-1');
+    ok(/--c-whs:\s*var\(--series-2\)/.test(code), '--c-whs must alias --series-2');
+    ok(!/--c-(?:roll|whs):\s*#[0-9a-f]{3,8}/i.test(code),
+      'a literal colour has been given back to a chart line — that is the drift the '
+      + "pack's rule 4 exists to prevent");
+  });
+  it('one declaration covers every theme, Auto included', () => {
+    /* The old arrangement needed four blocks plus a prefers-color-scheme copy,
+       and the Auto copy is exactly the kind of thing that gets forgotten —
+       Sprint Velocity had no Auto block at all for its own ten local tokens
+       until the same day. --series-* are themed inside theme.css, so one alias
+       follows all five picker entries for free. This asserts that live, in the
+       app frame, rather than reading the source. */
+    const el = W.document.documentElement;
+    const was = el.getAttribute('data-theme');
+    try {
+      const seen = {};
+      ['auto', 'midnight', 'dark', 'light', 'sepia'].forEach(th => {
+        el.setAttribute('data-theme', th);
+        const c = W.getComputedStyle(el);
+        const roll = c.getPropertyValue('--c-roll').trim();
+        const whs = c.getPropertyValue('--c-whs').trim();
+        eq(roll, c.getPropertyValue('--series-1').trim(), th + ': the rolling line is --series-1');
+        eq(whs, c.getPropertyValue('--series-2').trim(), th + ': the official line is --series-2');
+        ok(/^#[0-9a-f]{6}$/i.test(roll), th + ': --c-roll resolved to a real colour, not an empty string');
+        seen[th] = roll + '/' + whs;
+      });
+      /* The failure this catches specifically: an alias that resolves to nothing
+         reads as "the same in every theme" and would pass a weaker check. */
+      ok(seen.light !== seen.midnight, 'Light and Midnight must give different series colours');
+    } finally {
+      el.setAttribute('data-theme', was || 'auto');
+    }
+  });
+  it('colour is still not the only cue', () => {
+    /* The half of the old arrangement that was right and is unchanged. Six
+       call sites read these tokens; the dash pattern and the marker shape are
+       what make the chart readable to someone who cannot use the hue at all. */
+    const code = strip(APP_SRC);
+    ok(/stroke-dasharray="7 4"/.test(code), 'the official line stays dashed');
+    ok(/<circle[^>]*fill="var\(--c-roll\)"/.test(code), 'the rolling points stay round');
+    ok(/<rect[^>]*fill="var\(--c-whs\)"/.test(code), 'the official points stay square');
   });
 
   /* ── the footer every public page in this account carries ─────────────── */

@@ -132,16 +132,39 @@
   --page-w: 1500px;
 }
 
-/* ── App-specific chart colours ──────────────────────────────────────────────
-   Two series only, so they sit on the blue↔amber axis, which is the one that
-   survives red-green colour deficiency (the pack's rule 2 reasoning, applied to
-   a two-series chart). Colour is still not the only cue: the rolling line is
-   solid with round points, the WHS line is dashed with square points, and both
-   are named in the legend. These are ADDITIONS, not overrides of pack tokens,
-   so the midnight defaults live in :root exactly as the pack's own do.
+/* ── Chart series ────────────────────────────────────────────────────────────
+   THE TWO LINE COLOURS ARE THE PACK'S, as of 2026-08-23. `--c-roll` and
+   `--c-whs` are now NAMES for `--series-1` and `--series-2`, not colours — the
+   semantic name is worth keeping (there are six call sites, and "roll" and "whs"
+   say more at each of them than "1" and "2"), the values are not this page's to
+   choose.
+
+   They were four hand-picked pairs, one per theme, and the reasoning written
+   here was sound as far as it went: two series on the blue↔amber axis, which is
+   the one that survives red-green deficiency, plus dash pattern and marker shape
+   so colour is never the only cue. But the pack's rule 4 does not turn on whether
+   an app's invented palette is defensible — it says an app never invents one,
+   because `check_contrast.py` gates `--series-1..5` pairwise at ΔE 18 under BOTH
+   dichromacies and can only gate what it can see. This page's pair was gated by
+   nothing. That is the same shape as the lottery portfolio's five invented
+   colours (rule 4's worked example), caught here before it cost anything.
+
+   Measured on the swap, so the trade is on the record: separation under
+   deuteranopia goes 107.7 → 110.0 on the dark themes and 104.1 → 98.8 on Light,
+   both still an order of magnitude past the bar of 18. Contrast against the card
+   drops — worst case sepia's `--series-2` at 3.79:1, from 6.55:1 — which clears
+   WCAG 1.4.11's 3:1 for a non-text line, and the dash and marker cues are
+   unchanged. Strictly better on the axis that is gated, slightly worse on one
+   that still passes.
+
+   There is no per-theme block any more and there should never be one again:
+   `--series-*` are already themed inside theme.css, so an alias declared once
+   follows every theme, Auto included, for free.
 ─────────────────────────────────────────────────────────────────────────── */
-/* `color-scheme` rides along with the chart colours, one per theme, the same
-   shape PAPTrack and Money Map use. It is not a colour of ours and it overrides
+:root { --c-roll: var(--series-1); --c-whs: var(--series-2); }
+/* `color-scheme`, one declaration per theme, the same shape PAPTrack and Money
+   Map use. It rode along with four hand-picked chart colours until 2026-08-23;
+   those are the pack's `--series-*` now (see above) and only this is left. It is not a colour of ours and it overrides
    nothing in the pack — it is how a page TELLS the browser which way round it is,
    so the parts of a control the browser draws itself follow the theme. Without
    it they are always drawn light: the calendar button inside `<input type=date>`
@@ -151,18 +174,19 @@
    problem more quietly.
    Note the pairing follows the PALETTE, not the theme's name: sepia is a warm
    LIGHT theme and takes `light`. */
-:root { color-scheme: dark; --c-roll: #8ab4ff; --c-whs: #e3b04b; }
-[data-theme="dark"]  { color-scheme: dark;  --c-roll: #8ab4ff; --c-whs: #e3b04b; }
-[data-theme="light"] { color-scheme: light; --c-roll: #1f5fb0; --c-whs: #7a5c0c; }
-[data-theme="sepia"] { color-scheme: light; --c-roll: #2c5a94; --c-whs: #6f5407; }
+:root                 { color-scheme: dark; }
+[data-theme="dark"]   { color-scheme: dark; }
+[data-theme="light"]  { color-scheme: light; }
+[data-theme="sepia"]  { color-scheme: light; }
 /* Auto has no palette of its own — theme.css resolves it to Light or, under
    prefers-color-scheme: dark, to Midnight. The two line colours and the color-scheme
-   have to resolve the same way, or an Auto page in light mode would draw its native
-   controls dark and its chart lines in the dark theme's blues. Same structure as the
-   pack's own auto block: the light values, then the dark ones in the media query. */
-[data-theme="auto"]  { color-scheme: light; --c-roll: #1f5fb0; --c-whs: #7a5c0c; }
+   has to resolve the same way the palette does, or an Auto page in light mode would
+   draw its native controls dark. Same structure as the pack's own auto block: the
+   light value, then the dark one in the media query. The chart lines no longer need
+   a mention here — they follow `--series-*`, which theme.css already resolves. */
+[data-theme="auto"]   { color-scheme: light; }
 @media (prefers-color-scheme: dark) {
-  [data-theme="auto"] { color-scheme: dark; --c-roll: #8ab4ff; --c-whs: #e3b04b; }
+  [data-theme="auto"] { color-scheme: dark; }
 }
 
 * { box-sizing: border-box; }

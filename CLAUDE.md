@@ -219,23 +219,38 @@ that emphasis.
   `tests.html` pins that `openModal(manageDialog)` appears exactly once in the source, which is
   the check that catches a fifth opener.
 
-- **The two chart series sit on the blue↔amber axis** — the one that survives red-green
-  colour deficiency — and colour is not the only cue: the rolling line is solid with round
-  points, the official line is dashed with square points, and both are named in the legend.
-  Don't re-hue them, and don't drop the dash/shape distinction for a tidier look.
-  `--c-roll`/`--c-whs` are app-specific *additions*, not overrides of pack tokens, which is
-  why their midnight values live in `:root` (as the pack's own do). Any app-local *override*
-  of a pack token would have to target `[data-theme="…"]`, never `:root`.
-  **They sit OUTSIDE the pack's `check_contrast.py` gate, and that is the trade this
-  arrangement makes** (recorded 2026-08-20, after an audit asked why 8 colour values across
-  four themes were being defined outside the source of truth). Chart series aren't pack
-  tokens — the pack has no concept of "this app's two lines" — so gating them would mean
-  teaching it a per-app section, which is a bigger change than the risk warrants for two
-  colours. What that costs: nobody re-checks them automatically when the palette moves.
-  Both pairs were verified by hand at that audit and pass AA against `--bg`, `--surface`
-  and `--surface-alt` in all four themes. **Re-check them by hand whenever the pack's
-  surface tokens change**, and keep the dash/shape distinction, which is what makes the
-  chart readable regardless. Sprint Velocity carries the same note for its six series.
+- **The two chart series ARE `--series-1` and `--series-2` from the theme pack** (changed
+  2026-08-23). `--c-roll`/`--c-whs` still exist and are still the names used at all six call
+  sites — "roll" and "whs" say more there than "1" and "2" — but they are now *aliases*,
+  declared once as `:root { --c-roll: var(--series-1); --c-whs: var(--series-2) }` and
+  holding no colour of their own. Colour is still not the only cue and that half is
+  unchanged: the rolling line is solid with round points, the official line is dashed with
+  square points, and both are named in the legend. **Don't drop the dash/shape distinction
+  for a tidier look.**
+  **What this replaces, and why the old answer was wrong.** Until 2026-08-23 these were
+  eight hand-picked values — two colours across four themes — chosen on the sound reasoning
+  that two series fit on the blue↔amber axis, the one that survives red-green deficiency.
+  The 2026-08-20 audit asked why they sat outside the source of truth and the answer
+  recorded here was that gating them would mean teaching the pack a per-app section, which
+  wasn't worth it for two colours. **That was answering the wrong question.** The pack's
+  rule 4 does not ask whether an app's invented palette is defensible; it says an app never
+  invents one, *because* `check_contrast.py` gates `--series-1..5` pairwise at ΔE 18 under
+  both dichromacies and can only gate what it can see. The tokens already existed. Nothing
+  had to be taught anything.
+  **Measured on the swap**, so the trade is on the record rather than asserted: separation
+  under deuteranopia went 107.7 → 110.0 on the dark themes and 104.1 → 98.8 on Light, both
+  an order of magnitude past the bar. Contrast against the card dropped — worst case sepia's
+  `--series-2` at 3.79:1 from 6.55:1 — which still clears WCAG 1.4.11's 3:1 for a non-text
+  line. Better on the axis that is gated, slightly worse on one that still passes.
+  **There is no per-theme block any more and there must never be one again.** `--series-*`
+  are themed inside `theme.css`, so one alias follows every theme — Auto included — for
+  free. The old arrangement needed four blocks plus a `prefers-color-scheme` copy, and the
+  Auto copy is exactly the kind of thing that gets forgotten: Sprint Velocity had no Auto
+  block at all for its own ten local tokens until the same day.
+  **Sprint Velocity's six series are a different case and stay put** — see the pack's Known
+  divergences. Six categories do not fit on the axis, so that app carries a per-series
+  texture and dash as the real cue and treats colour as decoration. That is rule 4's own
+  "change the chart" answer, not a second invented palette.
 - **A status surface is a tint fill plus a full-strength edge.** The `-bg` tints are nearly
   identical to each other once red-green deficiency flattens them, so `.pill` carries a
   1.5px border in the status colour and that is what tells the states apart. Never a fill
