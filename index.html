@@ -793,6 +793,15 @@ dialog {
 }
 /* The count sits opposite the toggle: what is selected, and the one control
    that changes it wholesale. */
+/* Select All is a small BUTTON, not a link. The other four apps in the family
+   render it as `.btn.small` — a 4/9 box at --fs-xs — and this app had it as an
+   underlined `button.link` in --accent, which reads as navigation rather than as
+   the control it is. This app styles bare `button`, so the size gets a class of
+   its own rather than the siblings' `.btn.small`; the numbers are theirs. */
+/* The family's plain flex row, which this app had no need of until the share
+   window's two rows took the siblings' shape. */
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.chip-btn { padding: 4px 9px; font-size: var(--fs-xs); min-height: var(--chrome-h); }
 .checklist-head { display: flex; align-items: baseline; justify-content: space-between;
   gap: var(--sp-4); margin-bottom: var(--sp-4); }
 dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
@@ -1675,7 +1684,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
     <legend>Which Golfers</legend>
     <div class="checklist-head">
       <span class="hint" id="shareGolferCount" role="status"></span>
-      <button type="button" class="link" id="shareSelectAll">Select All</button>
+      <button type="button" class="chip-btn" id="shareSelectAll">Select All</button>
     </div>
     <div class="checklist" id="shareGolfers"></div>
     <p class="hint" style="margin:var(--sp-5) 0 0">Pick more than one and the link opens on the
@@ -1713,7 +1722,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
     <input type="text" id="shareLink" readonly aria-label="Read-only share link">
     <p class="hint" id="shareMeta" role="status" style="margin:var(--sp-4) 0 0"></p>
     <p class="warn" id="shareWarn" role="status"></p>
-    <div class="row-actions" style="justify-content:flex-start">
+    <div class="row" style="margin-top:10px">
       <button type="button" class="primary" id="shareCopyBtn">Copy Link</button>
       <button type="button" id="shareOpenBtn">Preview It</button>
     </div>
@@ -1725,8 +1734,8 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
     The league rule rides along, because it is what these figures were worked out with;
     nothing identifying does — no email, no account, not even your theme.</p>
 
-  <div class="row-actions">
-    <button type="button" class="primary" id="shareClose">Done</button>
+  <div class="row" style="justify-content:flex-end;margin-top:18px">
+    <button type="button" class="primary" id="shareCloseBtn">Done</button>
   </div>
 </dialog>
 
@@ -5547,7 +5556,7 @@ document.getElementById('shareKeep').addEventListener('change', (e) => {
 document.getElementById('shareDate').addEventListener('input', refreshShareLink);
 
 document.getElementById('shareBtn').addEventListener('click', openShare);
-document.getElementById('shareClose').addEventListener('click', () => shareDialog.close());
+document.getElementById('shareCloseBtn').addEventListener('click', () => shareDialog.close());
 /* Registered here rather than in the list further up, because `shareDialog` is
    declared in this block and would still be in its temporal dead zone up
    there. Same as Sprint Velocity and Team Dashboard, which register theirs
