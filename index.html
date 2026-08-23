@@ -850,6 +850,25 @@ button.icon-btn.danger:hover { color: var(--err); border-color: var(--err); back
 .sec-hd h3 { font-size: var(--fs-md); margin: 0; }
 .row-actions { display: flex; flex-wrap: wrap; gap: var(--sp-4); justify-content: flex-end; margin-top: var(--sp-6); }
 .row-actions .spacer { flex: 1 1 auto; }
+/* ── The delete-all confirmation ─────────────────────────────────────────────
+   The ONE window meant to be identical in every app in the family, so it is
+   PAPTrack's verbatim (asked for 2026-08-23, with the five lined up side by
+   side): 18px padding rather than this app's roomier --sp-7, a red sync warning
+   rather than the amber every other `.warn` here wears — the sentence is about
+   data leaving every device you own, which is the app's `--err` job, not a
+   form's amber "check this" — and a footer that pushes the safety net to the far
+   left, keeps the two answers together on the right and, on a phone, gives the
+   backup button a row of its own rather than wrapping its label in half beside
+   them. No colour is invented: `--err` is already what this app's danger buttons
+   wear. Scoped to this dialog; every other `.warn` and `.row-actions` in the app
+   is untouched. */
+#clearDialog { padding: 18px; }
+#clearDialog .warn { color: var(--err); margin: 0 0 12px; }
+.clearfoot { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; margin-top: 14px; }
+.clearfoot .safety { margin-right: auto; }
+@media (max-width: 460px) {
+  .clearfoot .safety { flex: 1 0 100%; margin-right: 0; }
+}
 .checkline { display: flex; align-items: center; gap: var(--sp-4); }
 .checkline input { width: auto; min-height: 0; }
 
@@ -1691,12 +1710,11 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
 </dialog>
 
 <dialog id="clearDialog" aria-labelledby="clearTitle">
-  <h2 id="clearTitle">Clear Everything?</h2>
+  <h2 id="clearTitle">Delete All Data?</h2>
   <p id="clearBody"></p>
   <p class="warn" id="clearSyncWarn" role="status"></p>
-  <div class="row-actions">
-    <button type="button" id="clearBackupBtn"><span aria-hidden="true">⬇︎</span> Download Backup First</button>
-    <span class="spacer"></span>
+  <div class="clearfoot">
+    <button type="button" id="clearBackupBtn" class="safety"><span aria-hidden="true">⬇︎</span> Download Backup First</button>
     <button type="button" id="clearCancel">Cancel</button>
     <button type="button" id="clearConfirm" class="danger">Delete Everything</button>
   </div>
@@ -4626,7 +4644,7 @@ document.getElementById('clearBtn').addEventListener('click', () => {
   document.getElementById('clearBody').textContent =
     `This deletes ${r} round${r === 1 ? '' : 's'}, ${c} course${c === 1 ? '' : 's'} and `
     + `${g} golfer${g === 1 ? '' : 's'}. The league rule and your theme are kept. `
-    + `There is no undo — a backup file is the only way to get any of it back.`;
+    + `There is no undo — a downloaded backup is the only way to get any of it back.`;
   /* Said plainly, because "clear this device" and "clear every device I own" are
      very different acts and the button looks identical either way. */
   const signedIn = typeof window.ghSignedIn === 'function' && window.ghSignedIn();
