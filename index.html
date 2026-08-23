@@ -1401,7 +1401,9 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
   </section>
 
   <section class="card" id="statsCard">
-    <h2>At a Glance</h2>
+    <h2>At a Glance
+      <button class="tile-help" type="button" data-help="glance" aria-label="How the five figures here are worked out">i</button>
+    </h2>
     <div class="stats" id="stats"></div>
   </section>
 
@@ -4611,6 +4613,10 @@ const HELP = {
   nine: ['Nine-Hole Rounds', `<p>Both handicaps count <em>games</em>, and a game is 18 holes — so a nine is not a round on its own. The official system adds two nine-hole score differentials together to make one 18-hole differential, and this app does the same, for the league handicap as well.</p>
     <p>Nines are paired in the order you played them, oldest first. One left over waits for the next nine you log, and the app says so rather than quietly ignoring it.</p>
     <p>A nine is scored against the <strong>9-hole</strong> rating, slope and par for those tees, which are printed on the scorecard and are typed in under Golfers &amp; Courses. Without them the round is kept but not scored — half the 18-hole figures would be a guess, not an answer. The conditions adjustment is halved, since it is published over a full round.</p>`],
+  glance: ['At a Glance', `<p><strong>Rounds logged</strong> is everything you have entered. <strong>Counting towards handicap</strong> is the smaller number both handicaps are actually built from, and a round drops out of it for one of three reasons: you marked it "don't count", its course has since been deleted, or it is a nine played off tees with no 9-hole rating — without that rating half the arithmetic would be a guess.</p>
+    <p><strong>Best differential</strong> is taken from games rather than rounds. A single nine's differential is roughly half an 18-hole one, so it would win this tile every time one appeared and would mean nothing; a pair of nines is scored as the one game it counts as.</p>
+    <p><strong>Change over ${TREND_ROUNDS} rounds</strong> compares whichever figure you have set as primary with what it was ${TREND_ROUNDS} counting rounds ago — far enough back to mean something, close enough to still be about current form. <strong>▼ is improving</strong>, because a lower handicap is the better golfer. It is the same arithmetic as the leaderboard's own column, so the two can never disagree about you.</p>
+    <p><strong>Last round</strong> is the score you actually wrote down, at the date you played it — not a differential, and not adjusted for anything.</p>`],
   esr: ['Exceptional Score Reduction', `<p>Play far better than your index says you can and the official index comes down by more than the averaging alone would bring it. A score differential <strong>7.0 to 9.9</strong> below your index takes an extra 1.0 off; <strong>10.0 or more</strong> below takes 2.0.</p>
     <p>It is measured against the index you held when you played, not the one the round produces. And it does not stop with that round — it stays in force for the next 19 scores and then falls away as that round drops out of the last 20, so two exceptional rounds close together stack.</p>
     <p>The league handicap is never affected: it averages whatever rounds its rule selects, and this is part of the official calculation only.</p>`],
