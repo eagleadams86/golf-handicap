@@ -102,7 +102,7 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'expected truthy'); }
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 252;
+const EXPECTED = 257;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -1899,6 +1899,63 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
     ok(APP_SRC.indexOf('if (window.ghViewOnly) return;')
        < APP_SRC.indexOf('const virgin = state.rounds.length'),
        'the shared-view guard must come first in renderEmptyState'));
+
+  /* ── the info dot and the help window ─────────────────────────────────────
+     Both are family-wide blocks as of 2026-08-23, and both were this app's
+     odd one out before that: a "?" in a filled 18px pill where three siblings
+     drew a 16px outlined "i", and a window that let the prose run the full
+     560px at about 80 characters a line. Neither is visible to any assertion
+     the rest of this suite makes, so they are pinned at the source. */
+  describe('the info dot and the help window');
+  it('every dot is a circled "i", never a "?"', () => {
+    const bare = stripHtmlComments(APP_SRC);
+    const dots = bare.match(/<button class="tile-help"[\s\S]*?<\/button>/g) || [];
+    ok(dots.length >= 10, 'the dots are still there — found ' + dots.length);
+    eq(dots.filter((d) => !/>i<\/button>/.test(d)).join(' | '), '',
+       'a dot drawing something other than "i" — "?" is the browser\'s own help '
+       + 'cursor and a validation bubble, and it asks where this answers');
+    eq((bare.match(/help-btn/g) || []).length, 0,
+       'the old class name is gone, so the family block is the only thing styling these');
+    eq(dots.filter((d) => !/aria-label="/.test(d)).join(' | '), '',
+       'and each one still says what it explains — "i" alone is not a label');
+  });
+  it('the dot is the family circle, declared property by property', () => {
+    ok(/\.tile-help \{[^}]*width: 16px; height: 16px; min-height: 0;/.test(APP_SRC),
+       '16px, and opted out of the 38.5px floor this app puts under every button');
+    ok(/\.tile-help \{[^}]*border-radius: 50%;/.test(APP_SRC), 'a circle');
+    ok(/\.tile-help \{[^}]*background: transparent;/.test(APP_SRC),
+       'outlined, not the filled pill this app drew before');
+    ok(/\.tile-help \{[^}]*margin-left: 7px;/.test(APP_SRC),
+       'and off the word it follows — standing preference in every app');
+    ok(/\.tile-help::after \{ content: ''; position: absolute; inset: -4px; \}/.test(APP_SRC),
+       "the 24px tap target, which is WCAG 2.2's and is not the circle's own size");
+  });
+  it('the help window is as wide as its text, not as wide as a table', () => {
+    /* Two rules, and only together — see the block's own note. */
+    ok(/#helpDialog \{ width: fit-content; max-width: calc\(100% - 32px\); \}/.test(APP_SRC),
+       'the window is sized by what is in it, and still fits a phone screen');
+    ok(/#helpBody \{ max-width: 66ch; font-size: var\(--fs-sm\); line-height: 1\.55; \}/.test(APP_SRC),
+       'the reading measure and the family reading size are what it is sized to');
+    ok(/#helpBody p, #helpBody li \{ font-size: inherit; line-height: inherit; \}/.test(APP_SRC),
+       'and the paragraphs inside the box follow it — `dialog p` sets 13px and '
+       + 'an element rule beats an id rule on the element it names');
+  });
+  it('every dot opens on words, and no entry is left unopened', () => {
+    const keys = Object.keys(H.HELP || {});
+    ok(keys.length >= 10, 'the HELP table is reachable — found ' + keys.length + ' entries');
+    const used = [...new Set((APP_SRC.match(/data-help="(\w+)"/g) || [])
+      .map((m) => m.slice(11, -1)))];
+    eq(used.filter((k) => !H.HELP[k]).join(', '), '',
+       'a dot with no entry opens an empty window, and nothing on screen can say so');
+    eq(keys.filter((k) => !used.includes(k)).join(', '), '',
+       'and an entry no dot points at is a second copy of an explanation waiting to drift');
+    eq(keys.filter((k) => !H.HELP[k][0] || String(H.HELP[k][1]).length < 120).join(', '), '',
+       'each one is headed and actually explains something');
+  });
+  it('the window is dismissed with the family\'s own words', () =>
+    ok(/id="helpClose" class="primary">Got It</.test(APP_SRC),
+       '"Got It", as in every other app — you have read the paragraph, not '
+       + 'abandoned a job half done'));
 
   run();
 }

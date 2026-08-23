@@ -295,9 +295,31 @@ that emphasis.
   lists with no `search` in them, and PAPTrack, which does have a search box, styles it
   through a bespoke `.search` class rather than the rule. Nothing is broken in any of them
   today — the next search field is what would break.
-- **Help buttons (`.help-btn`) carry `margin-left: 7px`** and cells containing one are
-  `nowrap`. An icon must never sit flush against the word it follows — a standing preference
-  across every app in this family.
+- **The info dot is `.tile-help`, a circled "i", and the block is the family's own,
+  property by property (2026-08-23).** It was `.help-btn` here — a "?" in a filled 18px
+  pill — while Money Map, Sprint Predictability and Flow Metrics drew a 16px outlined "i",
+  so one control had two glyphs and two sizes across the family. "i" is the one that
+  survives: "?" is what a browser already puts on its own help cursor and in a form's
+  validation bubble, and it asks a question where this thing answers one. Every property is
+  declared in the block rather than inherited from this app's bare-`button` rule, which is
+  how the two versions happened; `min-height: 0` is part of that, since every button here
+  has a 38.5px floor a 16px circle must opt out of. `margin-left: 7px` (an icon never sits
+  flush against the word it follows — standing preference in every app), cells holding one
+  are `nowrap`, and the 24px tap target comes from an unpainted `::after` rather than from
+  the circle, so the line's height never changes. A change to any of it belongs in all of
+  them.
+- **The help window is sized by its TEXT, and those two rules are the family's too.**
+  `#helpBody` is capped at a 66-character measure and `#helpDialog` is `width: fit-content`,
+  so the window takes the measure as its width — 674px here, the same 624px of text as every
+  sibling. Both rules or neither: the cap alone leaves the paragraph hugging the left of a
+  window sized for tables (Money Map's fault until 2026-08-23), and `fit-content` alone lets
+  the lines run the full width at about 150 characters. The type is pinned in the block at
+  `--fs-sm`, because this app's help ran at 13px — the size of its chrome and its table
+  headings, not of a paragraph — and `#helpBody p, #helpBody li` take `font-size: inherit`
+  because `dialog p` sets 13px and an element rule beats an id rule on the element it names.
+  The window keeps this app's own 24px dialog padding rather than Money Map's 20px:
+  one padding per app beats 4px of cross-app sameness nobody can see. Dismissed with
+  **Got It**, as everywhere else.
 - **The leaderboard's Trend cell is a sparkline PLUS the figure, and the figure is what
   counts.** Flow Metrics' column, ported: the shape answers "which way is this going", the
   number answers "by how much", and the number is what a screen reader reads and what a CSV

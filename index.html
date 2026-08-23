@@ -431,16 +431,58 @@ button.link { background: none; border: none; color: var(--accent); padding: 0;
    Sprint Velocity's fix and, at this font size, its very number. */
 #syncBtn { min-width: 125px; }
 
-/* Help buttons need breathing room — an icon must never sit flush against the
-   word it follows. Standing preference across every app in this family. */
-.help-btn {
-  margin-left: 7px; width: 18px; height: 18px; min-height: 18px; padding: 0;
-  border-radius: var(--radius-pill); font-size: var(--fs-xs); line-height: 1;
-  background: var(--surface-alt); border: 1px solid var(--border-control);
-  color: var(--text-secondary); flex: 0 0 auto;
-}
-h2 .help-btn, .label .help-btn { vertical-align: middle; }
-th:has(.help-btn), td:has(.help-btn) { white-space: nowrap; }
+/* ── The info dot ────────────────────────────────────────────────────────────
+   A circled "i" beside a label, opening the help window rather than a hover
+   tooltip so it works the same on a phone. THE SAME BLOCK IS IN EVERY APP THAT
+   HAS ONE, PROPERTY BY PROPERTY (2026-08-23). This app and the NY calculator
+   drew a "?" in a filled 18px pill while Money Map, Sprint Predictability and
+   Flow Metrics drew a 16px outlined "i" — one control, two glyphs and two sizes
+   across the family. "i" is the one that survives: "?" is the glyph a browser
+   already puts on its own help cursor and in a form's validation bubble, and it
+   asks a question where this thing answers one.
+   Every property is declared here rather than left to whatever the app styles a
+   bare <button> with, since that inheritance is how the two versions happened.
+   `min-height: 0` is part of that — this app gives every button a 38.5px floor,
+   which a 16px circle has to opt out of. ::after inflates the tap target to
+   WCAG 2.2's 24px without changing the line's height, and the left margin keeps
+   the circle off the word it follows (standing preference). A change to any of
+   it belongs in all of them. */
+.tile-help { display: inline-flex; align-items: center; justify-content: center;
+  position: relative; box-sizing: border-box; flex: none;
+  width: 16px; height: 16px; min-height: 0; padding: 0; margin-left: 7px;
+  border: 1px solid var(--border-control); border-radius: 50%;
+  background: transparent; color: var(--text-secondary);
+  font-family: inherit; font-size: var(--fs-xs); font-weight: 700;
+  line-height: 1; text-transform: none; cursor: pointer; vertical-align: 1px; }
+.tile-help:hover { border-color: var(--focus-border); color: var(--text-primary); }
+.tile-help::after { content: ''; position: absolute; inset: -4px; }
+th .tile-help, td .tile-help { vertical-align: 1px; }
+td:has(.tile-help), th:has(.tile-help) { white-space: nowrap; }
+
+/* ── The help window ─────────────────────────────────────────────────────────
+   THE SAME TWO RULES ARE IN EVERY APP THAT HAS ONE (2026-08-23), and they are
+   about the TEXT sizing the window rather than the window holding the text.
+   This is the one dialog that is nothing but prose, so `#helpBody` is capped at
+   a 66-character reading measure and `fit-content` makes the window take that
+   cap as its width. Both or neither: the cap alone leaves the paragraph hugging
+   the left of a window sized for tables with the rest of it empty (which is how
+   Money Map's looked until this date), and `fit-content` alone lets the lines
+   run to the full width at about 150 characters, roughly twice what anybody
+   reads comfortably. `max-width` is restated because the base `dialog` rule's
+   `width` is what is being overridden — on a phone the window is still the
+   screen less its margin, the same 32px as `--sp-8`.
+   The type is declared here too, at `--fs-sm`: this app's help ran at 13px, the
+   size its chrome and its table headings use, and the family's reading size for
+   a paragraph is 15px. The window keeps this app's own dialog padding rather
+   than pinning Money Map's 20px — one padding per app beats 4px of sameness
+   nobody can see, and the measure is what the reader actually notices. */
+#helpDialog { width: fit-content; max-width: calc(100% - 32px); }
+#helpBody { max-width: 66ch; font-size: var(--fs-sm); line-height: 1.55; }
+/* The third rule is for the apps whose help text is paragraphs inside the box
+   rather than the box itself — this one, and the NY calculator. `dialog p` sets
+   13px here, and an element rule beats an id rule on the element it names, so
+   without this the container is 15px and every paragraph in it is not. */
+#helpBody p, #helpBody li { font-size: inherit; line-height: inherit; }
 
 /* 18px, the family's card. Golf Handicap was --sp-6 (16px) and PAPTrack
    14px 14px 12px, so a card was a slightly different box in three of the five
@@ -1328,7 +1370,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
   <section class="card" id="handicapCard">
     <h2>
       Current Handicap
-      <button class="help-btn" type="button" data-help="handicap" aria-label="How the two handicaps are worked out">?</button>
+      <button class="tile-help" type="button" data-help="handicap" aria-label="How the two handicaps are worked out">i</button>
       <span class="spacer"></span>
       <span class="label" id="primaryLabel">Show as primary</span>
       <span class="seg" role="group" aria-labelledby="primaryLabel">
@@ -1364,7 +1406,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
 
   <section class="card" id="trendCard">
     <h2>Handicap Over Time
-      <button class="help-btn" type="button" data-help="trend" aria-label="About the trend chart">?</button>
+      <button class="tile-help" type="button" data-help="trend" aria-label="About the trend chart">i</button>
     </h2>
     <div class="chart-wrap" id="chartWrap"></div>
     <div class="legend">
@@ -1375,7 +1417,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
 
   <section class="card" id="playingCard">
     <h2>Course Handicap
-      <button class="help-btn" type="button" data-help="coursehcp" aria-label="About the course handicap">?</button>
+      <button class="tile-help" type="button" data-help="coursehcp" aria-label="About the course handicap">i</button>
     </h2>
     <div class="grid3">
       <div class="field">
@@ -1403,7 +1445,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
        go round here, and then the rounds themselves. -->
   <section class="card" id="courseStatsCard">
     <h2>By Course
-      <button class="help-btn" type="button" data-help="bycourse" aria-label="About the per-course figures">?</button>
+      <button class="tile-help" type="button" data-help="bycourse" aria-label="About the per-course figures">i</button>
     </h2>
     <div class="table-scroll" id="courseStatsTable"></div>
   </section>
@@ -1446,7 +1488,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
     <section class="card" id="leagueCard">
       <h2>
         Leaderboard
-        <button class="help-btn" type="button" data-help="league" aria-label="How the leaderboard is ordered">?</button>
+        <button class="tile-help" type="button" data-help="league" aria-label="How the leaderboard is ordered">i</button>
         <span class="spacer"></span>
         <span class="label" id="leagueRankLabel">Rank by</span>
         <span class="seg" role="group" aria-labelledby="leagueRankLabel">
@@ -1467,7 +1509,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
          table is already eight columns at 1100px. -->
     <section class="card" id="strokesCard">
       <h2>Strokes on the Day
-        <button class="help-btn" type="button" data-help="strokes" aria-label="About playing handicaps and shots given">?</button>
+        <button class="tile-help" type="button" data-help="strokes" aria-label="About playing handicaps and shots given">i</button>
       </h2>
       <p class="hint">What everyone's handicap comes to at one course, off one set of tees, in
         one format — the sheet you write out before you tee off.</p>
@@ -1532,7 +1574,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
         <input type="date" id="f_date" required>
       </div>
       <div class="field">
-        <label for="f_holes">Holes played <button class="help-btn" type="button" data-help="nine" aria-label="About nine-hole rounds">?</button></label>
+        <label for="f_holes">Holes played <button class="tile-help" type="button" data-help="nine" aria-label="About nine-hole rounds">i</button></label>
         <select id="f_holes">
           <option value="18" selected>18 holes</option>
           <option value="9">9 holes</option>
@@ -1659,7 +1701,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
     <div class="field checkline">
       <input type="checkbox" id="m_caps">
       <label for="m_caps" style="margin:0">Apply the official soft cap and hard cap</label>
-      <button class="help-btn" type="button" data-help="caps" aria-label="About the caps">?</button>
+      <button class="tile-help" type="button" data-help="caps" aria-label="About the caps">i</button>
     </div>
     <!-- Beside the caps, because the two are the same kind of thing: parts of
          the OFFICIAL calculation that can be switched off to see the plain
@@ -1667,7 +1709,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
     <div class="field checkline">
       <input type="checkbox" id="m_esr">
       <label for="m_esr" style="margin:0">Apply the official exceptional score reduction</label>
-      <button class="help-btn" type="button" data-help="esr" aria-label="About exceptional scores">?</button>
+      <button class="tile-help" type="button" data-help="esr" aria-label="About exceptional scores">i</button>
     </div>
     </div>
     <p class="warn" id="methodWarn" role="status"></p>
@@ -1843,10 +1885,15 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
   </div>
 </dialog>
 
+<!-- The help window. "Got It" rather than "Close": every other app in the
+     family dismisses this one window with those words, and it is the honest
+     label — you are not closing a job half done, you have read the paragraph.
+     The heading is replaced on open; "About" is what a reader with no script
+     would see. -->
 <dialog id="helpDialog" aria-labelledby="helpTitle">
   <h2 id="helpTitle">About</h2>
   <div id="helpBody"></div>
-  <div class="row-actions"><button type="button" id="helpClose" class="primary">Close</button></div>
+  <div class="row-actions"><button type="button" id="helpClose" class="primary">Got It</button></div>
 </dialog>
 
 <!-- Escape is deliberately blocked on this one: either answer replaces one of the
@@ -3198,7 +3245,7 @@ function renderRounds(c) {
     <thead><tr>
       <th scope="col">Date</th><th scope="col">Course</th><th scope="col">Tee</th>
       <th scope="col" class="num">Score</th>
-      <th scope="col" class="num">Diff<button class="help-btn" type="button" data-help="diff" aria-label="What is a score differential?">?</button></th>
+      <th scope="col" class="num">Diff<button class="tile-help" type="button" data-help="diff" aria-label="What is a score differential?">i</button></th>
       <th scope="col" class="num">vs par</th>
       <th scope="col">Used in</th><th scope="col">Note</th>
     </tr></thead><tbody>${rows}</tbody></table>`;
@@ -3273,7 +3320,7 @@ function renderCourseStats(c) {
     <thead><tr>
       <th scope="col">Course</th>
       <th scope="col" class="num">Rounds</th>
-      <th scope="col" class="num">Best diff<button class="help-btn" type="button" data-help="diff" aria-label="What is a score differential?">?</button></th>
+      <th scope="col" class="num">Best diff<button class="tile-help" type="button" data-help="diff" aria-label="What is a score differential?">i</button></th>
       <th scope="col" class="num">Average diff</th>
       <th scope="col" class="num">Best score</th>
       <th scope="col" class="num">Average score</th>
@@ -3629,7 +3676,7 @@ function renderLeague() {
       <th scope="col" class="num"${sortedOn('rolling')}>${esc(method.name)}</th>
       <th scope="col" class="num"${sortedOn('whs')}>Official</th>
       <th scope="col" class="num">Rounds</th>
-      <th scope="col" class="num">Best diff<button class="help-btn" type="button" data-help="diff" aria-label="What is a score differential?">?</button></th>
+      <th scope="col" class="num">Best diff<button class="tile-help" type="button" data-help="diff" aria-label="What is a score differential?">i</button></th>
       <th scope="col" class="num">Change over ${TREND_ROUNDS}</th>
       <th scope="col">Last round</th>
     </tr></thead><tbody>${body}</tbody></table>`;
@@ -4570,7 +4617,7 @@ const HELP = {
 
 const helpDialog = document.getElementById('helpDialog');
 document.addEventListener('click', (e) => {
-  const btn = e.target.closest('.help-btn');
+  const btn = e.target.closest('.tile-help');
   if (!btn) return;
   const h = HELP[btn.dataset.help];
   if (!h) return;
@@ -5716,6 +5763,10 @@ window.addEventListener('storage', (e) => {
 window.__ghTestHooks = { raisesKeyboard,
   DEFAULT_METHOD, WHS_TABLE, WHS_MIN_ROUNDS, WHS_MAX_INDEX, SOFT_CAP_AT, HARD_CAP_AT,
   ESR_AT, ESR_BIG_AT, ESR_LASTS, ALLOWANCES, DEFAULT_ALLOWANCE, SPARK_POINTS,
+  /* The info-dot text, so the suite can hold the table against the dots that
+     open it: a dot with no entry opens an empty window, and the dot is drawn
+     from the key rather than from the text, so nothing on screen would say so. */
+  HELP,
   /* Both declared above this line, which is the only reason they can be read
      here: a `const` referenced before its declaration is a temporal-dead-zone
      error that would take the whole app down at boot. */
