@@ -31,7 +31,8 @@ that emphasis.
   - `<meta name="theme-color">` is rewritten by `applyThemeColor()` from the pack's `--bg`, so an installed window's title bar follows the theme instead of staying dark behind a light page.
   - **The manifest is deliberately NOT linked from `privacy.html`** — that is a policy page, not a surface anyone installs from, and a manifest on it would offer to install something the reader is not looking at.
   - Offline predates all of this and is unchanged: it is `sw.js`, network-first. The manifest adds the window and the icon, not the caching.
-- **`--page-w` stays 1100px, and that is not drift.** Sprint Predictability, Flow Metrics, PAPTrack and the lottery pages are 1500 and Money Map is 2400; the family rule is that the CHROME is shared and the width is justified per app. This app's widest thing is an eight-column leaderboard, which goes sparse and gappy stretched to 1500 — tried and reverted. PAPTrack could take 1500 because its cards flow into columns rather than stretching; a table has no such move.
+- **`--page-w` is 1500px, the family's default.** This file argued for 1100 until 2026-08-23, two days after the code had already moved: commit `0eb65ce` ("Put golfers and courses in one window, and match the other apps", 2026-08-21) took it to 1500 and this note was not updated with it. **THERE ARE TWO WIDTHS IN THE FAMILY AND ONLY TWO** — 1500 (here, Sprint Predictability, Flow Metrics, both lottery pages) and 2400, the ultra-wide (Money Map, PAPTrack, the dashboard). A new app picks one of them; it does not invent a third. The old note also had PAPTrack at 1500, which it has never been.
+  The reasoning it carried is still worth reading, because it is the argument anyone will reach for again: an eight-column leaderboard does go sparse stretched to 1500. It lost anyway. If a table looks gappy that is a fact about the TABLE, and being the one app in the family at a width nothing else uses costs more than the gaps do.
 - **The rolling figure is called the LEAGUE handicap on screen**, and its settings dialog is
   reached from the header button **League rule**. It used to be "My method" everywhere; the
   rename is deliberate and total (2026-08-11) — the rule is one setting shared by every
@@ -301,7 +302,7 @@ that emphasis.
   could carry — so the SVG is `aria-hidden` and never the only thing saying anything. It is
   drawn with LOW at the top, because a lower handicap is better and an improving run has to
   rise. It shares the existing "Change over 5" cell rather than adding a ninth column, which
-  an eight-column table at `--page-w: 1100` has no room for. `td.trend` is deliberately NOT
+  an eight-column table has no room for even at `--page-w: 1500`. `td.trend` is deliberately NOT
   `display: flex` — that takes the cell out of the table's own layout and the column stops
   lining up.
 - **The At-a-glance tiles are Sprint Velocity's tile, and their columns are counted by
@@ -444,12 +445,13 @@ that emphasis.
   sprint-velocity; each app has its own mark now, so there is nothing left to keep in step.
   The two extra tints (`#a5b4fc`, `#141c33`) are artwork, not palette — copied byte-for-byte
   from Money Map's icon rather than re-picked, so nothing new enters the theme pack.
-- **`--page-w` is 1100px, and both `.wrap` and `.headbar` read it.** They must stay the same
+- **`--page-w` is 1500px, and both `.wrap` and `.headbar` read it.** They must stay the same
   number or the brand stops lining up with the left edge of the first card — that is the
-  whole reason it is a token. This is the **one** deliberate divergence from the siblings'
-  1500px: they earn that width with dense many-column tables, and the rounds table here is
-  seven columns that went sparse and gappy stretched to it. The full-bleed sticky bar, the
-  16px gutter and everything else about the header are still theirs.
+  whole reason it is a token rather than two literals, and Sprint Predictability and Flow
+  Metrics wrote it twice each until 2026-08-23. It is the family's default width, not a
+  divergence: see the `--page-w` note near the top of this file for the two widths and why
+  the 1100 this app used to run was abandoned. The full-bleed sticky bar, the 16px gutter and
+  everything else about the header are the siblings' too.
 - **Everything in the header row is written into the markup at its final size.** The header
   paints long before the script at the foot of the page runs, so a control filled in by JS
   grows on screen and shoves the page down. The sync button is therefore **visible by default
