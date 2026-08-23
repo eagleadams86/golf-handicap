@@ -359,6 +359,15 @@ that emphasis.
   the `tiles` array is layout, not editorial**: under 620px the fifth tile is the one that
   takes the full width, so the last-round *date* sits there — it is the only value that isn't
   a short number. Reordering the array moves that wide box to something that doesn't need it.
+  **THIS GRID IS THE FAMILY'S DELIBERATE EXCEPTION (2026-08-23).** Money Map, Sprint
+  Predictability and Flow Metrics now answer the same rule in CSS — a tile row fills one line
+  when the line has room and splits into equal rows when it does not, with the count read by
+  `:has(> :nth-child(N):last-child)` and the width by a container query — because their rows
+  vary in count and `auto-fit` was stranding a lone tile. This one does not vary: five, always,
+  hand-counted and already gap-free at both widths, and five ACROSS was costed and rejected in
+  the same note above (it squeezed every tile under the length of its own label). If a sixth
+  tile ever arrives, take the family block from Sprint Predictability rather than adding more
+  spans — that is what it is for.
 - **Exclusions are never silent.** Every round that sits outside the numbers — course
   deleted, marked "don't count", a nine with no 9-hole rating, or a nine still waiting for a
   partner — is named on the front page via `#handicapWarn`, and the *Used in* column shows
