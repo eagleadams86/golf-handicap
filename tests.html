@@ -102,7 +102,7 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'expected truthy'); }
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 231;
+const EXPECTED = 233;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -1617,6 +1617,64 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
       el.hidden = was;
       eq(display, 'none', `#${el.id || el.className} should hide:`);
     });
+  });
+
+  /* ── Golfers & Courses is drawn whichever way you arrive at it ─────────────
+     Reported 2026-08-22, on a FRESH app. `state` has held the default golfer
+     "Me" since boot, but the Golfers section came up empty — no table, not even a
+     heading row — and pressing + Add Golfer made "Me" and the new name appear
+     together, which reads as the app having invented "Me" on the spot. Nothing was
+     created or lost: the list simply had never been drawn.
+
+     The window is reachable four ways — the header button, and the three ways out
+     of the course editor (Save, Delete, Cancel). The three course ones redrew the
+     COURSE list and went straight to openModal(), which was invisible for as long
+     as the header button was the only way IN, because it draws both tables. On a
+     fresh app it is not: the welcome card's "Add your first course" opens the
+     course editor directly, so saving there was the first time the window had ever
+     been shown.
+
+     Pinned two ways, because either alone would have missed it. The behavioural
+     test walks the Cancel path, which writes nothing. The source check is what
+     covers Save and Delete without this suite having to create data in the frame,
+     and is the one that catches a FIFTH opener being added later. */
+  describe('Golfers & Courses is drawn whichever way you arrive at it');
+
+  it('has one opener, and no other line reaches for the dialog directly', () => {
+    const code = strip(APP_SRC);
+    ok(/function openManage\(\)/.test(code),
+      'openManage() is gone — the four entry points are drawing their own lists again');
+    const opens = code.match(/openModal\(manageDialog\)/g) || [];
+    eq(opens.length, 1,
+      'openModal(manageDialog) must appear exactly once, inside openManage(). A second call '
+      + 'site is a path that can show this window without drawing one of its two lists — '
+      + 'which is the bug this test exists for, and it only shows on a fresh app.');
+    const fn = (code.match(/function openManage\(\)[\s\S]*?\n}/) || [''])[0];
+    ok(/renderGolferList\(\)/.test(fn) && /renderCourseList\(\)/.test(fn),
+      'openManage() must draw BOTH lists before it opens the window');
+  });
+
+  it('shows the default golfer coming back from the course editor', () => {
+    /* The Cancel path, deliberately: it is one of the three that was broken and it
+       writes nothing, so this leaves no data behind in the frame. */
+    const d = W.document;
+    const manage = d.getElementById('manageDialog');
+    const wasOpen = manage.open;
+    const before = d.getElementById('golferList').innerHTML;
+    try {
+      /* Empty it first, so a pass cannot come from a list some earlier test drew.
+         Without this the assertion is true before the code under test even runs. */
+      d.getElementById('golferList').innerHTML = '';
+      d.getElementById('addCourseBtn').click();      // opens the course editor
+      d.getElementById('courseEditCancel').click();  // and backs out into this window
+      ok(manage.open, 'Cancel should come back to Golfers & Courses, not close everything');
+      ok(d.querySelectorAll('#golferList tbody tr').length >= 1,
+        'the Golfers list is empty on the way back — every golfer in state must have a row, '
+        + 'and a fresh app always has at least the default one');
+    } finally {
+      d.getElementById('golferList').innerHTML = before;
+      if (!wasOpen && manage.open) manage.close();
+    }
   });
 
   /* ── The welcome card ───────────────────────────────────────────────────────

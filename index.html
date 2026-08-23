@@ -3984,8 +3984,7 @@ document.getElementById('courseEditSave').addEventListener('click', () => {
   }
   save();
   courseEditDialog.close();
-  renderCourseList();
-  openModal(manageDialog);
+  openManage();
   toast('Course saved');
 });
 
@@ -4015,13 +4014,12 @@ document.getElementById('deleteCourseBtn').addEventListener('click', () => {
   if (!editingCourse) return;
   if (!deleteCourse(editingCourse.id)) return;
   courseEditDialog.close();
-  openModal(manageDialog);
+  openManage();
 });
 
 document.getElementById('courseEditCancel').addEventListener('click', () => {
   courseEditDialog.close();
-  renderCourseList();
-  openModal(manageDialog);
+  openManage();
 });
 /* Escape took the browser's own route out and closed this dialog flat, leaving
    the courses list it was opened from gone as well. It now backs out the same
@@ -4169,13 +4167,29 @@ document.getElementById('addGolferBtn').addEventListener('click', () => {
 });
 /* One opener for both lists, where there were two buttons and two windows. Both
    tables are drawn before the window is shown rather than on demand — they are
-   short, and drawing one after the open would grow the dialog under the reader. */
-document.getElementById('manageBtn').addEventListener('click', () => {
+   short, and drawing one after the open would grow the dialog under the reader.
+
+   AND ONE FUNCTION, which is what stops this drifting again. This window is
+   opened from four places — the header button, and the three ways out of the
+   course editor (Save, Delete, Cancel) — and the three course ones each drew
+   the COURSE list and went straight to openModal(). That was invisible while the
+   header button was the only way in, because it had already drawn both tables.
+   It was not invisible on a FRESH app: the welcome card's "Add your first course"
+   opens the course editor DIRECTLY, so saving there was the first time this
+   window had ever been shown, and it came up with an empty Golfers section — no
+   table, not even a heading row — over a state that had held the default golfer
+   "Me" since boot. Pressing + Add Golfer then redrew the list and both names
+   appeared at once, which reads as the app having created "Me" on the spot.
+   Nothing was ever created or lost; a list simply was not drawn. Reported
+   2026-08-22, pinned in tests.html by the Cancel path and by a source check that
+   no other line may call openModal(manageDialog). */
+function openManage() {
   document.getElementById('golferWarn').textContent = '';
   renderGolferList();
   renderCourseList();
   openModal(manageDialog);
-});
+}
+document.getElementById('manageBtn').addEventListener('click', openManage);
 document.getElementById('manageClose').addEventListener('click', () => manageDialog.close());
 document.getElementById('golferSel').addEventListener('change', (e) => {
   state.activeGolfer = e.target.value;

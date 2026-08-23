@@ -207,6 +207,18 @@ that emphasis.
   `tests.html` pins all three. Never retune a colour here: change the pack's `tokens.json`, run its
   `check_contrast.py` gate, rebuild, re-transcribe, and keep the other apps in step (drift
   policy in the pack's CLAUDE.md).
+- **Golfers & Courses is opened by `openManage()` and by nothing else** (2026-08-22). The window
+  is reachable four ways — the header button, and the three ways out of the course editor (Save,
+  Delete, Cancel) — and each course path used to draw the COURSE list and call
+  `openModal(manageDialog)` itself. That was invisible while the header button was the only way
+  IN, because it drew both tables; on a FRESH app it is not, because the welcome card's "Add your
+  first course" opens the course editor directly. Saving there showed the window for the first
+  time with an empty Golfers section over a state that had held the default golfer "Me" since
+  boot, and pressing + Add Golfer then drew both names at once — which reads as the app having
+  invented "Me" on the spot. **A new way into this window goes through `openManage()`**;
+  `tests.html` pins that `openModal(manageDialog)` appears exactly once in the source, which is
+  the check that catches a fifth opener.
+
 - **The two chart series sit on the blue↔amber axis** — the one that survives red-green
   colour deficiency — and colour is not the only cue: the rolling line is solid with round
   points, the official line is dashed with square points, and both are named in the legend.
