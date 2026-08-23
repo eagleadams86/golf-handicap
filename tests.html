@@ -102,7 +102,7 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'expected truthy'); }
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 257;
+const EXPECTED = 258;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -1957,6 +1957,36 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
     ok(/#helpBody p, #helpBody li \{ font-size: inherit; line-height: inherit;\s*color: inherit; margin: 0 0 10px; \}/.test(APP_SRC),
        'and the paragraphs inside the box follow it — `dialog p` sets 13px and '
        + 'an element rule beats an id rule on the element it names');
+  });
+  it('every note is paragraphs, and every note bolds something', () => {
+    /* This app has written its help as <p> blocks since it had help, which is
+       what the family sweep found the two textContent apps lacking on
+       2026-08-23 — but The Trend Chart still had no bold in it at all, so a
+       reader had nothing to skim by. The rule the family settled on: a note
+       over about 380 characters is paragraphs, every note bolds the thing it
+       is defining or the claim it turns on, and no note has more bold runs
+       than paragraphs, because a note half in bold has no emphasis left. */
+    const box = W.document.createElement('div');
+    const read = (k) => { box.innerHTML = String(H.HELP[k][1]); return box; };
+    const keys = Object.keys(H.HELP);
+    eq(keys.filter((k) => read(k).querySelectorAll('p').length < 2
+      && box.textContent.trim().replace(/\s+/g, ' ').length > 380).join(', '), '',
+       'a note over 380 characters with no paragraph break in it');
+    eq(keys.filter((k) => !read(k).querySelector('strong')).join(', '), '',
+       'and one that bolds nothing — the reader has no way in');
+    /* A SHARE OF THE CHARACTERS, not a count per paragraph. The obvious rule —
+       at most one bold run per paragraph — is wrong for a note that defines a
+       list: At a Glance bolds all five tile names across four paragraphs, which
+       is exactly right, and Money Map's net-worth note bolds its five parts the
+       same way. What actually goes wrong is bold stopping being the minority,
+       and that is what this measures. */
+    eq(keys.filter((k) => {
+      const all = read(k).textContent.replace(/\s+/g, ' ').length;
+      const bold = [...box.querySelectorAll('strong')]
+        .reduce((n, e) => n + e.textContent.replace(/\s+/g, ' ').length, 0);
+      return all > 0 && bold / all > 0.4;
+    }).join(', '), '', 'with bold a minority of the note — over about 40% and there '
+       + 'is no emphasis left, only a heavier paragraph');
   });
   it('every dot opens on words, and no entry is left unopened', () => {
     const keys = Object.keys(H.HELP || {});

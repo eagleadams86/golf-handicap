@@ -330,6 +330,14 @@ that emphasis.
   bold was carried by weight alone with no lift. Both are in the block now.
   Dismissed with **Got It**, on `id="helpCloseBtn"` — it was `helpClose` here and
   `helpCloseBtn` in the other five, which is one more thing a shared block could not name.
+- **Every note is paragraphs and every note bolds something** (pinned 2026-08-23). This app
+  has written its help as `<p>` blocks since it had help, which is what the sweep found the
+  two `textContent` apps lacking — but The Trend Chart had no bold in it at all, so a reader
+  had nothing to skim by. The rule, family-wide: a note over about 380 characters is
+  paragraphs, every note bolds the thing it defines or the claim it turns on, and **bold
+  stays under about 40% of the characters**. That last one is a SHARE and deliberately not
+  "one bold per paragraph": At a Glance bolds all five tile names across four paragraphs,
+  which is exactly right for a note that defines a list.
 - **The leaderboard's Trend cell is a sparkline PLUS the figure, and the figure is what
   counts.** Flow Metrics' column, ported: the shape answers "which way is this going", the
   number answers "by how much", and the number is what a screen reader reads and what a CSV
