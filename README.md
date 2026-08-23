@@ -607,8 +607,10 @@ every `favicon.ico` reference — browsers hold on to an icon for a long time.
 
 The palette comes from [`claude-theme-pack`](https://github.com/eagleadams86/claude-theme-pack)
 (private), the source of truth for every app in this family, and is **linked** as
-`theme.css` rather than inlined, so a pack change reaches the app by replacing one file. Four themes — Midnight
-(default), Dark, Light, Sepia — listed alphabetically in the picker. Never retune a colour
+`theme.css` rather than inlined, so a pack change reaches the app by replacing one file. Four themes — Midnight,
+Dark, Light, Sepia — plus **Auto, which is the default**: with nothing saved the app follows
+your own system, Light or Midnight, and changes with it while the page is open. Midnight is the
+base palette, and what Auto means by "dark". All five are listed alphabetically in the picker. Never retune a colour
 here: change the pack's `tokens.json`, run its contrast gate, rebuild, re-transcribe.
 
 ---

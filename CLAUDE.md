@@ -199,9 +199,12 @@ that emphasis.
   stylesheet is silently blocked without it. `tests.html` uses no tokens and links nothing.
   The app's own additions (`--c-roll`/`--c-whs` chart colours, `--chrome-h`, `--control-h`,
   `--page-w`) stay in the inline `<style>` AFTER the link, which is what lets them win.
-  Four themes (Midnight default, Dark, Light, Sepia), listed
-  **alphabetically** in the picker, unknown/missing saved values falling back to midnight
-  (`slate` → `dark`). Never retune a colour here: change the pack's `tokens.json`, run its
+  Four themes (Midnight — the base palette — Dark, Light, Sepia) plus Auto, which is the
+  **default** since 2026-08-22 and follows the reader's system, listed
+  **alphabetically** in the picker, unknown/missing saved values falling back to auto
+  (`slate` → `dark`). The default lives in three places that have to agree — `<html
+  data-theme="auto">`, the boot script's fallback, and the picker's `selected` — and
+  `tests.html` pins all three. Never retune a colour here: change the pack's `tokens.json`, run its
   `check_contrast.py` gate, rebuild, re-transcribe, and keep the other apps in step (drift
   policy in the pack's CLAUDE.md).
 - **The two chart series sit on the blue↔amber axis** — the one that survives red-green

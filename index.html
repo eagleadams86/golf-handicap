@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="auto">
 <head>
 <meta charset="UTF-8">
 <!-- Content Security Policy. GitHub Pages can't set response headers, so this meta
@@ -69,8 +69,11 @@
      the theme rather than staying dark behind a light page. -->
 <meta name="theme-color" content="#0a0e1a">
 <script>
-  // Apply the saved theme before first paint so there is no flash. Midnight is the
-  // default for every app in this family; "slate" is the old name for Dark.
+  // Apply the saved theme before first paint so there is no flash. AUTO is the
+  // default for every app in this family (2026-08-22) — never having chosen, or a
+  // retired id, both land there, so a first run follows the reader's own system.
+  // "slate" is the old name for Dark. The same id is in the markup above, which is
+  // what a browser with script disabled gets.
   //
   // The open tab is restored here for the same reason, not by the script at the
   // foot of the page: that one runs after the first paint, so a saved League tab
@@ -82,8 +85,18 @@
     var t = localStorage.getItem('gh-theme');
     if (t === 'slate') t = 'dark';
     var valid = ['auto', 'midnight', 'dark', 'light', 'sepia'];
-    if (valid.indexOf(t) === -1) t = 'midnight';
+    if (valid.indexOf(t) === -1) t = 'auto';
     document.documentElement.setAttribute('data-theme', t);
+    // And the installed window's title bar with it. The literal in the meta above is
+    // Midnight's, and Auto resolves to LIGHT on a light system — without this an
+    // installed app opens with a midnight bar over a light page until
+    // applyThemeColor() runs at the foot of the file. matchMedia is answerable this
+    // early; --bg is not, because theme.css has not loaded. Keep the one value in
+    // step with theme.css's Light --bg.
+    if (t === 'auto' && !matchMedia('(prefers-color-scheme: dark)').matches) {
+      var bar = document.querySelector('meta[name="theme-color"]');
+      if (bar) bar.setAttribute('content', '#f5f5f3');
+    }
     var tab = localStorage.getItem('gh-tab');
     document.documentElement.setAttribute('data-tab', tab === 'league' ? 'league' : 'player');
   })();
@@ -1025,10 +1038,10 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
          first. It carries `selected` so the picker never reads one theme while the
          boot script in <head> has already painted another. -->
     <select id="themeSel" title="Change the colour theme">
-      <option value="auto">◐ Auto</option>
+      <option value="auto" selected>◐ Auto</option>
       <option value="dark">☾ Dark</option>
       <option value="light">☀ Light</option>
-      <option value="midnight" selected>✦ Midnight</option>
+      <option value="midnight">✦ Midnight</option>
       <option value="sepia">📜 Sepia</option>
     </select>
   </div>
@@ -4258,9 +4271,9 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
 });
 
 const themeSel = document.getElementById('themeSel');
-themeSel.value = document.documentElement.getAttribute('data-theme') || 'midnight';
+themeSel.value = document.documentElement.getAttribute('data-theme') || 'auto';
 themeSel.addEventListener('change', () => {
-  const t = THEMES.indexOf(themeSel.value) === -1 ? 'midnight' : themeSel.value;
+  const t = THEMES.indexOf(themeSel.value) === -1 ? 'auto' : themeSel.value;
   document.documentElement.setAttribute('data-theme', t);
   try { localStorage.setItem(THEME_KEY, t); } catch (e) { /* the theme just won't be remembered */ }
   applyThemeColor();

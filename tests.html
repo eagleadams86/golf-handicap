@@ -102,7 +102,7 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'expected truthy'); }
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 230;
+const EXPECTED = 231;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -1102,6 +1102,33 @@ async function onAppLoad() {
   let futureErr = null;
   try { await S.decodeShare(futureLink); } catch (e) { futureErr = e; }
   const currentLink = await S.decodeShare(await S.encodeShare(sharePayload));
+
+  /* ── the default theme ─────────────────────────────────────────────────── */
+describe('The theme a reader who has never chosen one gets');
+  it('is auto, in the markup, the boot script and the picker alike', () => {
+    /* It moved from midnight to auto on 2026-08-22, so a first visit follows the
+       reader's own system. The default lives in THREE places which have to agree,
+       and none of them can see the other two: the <html> attribute (what a browser
+       with script disabled paints), the boot script (what a reader with nothing —
+       or something retired — saved gets), and the picker's `selected` (what the
+       header ROW reads while both of those happen). Any one left on midnight is a
+       silent disagreement, and silent in the direction that hides it: on a dark-mode
+       machine every combination looks identical. */
+    ok(APP_SRC, 'index.html did not load, so nothing below proves anything');
+    ok(/<html[^>]*\sdata-theme="auto"/.test(APP_SRC),
+      '<html> must carry data-theme="auto" — this page had no data-theme at all until '
+      + "2026-08-22, so with script off it took :root's midnight whatever the system said");
+    const boot = strip(APP_SRC).match(/valid\.indexOf\(t\) === -1\) t = '([a-z]+)'/);
+    ok(boot, 'the boot script no longer normalises an unknown or missing saved theme id');
+    eq(boot[1], 'auto', 'nothing saved, or a retired id, must land on the default');
+    ok(/<option value="auto" selected>/.test(APP_SRC),
+      'auto must carry `selected` in the picker markup, or the row names another theme '
+      + 'until the script at the foot of the file runs');
+    eq((APP_SRC.match(/<option value="(?:auto|midnight|dark|light|sepia)" selected>/g) || []).length,
+      1, 'exactly one theme option may carry `selected`');
+    ok(/getAttribute\('data-theme'\) \|\| 'auto'/.test(strip(APP_SRC)),
+      "and the picker's own initial value must fall back to auto too");
+  });
 
   /* ── the footer every public page in this account carries ─────────────── */
 describe('Google’s code is fetched when it is asked for, not on every visit');
