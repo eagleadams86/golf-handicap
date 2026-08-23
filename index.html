@@ -695,6 +695,33 @@ dialog {
    Asked for on 2026-08-22, alongside the share windows — these were all 560px,
    so the same dialog opened narrower here than in the app beside it. */
 #dataDialog { max-width: 700px; }
+/* ── Find ───────────────────────────────────────────────────────────────────
+   Money Map's Find window, ported here, to Sprint Predictability and to Flow
+   Metrics on 2026-08-23 so ⌘K reaches the same thing in whichever app is open.
+   Its own width and a narrow one: what it holds is a text box and a column of
+   short lines, and at any of the widths above it was the widest thing on screen
+   for the least content in it. */
+#searchDialog { max-width: 360px; }
+/* `max-width` rather than a flat width so it still shrinks with the dialog on
+   a phone. */
+#searchBox { width: 320px; max-width: 100%; margin-top: 4px; }
+.searchresults { max-height: 50vh; overflow-y: auto; margin-top: 10px; }
+/* A hit is a full-width button so the keyboard reaches it — Tab walks the list,
+   Enter opens. Left-aligned prose, not button chrome. */
+.searchresults .hit { display: block; width: 100%; text-align: left;
+  background: none; border: none; border-bottom: 1px solid var(--border);
+  padding: 8px 10px; cursor: pointer; color: var(--text-primary);
+  font-size: var(--fs-xs); border-radius: 0; }
+.searchresults .hit:hover, .searchresults .hit:focus-visible {
+  background: var(--accent-bg); }
+.searchresults .hitwhere { font-weight: 600; display: block; }
+/* --text-secondary, not the muted grey: this line sits on --accent-bg when the
+   hit is hovered or focused, and muted fails AA there. */
+.searchresults .hitsnip { display: block; color: var(--text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.searchresults .hittab { display: block; font-size: var(--fs-sm);
+  color: var(--text-secondary); text-transform: uppercase; letter-spacing: .04em;
+  margin-top: 2px; }
 #shareDialog { max-width: 1100px; }
   /* Two tables one under the other need the room the 560px base has not got.
      1100px is Sprint Predictability's width for the window this one is modelled
@@ -1025,6 +1052,12 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
          are, and at the left-hand end of a right-aligned row that growth pushes
          into space rather than shoving five controls sideways. -->
     <button id="syncBtn" title="Sign in with Google to see the same data on all your devices">☁️ Sign in to Sync</button>
+    <!-- Find is "everything else" in the family's header order above, so it sits
+         to the LEFT of the record picker, at the end of the row that grows into
+         space rather than shoving the furniture sideways. It stays for a visitor
+         to a shared link, unlike the buttons that write: moving around somebody
+         else's rounds is exactly what it is for. -->
+    <button id="findBtn" title="Search your golfers, courses and rounds (⌘K / Ctrl+K)"><span aria-hidden="true">⌕</span> Find</button>
     <label class="sr-only" for="golferSel">Golfer</label>
     <select id="golferSel" title="Which golfer you're looking at" style="min-width:130px"><option>—————</option></select>
     <!-- ONE button, not the two this row carried until 2026-08-21. Golfers and
@@ -1308,6 +1341,20 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
 <div id="toast" popover="manual" role="status" aria-live="polite"></div>
 
 <!-- ── Dialogs ───────────────────────────────────────────────────────────── -->
+<!-- ── Find ──────────────────────────────────────────────────────────────── -->
+<dialog id="searchDialog" aria-labelledby="searchDialogTitle">
+  <h3 id="searchDialogTitle">Find</h3>
+  <p class="hint">Every golfer, every course and set of tees, and every round — by its
+    course, its date or the note you left on it. A round opens straight into its card.</p>
+  <label class="sr-only" for="searchBox">Search</label>
+  <input type="text" id="searchBox" autocomplete="off" spellcheck="false"
+    placeholder="At least two characters…">
+  <!-- The COUNT is the live region, not the list: a screen reader hears
+       "12 results" per keystroke rather than the whole list re-read. -->
+  <span id="searchCount" class="sr-only" role="status"></span>
+  <div id="searchResults" class="searchresults"></div>
+</dialog>
+
 <dialog id="roundDialog" aria-labelledby="roundTitle">
   <form method="dialog" id="roundForm">
     <h2 id="roundTitle">Add Round</h2>
@@ -3634,6 +3681,7 @@ function closeOnBackdropClick(dlg, onClose) {
 /* ── Round dialog ───────────────────────────────────────────────────────── */
 
 const roundDialog = document.getElementById('roundDialog');
+const searchDialog = document.getElementById('searchDialog');
 let editingRound = null;
 
 function fillCourseSelects(courseSel, teeSel, courseId, teeId) {
@@ -4569,8 +4617,145 @@ document.getElementById('clearCancel').addEventListener('click', () => clearDial
    picking which copy of your rounds survives has to be a choice, not something
    you can click past by accident. `courseEditDialog` dismisses through its own
    Cancel button so it can never drift from what Cancel does. */
-[roundDialog, manageDialog, methodDialog, dataDialog, clearDialog, helpDialog]
+[roundDialog, manageDialog, methodDialog, dataDialog, clearDialog, helpDialog, searchDialog]
   .forEach((dlg) => closeOnBackdropClick(dlg));
+
+/* ── Find ───────────────────────────────────────────────────────────────────
+   Money Map's Find window, ported here and to the two work apps on 2026-08-23,
+   so ⌕ Find and ⌘K reach the same thing in whichever one is open.
+
+   A season is a hundred rows in one table, and a league is that times however
+   many golfers — which is more than the filter bar above the rounds was ever
+   meant to answer. This reaches three things nothing else does: the NOTE on a
+   round (the only prose in the app, and the only record of "played in the rain"
+   or "first round off the new tees"), every round at one course whatever the
+   filter is set to, and a date — `2026-07` for July, `2026` for the season.
+
+   Pure over the state it is handed, so the matching is pinned by tests and the
+   dialog renders whatever this returns: the same arrangement as `searchPlan` in
+   Money Map, down to the two-character minimum (one character matches half the
+   app) and the hard cap, counted so the cap is never silent. It reads the lists
+   it is given rather than the `courseById` helper above, which is bound to the
+   live `state` — a search over a fixture has to be a search over that fixture. */
+const SEARCH_CAP = 80;
+const SEARCH_VIEW_LABEL = { player: 'My Handicap', course: 'Golfers & Courses' };
+function searchApp(st, query) {
+  const q = String(query || '').trim().toLowerCase();
+  if (q.length < 2) return { hits: [], more: 0 };
+  const hits = [];
+  let dropped = 0;
+  const has = (t) => t && String(t).toLowerCase().includes(q);
+  const push = (r) => { if (hits.length < SEARCH_CAP) hits.push(r); else dropped++; };
+  const golfers = Array.isArray(st.golfers) ? st.golfers : [];
+  const courses = Array.isArray(st.courses) ? st.courses : [];
+  const rounds  = Array.isArray(st.rounds)  ? st.rounds  : [];
+  const gName = (id) => (golfers.find(g => g.id === id) || {}).name || '';
+  const cOf   = (id) => courses.find(c => c.id === id) || null;
+
+  /* Golfers and courses first: they are what the picker and the manage window
+     would have found, so somebody who typed a name wants the name itself before
+     forty of its rounds. */
+  for (const g of golfers)
+    if (has(g.name)) {
+      const n = rounds.filter(r => r.golferId === g.id).length;
+      push({ view: 'player', golferId: g.id, where: g.name + ' — golfer',
+             snippet: n + ' round' + (n === 1 ? '' : 's') });
+    }
+  for (const c of courses) {
+    const tees = Array.isArray(c.tees) ? c.tees : [];
+    if (!has(c.name) && !tees.some(t => has(t.name))) continue;
+    push({ view: 'course', courseId: c.id, where: c.name + ' — course',
+           snippet: tees.length
+             ? tees.map(t => t.name).join(', ')
+             : 'no tees yet' });
+  }
+  /* Newest round first, which is the order the rounds table itself reads in.
+     A round matches on its note, its course, its tees, its golfer and its DATE
+     as stored — so "2026-07" is July and "2026" is the season. */
+  for (const r of rounds.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))) {
+    const c = cOf(r.courseId);
+    const tee = c && (Array.isArray(c.tees) ? c.tees : []).find(t => t.id === r.teeId);
+    if (!has(r.note) && !has(c && c.name) && !has(tee && tee.name)
+        && !has(gName(r.golferId)) && !has(r.date)) continue;
+    push({ view: 'player', golferId: r.golferId, roundId: r.id,
+           where: (c ? c.name : 'Round') + ' · ' + r.date,
+           /* The note first when there is one — it is why you came looking. The
+              score and the golfer are what tell two rounds of the same day at
+              the same course apart. */
+           snippet: [gName(r.golferId), r.score + (r.holes === 9 ? ' (9 holes)' : ''),
+                     r.note].filter(Boolean).join(' · ') });
+  }
+  return { hits, more: dropped };
+}
+
+let searchHits = [];
+function renderSearchResults() {
+  const box = document.getElementById('searchBox');
+  const out = document.getElementById('searchResults');
+  const all = searchApp(state, box.value);
+  /* The fence for a shared view, applied HERE rather than only at navigation:
+     a visitor has no Golfers & Courses window, so a course hit would be a row
+     that looks clickable and silently does nothing. Filtered hits don't count
+     against the cap and don't inflate `more`. */
+  const hits = viewOnly ? all.hits.filter(h => h.view !== 'course') : all.hits;
+  const more = all.more;
+  searchHits = hits;
+  /* Announced through the count span (role="status") — the toast pattern's
+     quiet cousin. The list itself stays out of the live region. */
+  const count = document.getElementById('searchCount');
+  if (count) count.textContent = box.value.trim().length < 2 ? ''
+    : hits.length ? hits.length + (more ? ' of ' + (hits.length + more) : '')
+        + ' result' + (hits.length === 1 && !more ? '' : 's')
+    : 'Nothing matches';
+  out.innerHTML = hits.length
+    ? hits.map((h, i) => '<button type="button" class="hit" data-hit="' + i + '">'
+        + '<span class="hitwhere">' + esc(h.where) + '</span>'
+        + (h.snippet ? '<span class="hitsnip">' + esc(String(h.snippet).slice(0, 120)) + '</span>' : '')
+        + '<span class="hittab">' + esc(SEARCH_VIEW_LABEL[h.view] || h.view)
+        + '</span></button>').join('')
+      + (more ? '<p class="hint" style="padding:8px 10px">…and ' + more
+          + ' more — narrow the search.</p>' : '')
+    : box.value.trim().length >= 2
+      ? '<p class="hint" style="padding:8px 10px">Nothing matches.</p>'
+      : '<p class="hint" style="padding:8px 10px">Type at least two characters.</p>';
+}
+function goToSearchHit(h) {
+  searchDialog.close();
+  if (h.view === 'course') { openManage(); return; }
+  if (h.golferId && state.golfers.some(g => g.id === h.golferId))
+    state.activeGolfer = h.golferId;
+  save();          // the golfer on screen, like the picker's own change
+  setTab('player');
+  render();
+  /* A round hit opens straight into its card — the round found is the round on
+     screen. Navigation only in a shared view, where nothing saves anyway and the
+     Add Round button has already been taken away. */
+  if (h.roundId && !viewOnly) openRound(h.roundId);
+}
+document.getElementById('findBtn').addEventListener('click', () => {
+  /* Through openModal like every other dialog — and the focus() below then
+     takes it back, on a phone as much as anywhere. Typing IS the reason this
+     window opens, so it is the one place the keyboard should arrive with it. */
+  openModal(searchDialog);
+  document.getElementById('searchBox').value = '';
+  renderSearchResults();
+  document.getElementById('searchBox').focus();
+});
+document.getElementById('searchBox').addEventListener('input', renderSearchResults);
+document.getElementById('searchResults').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-hit]');
+  if (btn && searchHits[+btn.dataset.hit]) goToSearchHit(searchHits[+btn.dataset.hit]);
+});
+document.addEventListener('keydown', (e) => {
+  if ((e.key !== 'k' && e.key !== 'K') || !(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey)
+    return;
+  /* Never over the top of another window, and a second press closes it. */
+  const open = document.querySelector('dialog[open]');
+  if (open && open.id !== 'searchDialog') return;
+  e.preventDefault();
+  if (open) open.close();
+  else document.getElementById('findBtn').click();
+});
 closeOnBackdropClick(courseEditDialog, () => document.getElementById('courseEditCancel').click());
 document.getElementById('clearConfirm').addEventListener('click', () => {
   const keepSettings = state.settings;
@@ -5113,6 +5298,7 @@ function shareBanner() {
 function renderShareError(reason) {
   setTab('player');
   document.querySelector('.tabs').hidden = true;
+  document.getElementById('findBtn').hidden = true;   // nothing loaded to search
   document.getElementById('playerPanel').innerHTML = reason === 'newer'
     ? '<section class="card"><div class="empty">'
     + '<h2>This Link Was Made by a Newer Version</h2>'
@@ -5364,7 +5550,10 @@ window.__ghTestHooks = { raisesKeyboard,
   /* Both declared above this line, which is the only reason they can be read
      here: a `const` referenced before its declaration is a temporal-dead-zone
      error that would take the whole app down at boot. */
-  SCHEMA, SHARE_PAYLOAD_V };
+  SCHEMA, SHARE_PAYLOAD_V,
+  /* Find's cap and its tab labels — the matcher itself is a plain function
+     declaration, so the suite reaches searchApp straight off window. */
+  SEARCH_CAP, SEARCH_VIEW_LABEL };
 
 /* ── Boot ───────────────────────────────────────────────────────────────── */
 

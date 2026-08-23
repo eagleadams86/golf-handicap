@@ -102,7 +102,7 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'expected truthy'); }
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 236;
+const EXPECTED = 252;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -1531,6 +1531,118 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
      the text is not something you typed yourself.
      It matters beyond this app: every GitHub Pages site in this account shares
      one browser origin, so a hole here is a hole in all of them. */
+  /* ── Find ────────────────────────────────────────────────────────────── */
+  describe('searchApp — what Find reaches');
+
+  /* Pure over the state it is handed, so this fixture IS the app as far as
+     these go: nothing here touches the live state, the dialog or the tab. */
+  const S_STATE = {
+    golfers: [{ id: 'g1', name: 'Alex Nash' }, { id: 'g2', name: 'Priya Raman' }],
+    courses: [
+      { id: 'c1', name: 'Kilbryde Dunes', tees: [{ id: 'e1', name: 'Championship' }, { id: 'e2', name: 'Medal' }] },
+      { id: 'c2', name: 'Brookvale Municipal', tees: [] },
+    ],
+    rounds: [
+      { id: 'r1', golferId: 'g1', date: '2026-07-04', courseId: 'c1', teeId: 'e1', score: 76, holes: 18, note: 'windy' },
+      { id: 'r2', golferId: 'g2', date: '2026-08-12', courseId: 'c1', teeId: 'e2', score: 84, holes: 18, note: '' },
+      { id: 'r3', golferId: 'g1', date: '2026-08-20', courseId: 'c2', teeId: '', score: 41, holes: 9, note: 'society day' },
+    ],
+  };
+  const sFind = (q, st) => W.searchApp(st === undefined ? S_STATE : st, q);
+  const sWhere = (q, st) => sFind(q, st).hits.map((h) => h.where);
+
+  it('finds nothing under two characters — one letter would match half the app', () => {
+    eq(sFind('K').hits.length, 0);
+    eq(sFind('').hits.length, 0);
+    eq(sFind('   ').hits.length, 0);
+    eq(sFind(null).hits.length, 0);
+    ok(sFind('Al').hits.length > 0, 'two characters is the minimum, and it works');
+  });
+  it('puts a golfer above their own rounds, and counts them', () => {
+    eq(sWhere('alex')[0], 'Alex Nash — golfer');
+    eq(sFind('alex').hits[0].snippet, '2 rounds');
+    eq(sFind('priya').hits[0].snippet, '1 round', 'singular at one');
+    eq(sFind('alex').hits[0].view, 'player');
+    eq(sFind('alex').hits[0].golferId, 'g1');
+  });
+  it('matches whatever case you type', () => {
+    eq(sWhere('ALEX')[0], 'Alex Nash — golfer');
+    eq(sWhere('aLeX')[0], 'Alex Nash — golfer');
+  });
+  it('finds a course by name and lists its tees', () => {
+    eq(sWhere('kilbryde')[0], 'Kilbryde Dunes — course');
+    eq(sFind('kilbryde').hits[0].snippet, 'Championship, Medal');
+    eq(sFind('kilbryde').hits[0].view, 'course');
+    eq(sFind('kilbryde').hits[0].courseId, 'c1');
+  });
+  it('says so when a course has no tees rather than showing an empty line', () => {
+    eq(sFind('brookvale').hits[0].snippet, 'no tees yet');
+  });
+  it('finds a course by the name of one of its TEES', () => {
+    eq(sWhere('championship')[0], 'Kilbryde Dunes — course');
+  });
+  it('finds a round by the note on it — the only prose in the app', () => {
+    eq(sWhere('windy'), ['Kilbryde Dunes · 2026-07-04']);
+    eq(sFind('windy').hits[0].roundId, 'r1');
+    eq(sFind('windy').hits[0].golferId, 'g1', 'and carries whose round it is');
+  });
+  it('finds every round at a course, newest first, whatever the filter bar says', () => {
+    eq(sWhere('kilbryde'), ['Kilbryde Dunes — course',
+      'Kilbryde Dunes · 2026-08-12', 'Kilbryde Dunes · 2026-07-04']);
+  });
+  it('finds rounds by DATE — a month, or a whole season', () => {
+    eq(sWhere('2026-08'), ['Brookvale Municipal · 2026-08-20', 'Kilbryde Dunes · 2026-08-12']);
+    eq(sWhere('2026-07-04'), ['Kilbryde Dunes · 2026-07-04']);
+    eq(sFind('2026').hits.length, 3, 'the season is every round in it');
+  });
+  it('finds a round by the tees it was played off', () => {
+    eq(sWhere('medal'), ['Kilbryde Dunes — course', 'Kilbryde Dunes · 2026-08-12'],
+       'the course because a tee of its own is named, and only the round played off it');
+  });
+  it('names the golfer and the score on a round, and says when it was nine holes', () => {
+    eq(sFind('windy').hits[0].snippet, 'Alex Nash · 76 · windy');
+    eq(sFind('society').hits[0].snippet, 'Alex Nash · 41 (9 holes) · society day');
+    eq(sFind('2026-08-12').hits[0].snippet, 'Priya Raman · 84',
+       'and leaves the note out entirely when there isn’t one');
+  });
+  it('caps the list, and says how much it dropped', () => {
+    const CAP = H.SEARCH_CAP;
+    const many = [];
+    for (let i = 0; i < CAP + 5; i++) many.push({ id: 'x' + i, name: 'Sandpiper ' + i, tees: [] });
+    const out = sFind('sandpiper', { golfers: [], courses: many, rounds: [] });
+    eq(out.hits.length, CAP);
+    eq(out.more, 5, 'counted, so the cap is never silent');
+  });
+  it('never throws on a state that is missing or malformed', () => {
+    eq(sFind('al', {}).hits.length, 0);
+    eq(sFind('al', { golfers: 'nope', courses: 42, rounds: null }).hits.length, 0);
+    eq(sWhere('kilbryde', { golfers: [], courses: [{ id: 'c', name: 'Kilbryde', tees: 'nope' }], rounds: [] }),
+       ['Kilbryde — course'], 'a course whose tees are not a list still finds the course');
+  });
+  it('names only destinations that exist', () => {
+    eq(Object.keys(H.SEARCH_VIEW_LABEL).sort(), ['course', 'player']);
+    ok(!!W.document.querySelector('.tab[data-tab="player"]'), 'player is a real tab');
+    ok(!!W.document.getElementById('manageDialog'), 'and course is the window Golfers & Courses opens');
+  });
+  it('puts a Find button in the header, with the family’s glyph and its shortcut', () => {
+    const btn = W.document.getElementById('findBtn');
+    ok(!!btn, 'the header carries a Find button');
+    eq(btn.querySelector('[aria-hidden="true"]').textContent, '⌕');
+    ok(/⌘K/.test(btn.title) && /Ctrl\+K/.test(btn.title),
+       'saying which keys open it, since nothing on screen otherwise does');
+    /* Find is "everything else" in the family's header order, so it sits to the
+       LEFT of the record picker. Pinned as the whole row, because that is the
+       invariant — a new control added in the middle should have to come back
+       here and say where it goes. */
+    eq([...btn.parentElement.children].filter((e) => e.id).map((e) => e.id),
+       ['syncBtn', 'findBtn', 'golferSel', 'manageBtn', 'methodBtn', 'dataBtn', 'shareBtn', 'themeSel']);
+  });
+  it('announces the COUNT rather than re-reading the list on every keystroke', () => {
+    eq(W.document.getElementById('searchCount').getAttribute('role'), 'status');
+    ok(W.document.getElementById('searchCount').classList.contains('sr-only'),
+       'and does it without putting a running count on screen');
+  });
+
   describe('esc — the free-text boundary (names reaching innerHTML)');
   it('replaces every HTML-significant character', () => {
     eq(W.esc('<>&"\''), '&lt;&gt;&amp;&quot;&#39;');

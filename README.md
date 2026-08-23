@@ -39,6 +39,7 @@ to put the same rounds on your phone and your laptop.
 - [Nine-Hole Rounds](#nine-hole-rounds)
 - [Course Handicap and Playing Handicap](#course-handicap-and-playing-handicap)
 - [By Course](#by-course)
+- [Find (⌘K)](#find-k)
 - [Sharing a Read-Only Link](#sharing-a-read-only-link)
 - [Backups](#backups)
 - [Working Offline](#working-offline)
@@ -364,6 +365,33 @@ and average scores beside it — the differential columns are the fair compariso
 columns are the numbers you remember. It appears once you have played more than one course.
 
 ---
+
+## Find (⌘K)
+
+**⌕ Find** in the header — or **⌘K** / **Ctrl-K** from anywhere — opens a search box over
+every golfer, every course and every round. Type two characters, and clicking a result takes
+you to it; a round opens straight into its card.
+
+It's the same window, in the same place, with the same shortcut as
+[Money Map's](https://github.com/eagleadams86/financial-plan),
+[Sprint Predictability's](https://github.com/eagleadams86/sprint-velocity) and
+[Flow Metrics'](https://github.com/eagleadams86/team-dashboard).
+
+The golfer picker and the [rounds filter](#by-course) already narrow things down. What Find
+adds is what they can't reach:
+
+- **The note on a round.** It's the only prose in the app, and nothing else searches it —
+  so *windy*, *society day* or *first round off the new tees* is the way back to that round.
+- **A course, whatever the filter is set to** — every round at Kilbryde Dunes, newest first,
+  across every golfer.
+- **A date.** `2026-08` is August; `2026` is the season; `2026-07-04` is that day.
+- **A set of tees**, by name — both the course that has them and the rounds played off them.
+- **A golfer**, with how many rounds they have.
+
+Results are capped at 80, and the list says how many more matched so the cap is never
+silent. A shared read-only link searches golfers and rounds but not courses, because the
+Golfers & Courses window isn't there — and a round opens read-only rather than into an
+editor that would refuse to save.
 
 ## Sharing a Read-Only Link
 
