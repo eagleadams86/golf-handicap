@@ -1929,6 +1929,10 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
        'and off the word it follows — standing preference in every app');
     ok(/\.tile-help::after \{ content: ''; position: absolute; inset: -4px; \}/.test(APP_SRC),
        "the 24px tap target, which is WCAG 2.2's and is not the circle's own size");
+    ok(/\.tile-help:hover \{ background: var\(--surface-alt\); border-color: var\(--text-secondary\);/
+       .test(APP_SRC),
+       'and the hover fills rather than borrowing --focus-border, which would say '
+       + '"focused" to anybody reading the two states side by side');
   });
   it('the help window is as wide as its text, not as wide as a table', () => {
     /* Two rules, and only together — see the block's own note. */

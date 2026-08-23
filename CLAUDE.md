@@ -306,8 +306,10 @@ that emphasis.
   has a 38.5px floor a 16px circle must opt out of. `margin-left: 7px` (an icon never sits
   flush against the word it follows — standing preference in every app), cells holding one
   are `nowrap`, and the 24px tap target comes from an unpainted `::after` rather than from
-  the circle, so the line's height never changes. A change to any of it belongs in all of
-  them.
+  the circle, so the line's height never changes. The hover fills with `--surface-alt`,
+  which is Flow Metrics' — Money Map reached for `--focus-border`, and a hover in the focus
+  colour says "focused" to anybody reading the two states side by side. A change to any of
+  it belongs in all of them.
 - **The help window is sized by its TEXT, and those two rules are the family's too.**
   `#helpBody` is capped at a 66-character measure and `#helpDialog` is `width: fit-content`,
   so the window takes the measure as its width — 674px here, the same 624px of text as every
