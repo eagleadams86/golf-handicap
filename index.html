@@ -927,6 +927,14 @@ button.icon-btn.danger:hover { color: var(--err); border-color: var(--err); back
 #dataDialog .datarow { display: flex; gap: 10px; flex-wrap: wrap; margin: 0; }
 #dataDialog details.danger-zone > p { margin: 10px 0 12px; }
 #dataDialog .datafoot { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; margin-top: 14px; }
+/* The share window's prose, pinned the way the Back Up window's is. Flow
+   Metrics' intro sat FLUSH on the panels below it — that app's reset zeroes a
+   `p` margin and its intro carries no class, so nothing was giving it one —
+   while the same paragraph in Sprint Predictability had the browser's own 1em.
+   Reported 2026-08-23. Size and colour ride along so a paragraph added later
+   cannot land at the wrong one; every paragraph with an inline margin of its
+   own still wins, which is how the panels' hints keep their spacing. */
+#shareDialog p { font-size: var(--fs-xs); color: var(--text-secondary); margin: 0 0 12px; }
 #clearDialog { padding: 18px; }
 #clearDialog .warn { color: var(--err); margin: 0 0 12px; }
 .clearfoot { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; margin-top: 14px; }
@@ -5454,7 +5462,9 @@ function syncSelectAll() {
   const picked = boxes.filter((i) => i.checked).length;
   const all = boxes.length > 0 && picked === boxes.length;
   const btn = document.getElementById('shareSelectAll');
-  btn.textContent = all ? 'Select none' : 'Select all';
+  /* Title Case, like every other button in the family — the markup says
+     "Select All" and this line used to overwrite it in lower case. */
+  btn.textContent = all ? 'Select None' : 'Select All';
   btn.hidden = boxes.length < 2;          // nothing to select wholesale
   document.getElementById('shareGolferCount').textContent =
     `${picked} of ${boxes.length} selected`;
