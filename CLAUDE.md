@@ -367,7 +367,9 @@ that emphasis.
   hand-counted and already gap-free at both widths, and five ACROSS was costed and rejected in
   the same note above (it squeezed every tile under the length of its own label). If a sixth
   tile ever arrives, take the family block from Sprint Predictability rather than adding more
-  spans — that is what it is for.
+  spans — that is what it is for, and the six-track trick below is exactly what it generalises:
+  the family block computes `lcm(columns, last row)` tracks for any count, so the spans stop
+  being something a later commit has to remember.
 - **Exclusions are never silent.** Every round that sits outside the numbers — course
   deleted, marked "don't count", a nine with no 9-hole rating, or a nine still waiting for a
   partner — is named on the front page via `#handicapWarn`, and the *Used in* column shows
