@@ -651,7 +651,7 @@ details > summary { cursor: pointer; color: var(--accent); font-size: var(--fs-x
    family whose delete-everything toggle was painted the same colour as a link.
    Secondary ink, going primary on hover, with the rule above it that separates
    it from the backup controls. */
-details.danger-zone { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
+details.danger-zone { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
 details.danger-zone > summary { cursor: pointer; font-size: var(--fs-xs); font-weight: var(--fw-semibold);
   color: var(--text-secondary); }
 details.danger-zone > summary:hover { color: var(--text-primary); }
@@ -756,7 +756,11 @@ dialog {
 .checklist-head { display: flex; align-items: baseline; justify-content: space-between;
   gap: var(--sp-4); margin-bottom: var(--sp-4); }
 dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
-dialog h2 { margin: 0 0 var(--sp-5); font-size: var(--fs-md); }
+/* --fw-semibold, like every card heading here and every dialog title in the
+   family. Without it a dialog title fell through to the UA's bold, so the
+   ONE heading in the app that was heavier than the rest was the one on top
+   of a window shared with five other apps. */
+dialog h2 { margin: 0 0 var(--sp-5); font-size: var(--fs-md); font-weight: var(--fw-semibold); }
 .field { margin-bottom: var(--sp-5); }
 .field > label { display: block; font-size: var(--fs-xs); color: var(--text-secondary); margin-bottom: var(--sp-2); }
 .field input, .field select { width: 100%; }
@@ -862,6 +866,18 @@ button.icon-btn.danger:hover { color: var(--err); border-color: var(--err); back
    them. No colour is invented: `--err` is already what this app's danger buttons
    wear. Scoped to this dialog; every other `.warn` and `.row-actions` in the app
    is untouched. */
+/* ── Back Up & Restore: the family's window ──────────────────────────────────
+   One window across six apps (2026-08-23) — PAPTrack's, to the pixel. What
+   varies between the apps is the CONTENT (what a backup holds, which extra
+   buttons the app offers), never the frame around it. Keep this block in step
+   with PAPTrack, Sprint Predictability, Flow Metrics, Money Map and the starter.
+   700px, which is what the other five open at — this app was at the base 560. */
+#dataDialog { max-width: 700px; padding: 18px; }
+#dataDialog p { font-size: var(--fs-xs); color: var(--text-secondary); margin: 0 0 12px; }
+#dataDialog hr { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
+#dataDialog .datarow { display: flex; gap: 10px; flex-wrap: wrap; margin: 0; }
+#dataDialog details.danger-zone > p { margin: 10px 0 12px; }
+#dataDialog .datafoot { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; margin-top: 14px; }
 #clearDialog { padding: 18px; }
 #clearDialog .warn { color: var(--err); margin: 0 0 12px; }
 .clearfoot { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; margin-top: 14px; }
@@ -1679,32 +1695,32 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
   <p>One JSON file holding every golfer, course, round and setting — a copy you keep,
     independent of this browser and of any Google account. With no account required to
     use the app, clearing your browser data is the one thing that will lose your history.</p>
-  <div class="row-actions" style="justify-content:flex-start">
+  <div class="datarow">
     <button type="button" id="exportBtn"><span aria-hidden="true">⬇︎</span> Download Backup (JSON)</button>
     <button type="button" id="importBtn"><span aria-hidden="true">⬆︎</span> Restore from Backup…</button>
     <input type="file" id="importFile" accept="application/json,.json" class="sr-only" aria-hidden="true" tabindex="-1">
   </div>
-  <hr style="border:0;border-top:1px solid var(--border);margin:16px 0">
-  <p class="hint" style="margin-top:var(--sp-5)">Every round as a spreadsheet, for anyone who
+  <hr>
+  <p>Every round as a spreadsheet, for anyone who
     keeps their handicap in one — every golfer, with the differential the app worked out
     beside each score. It is a one-way door: the CSV is for reading and charting elsewhere,
     and <strong>Restore reads the JSON above, never this</strong>.</p>
-  <div class="row-actions" style="justify-content:flex-start">
+  <div class="datarow">
     <button type="button" id="csvBtn"><span aria-hidden="true">⬇︎</span> Download Rounds (CSV)</button>
   </div>
-  <hr style="border:0;border-top:1px solid var(--border);margin:16px 0">
-  <p class="hint" style="margin-top:var(--sp-5)">Restoring <strong>replaces everything in this
+  <hr>
+  <p>Restoring <strong>replaces everything in this
     browser</strong>. You are shown what the file holds and asked to confirm first — and if you
     are signed in, the restored copy becomes the one your other devices get.</p>
   <details class="danger-zone">
     <summary>Start Again</summary>
-    <p class="hint" style="margin-top:var(--sp-5)">Deletes every round, course and golfer.
+    <p>Deletes every round, course and golfer.
       The league rule and your theme are kept.</p>
-    <div class="row-actions" style="justify-content:flex-start">
+    <div class="datarow">
       <button type="button" id="clearBtn" class="danger">Delete All Data</button>
     </div>
   </details>
-  <div class="row-actions">
+  <div class="datafoot">
     <button type="button" id="dataClose" class="primary">Close</button>
   </div>
 </dialog>
