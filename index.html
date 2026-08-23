@@ -477,13 +477,24 @@ td:has(.tile-help), th:has(.tile-help) { white-space: nowrap; }
    a paragraph is 15px. The window keeps this app's own dialog padding rather
    than pinning Money Map's 20px — one padding per app beats 4px of sameness
    nobody can see, and the measure is what the reader actually notices. */
-#helpDialog { width: fit-content; max-width: calc(100% - 32px); }
-#helpBody { max-width: 66ch; font-size: var(--fs-sm); line-height: 1.55; }
+#helpDialog { width: fit-content; max-width: calc(100% - 32px); padding: 20px; }
+/* THE PADDING IS PINNED HERE and not left to each app's own dialog rule
+   (2026-08-23). It was 24px in Golf Handicap and 18px in PAPTrack, so the
+   same 624px of text opened in a 674px, a 666px and a 662px window across
+   the family. One window means one width, and this is the only property
+   that decides it once the measure is fixed. */
+#helpTitle { margin: 0 0 12px; font-size: var(--fs-md); font-weight: 600;
+  color: var(--text-primary); }
+#helpBody { max-width: 66ch; font-size: var(--fs-sm); line-height: 1.55;
+  color: var(--text-secondary); }
 /* The third rule is for the apps whose help text is paragraphs inside the box
    rather than the box itself — this one, and the NY calculator. `dialog p` sets
    13px here, and an element rule beats an id rule on the element it names, so
    without this the container is 15px and every paragraph in it is not. */
-#helpBody p, #helpBody li { font-size: inherit; line-height: inherit; }
+#helpBody p, #helpBody li { font-size: inherit; line-height: inherit;
+  color: inherit; margin: 0 0 10px; }
+#helpBody p:last-child, #helpBody li:last-child { margin-bottom: 0; }
+#helpBody strong { color: var(--text-primary); }
 
 /* 18px, the family's card. Golf Handicap was --sp-6 (16px) and PAPTrack
    14px 14px 12px, so a card was a slightly different box in three of the five
@@ -1896,7 +1907,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
 <dialog id="helpDialog" aria-labelledby="helpTitle">
   <h2 id="helpTitle">About</h2>
   <div id="helpBody"></div>
-  <div class="row-actions"><button type="button" id="helpClose" class="primary">Got It</button></div>
+  <div class="row-actions"><button type="button" id="helpCloseBtn" class="primary">Got It</button></div>
 </dialog>
 
 <!-- Escape is deliberately blocked on this one: either answer replaces one of the
@@ -4632,7 +4643,7 @@ document.addEventListener('click', (e) => {
   document.getElementById('helpBody').innerHTML = h[1];
   openModal(helpDialog);
 });
-document.getElementById('helpClose').addEventListener('click', () => helpDialog.close());
+document.getElementById('helpCloseBtn').addEventListener('click', () => helpDialog.close());
 
 document.getElementById('chCourse').addEventListener('change', () => render());
 document.getElementById('chTee').addEventListener('change', () => render());

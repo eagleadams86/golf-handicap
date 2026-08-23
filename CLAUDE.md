@@ -319,9 +319,17 @@ that emphasis.
   `--fs-sm`, because this app's help ran at 13px — the size of its chrome and its table
   headings, not of a paragraph — and `#helpBody p, #helpBody li` take `font-size: inherit`
   because `dialog p` sets 13px and an element rule beats an id rule on the element it names.
-  The window keeps this app's own 24px dialog padding rather than Money Map's 20px:
-  one padding per app beats 4px of cross-app sameness nobody can see. Dismissed with
-  **Got It**, as everywhere else.
+  **The window's padding is pinned at 20px in the block, NOT left at this app's 24px**
+  (2026-08-23, a second pass after Charles spotted differences between the windows). The
+  first pass left it per-app on the argument that nobody can see 4px — but padding is the
+  only thing left deciding the width once the measure is fixed, so one measure was coming
+  out as a 674px, a 666px and a 662px window. It is 666px everywhere now.
+  Two more things this app was drifting on, both by inheritance: `dialog h2` sets a weight
+  here so the heading was right, but the **paragraph spacing was the browser's 1em (15px)**
+  against 10px elsewhere, and **`<strong>` inherited the paragraph's `--text-secondary`** so
+  bold was carried by weight alone with no lift. Both are in the block now.
+  Dismissed with **Got It**, on `id="helpCloseBtn"` — it was `helpClose` here and
+  `helpCloseBtn` in the other five, which is one more thing a shared block could not name.
 - **The leaderboard's Trend cell is a sparkline PLUS the figure, and the figure is what
   counts.** Flow Metrics' column, ported: the shape answers "which way is this going", the
   number answers "by how much", and the number is what a screen reader reads and what a CSV
