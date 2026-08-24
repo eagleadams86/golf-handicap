@@ -1960,8 +1960,9 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
        'outlined, not the filled pill this app drew before');
     ok(/\.tile-help \{[^}]*margin-left: 7px;/.test(APP_SRC),
        'and off the word it follows — standing preference in every app');
-    ok(/\.tile-help::after \{ content: ''; position: absolute; inset: -4px; \}/.test(APP_SRC),
-       "the 24px tap target, which is WCAG 2.2's and is not the circle's own size");
+    ok(/\.tile-help::after \{ content: ''; position: absolute; inset: -5px; \}/.test(APP_SRC),
+       "a true 24px tap target: -5px, because `inset` grows from the PADDING box "
+       + "and the 1px border made -4px a 22px target");
     ok(/\.tile-help:hover \{ background: var\(--surface-alt\); border-color: var\(--text-secondary\);/
        .test(APP_SRC),
        'and the hover fills rather than borrowing --focus-border, which would say '
