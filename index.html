@@ -425,11 +425,23 @@ button.link { background: none; border: none; color: var(--accent); padding: 0;
 }
 
 /* The sync button is the one control in the row whose label changes: it paints
-   as "☁️ Sign In to Sync" (125px) and then, the moment Firebase reports who you
-   are, becomes "☁️ Charlie" (79px) — and every control to its left slid right
-   on every refresh. Pinning it to its widest state holds the row still. This is
-   Sprint Velocity's fix and, at this font size, its very number. */
-#syncBtn { min-width: 125px; }
+   as "☁️ Sign In to Sync" and then, the moment Firebase reports who you are,
+   becomes "☁️ Charlie" — and every control to its right slid sideways on every
+   refresh. Pinning it to its widest state holds the row still.
+
+   THE NUMBER WAS 125px AND HAD STOPPED COVERING THE LABEL (fixed 2026-08-26).
+   It was Sprint Velocity's, taken "at this font size" — and the font size moved
+   underneath it when the pack went to a 16px rem ramp on 2026-08-22, while the
+   number did not. The signed-out label measures 129.98px now, so the pin was
+   five short: on a 375px screen every control to the right of this one still
+   jumped ~5px the moment sign-in resolved. Exactly the bug the pin exists to
+   stop, quietly back again, because a magic number cannot notice the type
+   ramp changing.
+   134px: the measured 129.98 plus a little headroom, since text metrics differ
+   slightly by platform and this is a floor, not a size. tests.html now MEASURES
+   the widest label against this value rather than trusting it, so the next ramp
+   change fails loudly instead of silently reopening the same 5px. */
+#syncBtn { min-width: 134px; }
 
 /* ── The info dot ────────────────────────────────────────────────────────────
    A circled "i" beside a label, opening the help window rather than a hover

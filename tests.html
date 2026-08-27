@@ -102,7 +102,7 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'expected truthy'); }
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 259;
+const EXPECTED = 260;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -146,6 +146,25 @@ async function onAppLoad() {
       : 'The hidden frame never loaded index.html — is it being served? Run "python3 -m http.server 8014" in this folder and open http://localhost:8014/tests.html.');
     return;
   }
+
+  /* A SECOND frame, at a real width, purely to measure the header row.
+     The suite's own frame is 1x1px and its sync button is `display: none`
+     (Firebase cannot run here), so every width read from it is 0 — which is how
+     the first draft of the sync-pin test below passed on the very bug it was
+     written to catch. Loaded here because this is where the awaits live: a test
+     body in this file has to be synchronous. */
+  let MEASURE = null;
+  try {
+    const mf = document.createElement('iframe');
+    mf.setAttribute('aria-hidden', 'true');
+    mf.style.cssText = 'position:absolute;left:-9999px;width:1280px;height:800px;border:0';
+    await new Promise((resolve) => {
+      mf.onload = resolve;
+      mf.src = 'index.html?measure=' + Date.now();
+      document.body.appendChild(mf);
+    });
+    MEASURE = mf.contentWindow;
+  } catch (e) { MEASURE = null; }
 
   /* ── round1 ──────────────────────────────────────────────────────────── */
   describe('round1');
@@ -1086,8 +1105,16 @@ async function onAppLoad() {
      All the awaiting for both groups happens here, before a single it() is
      defined, so the test bodies below stay synchronous like every other one in
      this file. */
-  const [swRes, killRes, appRes, privRes] = await Promise.all(
-    [bustFetch('sw.js'), bustFetch('sw-kill.js'), bustFetch('index.html'), bustFetch('privacy.html')]);
+  const [swRes, killRes, appRes, privRes, pkgRes] = await Promise.all(
+    [bustFetch('sw.js'), bustFetch('sw-kill.js'), bustFetch('index.html'), bustFetch('privacy.html'),
+     /* package.json joins the up-front fetches because the test that reads it
+        was written `async` and this runner does not await — so it passed
+        unconditionally from the day it was added (2026-08-21) until 2026-08-26,
+        including all eleven of its assertions about the Firebase pin. It
+        happened to be telling the truth; it was never checking. */
+     bustFetch('package.json')]);
+  const PKG_SRC = pkgRes.ok ? await pkgRes.text() : '';
+  const PKG_OK = pkgRes.ok;
   const SW_SRC = swRes.ok ? await swRes.text() : '';
   const KILL_SRC = killRes.ok ? await killRes.text() : '';
   const APP_SRC = appRes.ok ? await appRes.text() : '';
@@ -1223,7 +1250,7 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
   });
 
   describe('Dependabot can see the one third-party thing this app runs');
-  it('package.json and the page name the SAME Firebase SDK', async () => {
+  it('package.json and the page name the SAME Firebase SDK', () => {
   /* The one genuinely third-party thing this app runs is Google's Firebase SDK,
      and it is loaded by URL from www.gstatic.com — so until 2026-08-21 NOTHING
      was watching it. Dependabot only reads manifests, and there was no manifest
@@ -1235,21 +1262,25 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
      Dependabot cannot rewrite a URL, so a version-bump PR would raise the
      manifest while the page went on fetching the old one. Pinning the two
      together turns that PR into the right instruction — "a newer SDK exists,
-     now change the URL too" — rather than a false record. */
-  const [pkgRes, appRes] = await Promise.all([bustFetch('package.json'), bustFetch('index.html')]);
-  ok(pkgRes.ok, 'package.json is missing — Dependabot then scans nothing at all');
-  ok(appRes.ok, 'index.html is missing');
-  const PKG = await pkgRes.text(), APPSRC = await appRes.text();
-  const pinned = (PKG.match(/"firebase"\s*:\s*"([^"]+)"/) || [])[1];
+     now change the URL too" — rather than a false record.
+
+     This body was `async` until 2026-08-26, which in this runner means it
+     passed no matter what it asserted — the manifest and the URL could have
+     drifted apart for five years and nothing here would have said so. The
+     fetches moved up to onAppLoad with the others; the body is synchronous now,
+     and run() rejects an async one outright. */
+  ok(PKG_OK, 'package.json is missing — Dependabot then scans nothing at all');
+  ok(APP_SRC, 'index.html is missing');
+  const pinned = (PKG_SRC.match(/"firebase"\s*:\s*"([^"]+)"/) || [])[1];
   ok(pinned, 'package.json must declare firebase');
   ok(/^\d+\.\d+\.\d+$/.test(pinned),
     'pin it exactly — a ^ or ~ range cannot be checked against a URL: ' + pinned);
-  const used = (APPSRC.match(/firebasejs\/(\d+\.\d+\.\d+)\//) || [])[1];
+  const used = (APP_SRC.match(/firebasejs\/(\d+\.\d+\.\d+)\//) || [])[1];
   ok(used, 'could not find the firebasejs URL in index.html');
   eq(used, pinned,
     'the page loads Firebase ' + used + ' but the manifest pins ' + pinned
     + ' — if this followed a Dependabot bump, the URL still has to be changed');
-  const pkgObj = JSON.parse(PKG);
+  const pkgObj = JSON.parse(PKG_SRC);
   eq(pkgObj.private, true, 'private:true, so it can never reach npm by accident');
   ok(!pkgObj.scripts, 'no scripts — this repo has no build step and must not grow one');
   ok(!pkgObj.dependencies, "the entry belongs in devDependencies, which CI's --omit=dev skips");
@@ -1651,6 +1682,47 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
        here and say where it goes. */
     eq([...btn.parentElement.children].filter((e) => e.id).map((e) => e.id),
        ['syncBtn', 'findBtn', 'golferSel', 'manageBtn', 'methodBtn', 'dataBtn', 'shareBtn', 'themeSel']);
+  });
+  it('the sync button is pinned WIDER than its own widest label', () => {
+    /* The one control in the row whose label changes: "☁️ Sign In to Sync"
+       becomes "☁️ Charlie" the moment Firebase reports who you are, and without
+       a floor every control to its right slides sideways on every refresh.
+
+       The floor was 125px and had QUIETLY STOPPED COVERING THE LABEL: a number
+       taken at an older font size, while the pack moved to a 16px rem ramp on
+       2026-08-22. The label measures ~130px now, so the pin was five short and
+       the header slid ~5px again on a narrow screen — the exact bug it exists to
+       prevent, back without a word. A magic number cannot notice the type ramp
+       changing underneath it, so this MEASURES instead of trusting it.
+
+       Measured in MEASURE, the second frame built in onAppLoad: the suite's own
+       frame is 1x1px and hides this button, so every width read there is 0 and
+       `0 <= 125` passes on the bug. The guard below is what makes that
+       impossible to repeat quietly. */
+    ok(!!MEASURE, 'the measuring frame loaded — without it nothing here is a measurement');
+    const btn = MEASURE.document.getElementById('syncBtn');
+    ok(!!btn, 'the header carries a sync button');
+    btn.hidden = false;               // Firebase cannot run here; the row is still measurable
+    const pin = parseFloat(MEASURE.getComputedStyle(btn).minWidth);
+    ok(pin > 0, 'and it has a min-width floor at all', MEASURE.getComputedStyle(btn).minWidth);
+    const was = btn.textContent;
+    try {
+      /* The three labels the sync module actually writes. The signed-in one is a
+         FIRST name by design, so it is the short case, not the wide one. */
+      const widths = ['☁️ Sign in to Sync', '☁️ Charlie', '⚠️ Not syncing'].map((label) => {
+        btn.textContent = label;
+        return { label, px: btn.getBoundingClientRect().width };
+      });
+      ok(widths.every((x) => x.px > 40),
+        'the button was actually laid out — a 0 here means nothing below this line '
+          + 'proves anything, which is how the first version of this test passed',
+        widths.map((x) => x.px.toFixed(1)).join(', '));
+      const widest = widths.reduce((a, b) => (b.px > a.px ? b : a));
+      ok(widest.px <= pin,
+        'the widest label this button ever paints has to fit inside the floor, or the '
+          + 'row moves when sign-in resolves — \u201c' + widest.label + '\u201d needs '
+          + widest.px.toFixed(2) + 'px against a ' + pin + 'px pin');
+    } finally { btn.textContent = was; btn.hidden = true; }
   });
   it('announces the COUNT rather than re-reading the list on every keystroke', () => {
     eq(W.document.getElementById('searchCount').getAttribute('role'), 'status');
@@ -2164,7 +2236,23 @@ function run() {
   const html = groups.map((g) => {
     const items = g.tests.map((t) => {
       total++;
-      try { t.fn(); pass++; return `<li class="ok">${escape_(t.name)}</li>`; }
+      try {
+        const r = t.fn();
+        /* A test body here MUST be synchronous — see the note on onAppLoad. This
+           runner does not await, so an `async` one returns a resolved promise,
+           `pass++` runs immediately, and every assertion inside it lands later as
+           an unhandled rejection the report never sees. A test written that way
+           passes unconditionally, including on the bug it was written to catch.
+           That happened on 2026-08-26 and cost an hour, so it is an error now
+           rather than a convention. */
+        if (r && typeof r.then === 'function') {
+          return `<li class="bad">${escape_(t.name)} — ${escape_('this test body is async, '
+            + 'and run() does not await. It would pass no matter what it asserts. Do the '
+            + 'awaiting in onAppLoad, before the tests are defined, and keep the body '
+            + 'synchronous.')}</li>`;
+        }
+        pass++; return `<li class="ok">${escape_(t.name)}</li>`;
+      }
       catch (e) { return `<li class="bad">${escape_(t.name)} — ${escape_(e.message)}</li>`; }
     }).join('');
     return `<h2>${escape_(g.name)}</h2><ol>${items}</ol>`;
