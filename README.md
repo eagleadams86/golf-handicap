@@ -668,6 +668,16 @@ tests — they need `http://localhost` because `file://` iframes are blocked in 
 `syncDecision`, `buildDemo`, `buildDemoLeague`, `encodeShare`/`decodeShare`, `buildSharePayload`,
 `windowRounds`, `sanitizeIds` or `normalizeState`.
 
+**And a smoke walk, because everything above is a pure function.** Pinning the maths leaves
+the largest part of the file — the render layer — never executed at all, so a throw inside a
+tab panel or a dialog would ship green. A coverage run on 2026-08-27 measured exactly that:
+`updateUI`, `renderScoreRows`, `openRound` and 63 others sat at zero. The walk plants the
+example league in a second, full-size frame, visits both tabs, opens and closes every window,
+and fails if the frame throws or if a panel comes back empty. It was verified by breaking
+`renderLeague` on purpose and watching the suite go red where nothing else noticed. It writes
+nothing: the plant hook replaces the state in memory rather than saving, and the one key it
+does touch — the remembered tab — is put back and then read again to prove it.
+
 **It only runs on localhost, and enforces that itself.** The test code writes nothing, but
 the iframe boots the real app — and GitHub Pages publishes `tests.html` next to it, at
 `/golf-handicap/tests.html`, where that iframe would be your signed-in copy: sync would start

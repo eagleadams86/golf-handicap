@@ -5812,8 +5812,18 @@ window.addEventListener('storage', (e) => {
 
 /* tests.html reaches the pure functions directly — they are all plain function
    declarations, so they are already on window. This hook exists only for the
-   `const` values, which are not. */
+   `const` values, which are not — and for the two below, which DO something.
+
+   `__plant` replaces the state IN MEMORY and redraws. It never calls save(),
+   because the suite runs against the reader's own copy of the app and has to
+   stay read-only about storage. It exists so a test can draw a populated app
+   without going through loadDemoLeague(), which saves — the difference between
+   showing the render layer some data and writing example rounds into somebody's
+   real handicap record. The starter carries the same pair, worded the same way. */
 window.__ghTestHooks = { raisesKeyboard,
+  __plant: function (next) { state = normalizeState(next); render(); },
+  __state: function () { return state; },
+  TABS, TAB_KEY,
   DEFAULT_METHOD, WHS_TABLE, WHS_MIN_ROUNDS, WHS_MAX_INDEX, SOFT_CAP_AT, HARD_CAP_AT,
   ESR_AT, ESR_BIG_AT, ESR_LASTS, ALLOWANCES, DEFAULT_ALLOWANCE, SPARK_POINTS,
   /* The info-dot text, so the suite can hold the table against the dots that

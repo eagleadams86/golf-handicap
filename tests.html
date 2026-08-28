@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 263;
+const EXPECTED = 267;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -176,6 +176,104 @@ async function onAppLoad() {
     });
     MEASURE = mf.contentWindow;
   } catch (e) { MEASURE = null; }
+
+  /* ── The render smoke walk ────────────────────────────────────────────────
+     Everything else in this file calls a pure function or reads index.html as
+     text. That covers the handicap arithmetic and the boundaries very well and
+     leaves the LARGEST part of the app — the render layer — never executed at
+     all: a coverage run on 2026-08-27 put updateUI, renderScoreRows, openRound
+     and 63 others at zero. A throw in any of them would have shipped green.
+
+     So this walks the app the way a person does: plant the example league,
+     visit both tabs, open and close every dialog, and record anything the frame
+     throws while it happens. It cannot tell a right figure from a wrong one —
+     that is what the 250 tests below are for — but it is the difference between
+     "the maths is right" and "the app runs".
+
+     IT RUNS IN THE MEASURE FRAME, not the suite's own. That frame is a second,
+     full-size boot with nothing else reading it, so planting here cannot
+     disturb a single test above or below. The suite's frame is 1x1px, where a
+     render draws into a box with no room and proves nothing.
+
+     `__plant` replaces the state in memory and never saves. The one thing that
+     DOES touch storage is setTab(), which remembers the tab in `gh-tab` — the
+     reader's own key, on the reader's own origin — so it is put back afterwards.
+     A suite that quietly moved which tab your app opens on would be a suite
+     with a side effect, however small. */
+  let SMOKE = { errs: ['the measure frame never loaded'], drawn: {}, dialogs: 0 };
+  if (MEASURE) {
+    const MH = MEASURE.__ghTestHooks;
+    const savedTab = localStorage.getItem(MH ? MH.TAB_KEY : 'gh-tab');
+    try {
+      const errs = [], drawn = {};
+      MEASURE.addEventListener('error', (e) => errs.push(String(e.message)));
+      MEASURE.addEventListener('unhandledrejection', (e) => errs.push('unhandled rejection: ' + e.reason));
+      const league = MEASURE.buildDemoLeague();
+      MH.__plant({
+        version: MH.SCHEMA, golfers: league.golfers, courses: league.courses,
+        rounds: league.rounds, activeGolfer: 'demo-g-3',
+      });
+      const doc = MEASURE.document;
+      MH.TABS.forEach((tab) => {
+        const btn = doc.getElementById('tab-' + tab);
+        if (!btn) { errs.push('no tab button for ' + tab); return; }
+        btn.click();
+        const panel = doc.getElementById(btn.getAttribute('aria-controls'));
+        /* A panel that drew NOTHING is the failure this is really looking for:
+           a render that threw half way leaves an element that is present and
+           empty, which no "did it throw" check on its own would notice. */
+        drawn['tab:' + tab] = panel ? panel.textContent.trim().length : 0;
+      });
+      const dialogs = [...doc.querySelectorAll('dialog')].filter((d) => d.id);
+      dialogs.forEach((d) => {
+        try { d.showModal(); drawn['dialog:' + d.id] = d.textContent.trim().length; d.close(); }
+        catch (e) { errs.push('dialog ' + d.id + ': ' + e.message); }
+      });
+      SMOKE = { errs, drawn, dialogs: dialogs.length };
+    } catch (e) {
+      SMOKE = { errs: ['the walk itself threw: ' + e.message], drawn: {}, dialogs: 0 };
+    } finally {
+      const key = MH ? MH.TAB_KEY : 'gh-tab';
+      try {
+        if (savedTab === null) localStorage.removeItem(key);
+        else localStorage.setItem(key, savedTab);
+      } catch (e) { /* a browser refusing the write left it alone anyway */ }
+      /* Read back rather than assume: the assertion below compares these two,
+         so a restore that silently failed is reported instead of trusted. */
+      SMOKE.tabBefore = savedTab;
+      try { SMOKE.tabAfter = localStorage.getItem(key); } catch (e) { SMOKE.tabAfter = savedTab; }
+    }
+  }
+
+  /* ── The render smoke walk ───────────────────────────────────────────────
+     The walk itself is above, where the awaits live. These read its verdict.
+     See the note there for why the suite needed one at all. */
+  describe('the app actually runs — both tabs drawn, every dialog opened');
+  it('nothing threw while the app was walked', () => {
+    eq(SMOKE.errs.length, 0, 'the frame threw during the walk', SMOKE.errs.join(' | '));
+  });
+  it('both tabs drew something', () => {
+    /* Not "did it throw": a render that fell over half way leaves a panel that
+       is present and empty, and only a length says so. */
+    (MEASURE ? MEASURE.__ghTestHooks.TABS : []).forEach((tab) => {
+      const n = SMOKE.drawn['tab:' + tab];
+      ok(n > 0, 'the ' + tab + ' panel rendered no text', n);
+    });
+  });
+  it('every dialog opened, and had something in it', () => {
+    ok(SMOKE.dialogs >= 8, 'the app should carry the family windows', SMOKE.dialogs);
+    Object.keys(SMOKE.drawn).filter((k) => k.indexOf('dialog:') === 0).forEach((k) => {
+      ok(SMOKE.drawn[k] > 0, k + ' opened empty', SMOKE.drawn[k]);
+    });
+  });
+  it('the walk left the reader’s remembered tab exactly as it found it', () => {
+    /* The one thing in the walk that touches storage is setTab(), and the key it
+       writes is the reader's own, on the reader's own origin. The finally puts
+       it back; this reads it back afterwards and compares, rather than trusting
+       that the restore is still written where it was. */
+    eq(SMOKE.tabAfter, SMOKE.tabBefore,
+       'the suite changed which tab the reader’s app opens on');
+  });
 
   /* ── round1 ──────────────────────────────────────────────────────────── */
   describe('round1');

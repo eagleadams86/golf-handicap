@@ -203,6 +203,20 @@ that emphasis.
   PAPTrack, Sprint Predictability, the starter and both lottery pages carry them verbatim,
   and a change belongs in all seven. `tests.html` pins both halves and asserts no cell in the
   example export is a defused number.
+- **`tests.html` carries a render SMOKE WALK, and it is not a substitute for the tests
+  around it.** Everything else in that file calls a pure function or reads `index.html` as
+  text, which left the render layer entirely unexecuted — measured on 2026-08-27, and the
+  measurement is the point: `updateUI`, `renderScoreRows`, `openRound` and 63 others sat at zero. A throw in any of them
+  would have shipped green. The walk boots a SECOND, FULL-SIZE frame (the suite's own is
+  1x1px, where a render draws into a box with no room and proves nothing), populates it,
+  visits every view and opens every window, and fails if the frame throws OR if a panel
+  comes back empty — the second half matters, because a render that threw half way leaves an
+  element that is present and with nothing in it, which no "did it throw" check would notice.
+  **It writes nothing**, and that is enforced rather than intended: `__plant` replaces the state in memory and never calls save(), and the one key the walk does
+  touch — `gh-tab`, via setTab() — is restored in a `finally` and then READ BACK and compared.
+  Verified by breaking a render on purpose and watching the suite go red where nothing else
+  did — do that again if you ever doubt it is still connected. The starter carries the same
+  walk, so a new app inherits one.
 - **The official calculation must never be affected by the rolling-method settings.** That
   independence is the app's whole claim; it is stated in the UI and in the README, and a
   test pins it indirectly (`whsIndex` takes only differentials).
