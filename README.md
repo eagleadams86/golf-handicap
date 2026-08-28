@@ -445,6 +445,13 @@ their handicap in one. It is a one-way door — *Restore* reads the JSON, never 
 nine-hole round carries its own nine-hole differential rather than the combined figure, so
 each line reconciles with the score beside it.
 
+**The negative figures come out as numbers.** Two of the columns go below zero — a score
+differential does for anyone playing under their handicap, and *vs par* does for every round
+under par — and until 2026-08-27 the guard that stops a cell being read as a spreadsheet
+formula was quoting them as text, in exactly the two columns somebody exports this file in
+order to average. A cell that is a whole number now goes out as one; a cell that merely
+*starts* like a number (`-1+1`) is still defused.
+
 This matters more than it does in most apps: with no account, clearing your browser data is
 the one thing that will lose your history. Take a backup now and then, or turn sync on.
 

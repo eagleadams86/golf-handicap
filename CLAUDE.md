@@ -187,11 +187,22 @@ that emphasis.
   whatever the shape, so the live differential hint has one field to read.
 - **`csvRounds()` is pure, and its quoting is the part that is ever actually wrong.** RFC
   4180 quoting, CRLF line ends, a UTF-8 BOM at the download so Excel doesn't guess a code
-  page — and a leading `'` on anything starting `=`, `+`, `-` or `@`, which a spreadsheet
-  would otherwise run as a FORMULA. Nothing in the app can hold one today; a CSV is a file
-  that leaves the app, and a hand-edited backup is one restore away. Each line carries the
-  SINGLE round's differential, not a paired game's — that is the figure that reconciles with
-  the score beside it. Restore reads the JSON and never this.
+  page — and a leading `'` on anything opening with one of OWASP's six leads (`=` `+` `-` `@`
+  TAB CR), which a spreadsheet would otherwise run as a FORMULA. Nothing in the app can hold
+  one today; a CSV is a file that leaves the app, and a hand-edited backup is one restore
+  away. Each line carries the SINGLE round's differential, not a paired game's — that is the
+  figure that reconciles with the score beside it. Restore reads the JSON and never this.
+- **`PLAIN_NUMBER` is the carve-out, and this table is the reason the family has one.**
+  Until 2026-08-27 the guard defused on the leading character alone, and TWO of this file's
+  own columns are routinely negative: a score differential goes below zero for anyone playing
+  under their handicap, and `vs par` does it for every round under par. Five rows of the app's
+  own example data carried one, so every export handed the spreadsheet `'-1.1` — text — in
+  precisely the columns somebody exports a CSV in order to average. The test is now "is the
+  WHOLE cell a number?", which lets `-1.1` through while `-1+1` and `-3+cmd|' /c calc'!A0`
+  are still defused. **The same two lines are the family's one CSV rule** — Flow Metrics,
+  PAPTrack, Sprint Predictability, the starter and both lottery pages carry them verbatim,
+  and a change belongs in all seven. `tests.html` pins both halves and asserts no cell in the
+  example export is a defused number.
 - **The official calculation must never be affected by the rolling-method settings.** That
   independence is the app's whole claim; it is stated in the UI and in the README, and a
   test pins it indirectly (`whsIndex` takes only differentials).

@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 260;
+const EXPECTED = 263;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -760,9 +760,42 @@ async function onAppLoad() {
   it('defuses a field a spreadsheet would run as a FORMULA', () => {
     /* Nothing in this app can hold one today. A CSV is a file that leaves the
        app, though, and the day somebody restores a hand-edited backup is the
-       day this matters. */
-    ['=1+1', '+1', '-1', '@SUM(A1)'].forEach((v) =>
-      ok(W.csvCell(v).charAt(0) === "'", v + ' should be prefixed'));
+       day this matters. TAB and CR are in the lead set with the four printable
+       ones: a reader that strips the whitespace finds the formula underneath. */
+    ['=1+1', '+SUM(A1)', '@SUM(A1)', '-alpha', '\tHYPERLINK(x)'].forEach((v) =>
+      ok(W.csvCell(v).charAt(0) === "'", JSON.stringify(v) + ' should be prefixed'));
+    /* And when the same value ALSO needs quoting, the apostrophe goes on first
+       and the quotes wrap it — the guard is not skipped by the quoting path.
+       A carriage return is both a lead AND a reason to quote, so it is the one
+       case that has to be read whole rather than by its first character. */
+    eq(W.csvCell('=A1,B2'), '"\'=A1,B2"');
+    eq(W.csvCell('\rcmd'), '"\'\rcmd"');
+  });
+  it('lets a NUMBER through, because two of these columns go negative', () => {
+    /* The carve-out asks whether the WHOLE cell is a number, and this table is
+       why. A score differential is below zero for anyone playing under their
+       handicap and `vs par` is for every round under par, so defusing on the
+       leading character alone would hand the spreadsheet a column of text in
+       the two columns people export this file to average. */
+    eq(W.csvCell('-1.1'), '-1.1', 'a negative differential is a number');
+    eq(W.csvCell('-3'), '-3', 'so is an under-par figure');
+    eq(W.csvCell('0.2'), '0.2');
+    eq(W.csvCell('+4.3'), '+4.3', 'a signed positive number goes through too');
+  });
+  it('but a cell that merely STARTS like a number is still defused', () => {
+    /* The old rule asked only whether the character after the sign was a digit,
+       which let a payload wearing a number for a hat straight past. */
+    eq(W.csvCell('-1+1'), "'-1+1", 'a sum is not a number');
+    eq(W.csvCell('-3abc'), "'-3abc", 'which the old lookahead let past');
+    eq(W.csvCell("-3+cmd|' /c calc'!A0"), "'-3+cmd|' /c calc'!A0",
+       'a DDE payload wearing a negative digit for a hat');
+  });
+  it('the exported file carries its negatives as numbers', () => {
+    /* The end-to-end version of the two tests above: the guard is only worth
+       having if it survives the row builder that actually writes the file. */
+    const rows = W.csvRounds(CSV_STATE).split('\r\n').slice(1).filter(Boolean);
+    ok(rows.length > 0, 'sanity: the example export has rows');
+    ok(!/'-/.test(W.csvRounds(CSV_STATE)), 'no cell in the file is a defused number');
   });
   it('carries every golfer, not just the one on screen', () => {
     const two = Object.assign({}, CSV_STATE, {
