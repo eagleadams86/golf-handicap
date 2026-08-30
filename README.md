@@ -89,6 +89,16 @@ The app has two tabs. **My handicap** is one golfer's page — the two figures, 
 chart, the course handicap and the full list of rounds. **Leaderboard** is everybody at
 once (see [The leaderboard](#the-leaderboard)).
 
+**The trend chart fills the window.** *Handicap Over Time* carries a ⤢ button in its
+top-right corner; press it and the chart alone fills the screen under the header. **The
+header stays where it is and stays usable** — change golfer, or the theme, and the line
+redraws in front of you, still full screen. Escape, the same button (now an arrows-in icon),
+or a click on the margin round the card brings it back down, and the page is where you left
+it. The chart is *redrawn* at the window's size rather than blown up: on the page it is a
+fixed 900×280 drawing scaled to the card's width, and stretching that into a full window
+would leave it in a band with half the screen empty. It is the same feature as in Flow
+Metrics, Sprint Predictability, Money Map and the Lottery Portfolio.
+
 Multiple golfers are supported: use **Golfers & Courses** in the header, which is also where
 courses and their tees are added and edited. Each golfer keeps their own rounds and their own
 handicap. Courses and the league rule are shared between everyone, which is what makes the

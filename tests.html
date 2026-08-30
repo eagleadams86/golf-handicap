@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 267;
+const EXPECTED = 276;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -2263,6 +2263,255 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
     /* The id was `helpClose` here and `helpCloseBtn` in the other five, which is
        one more thing a shared block could not name. */
     ok(!/helpClose[^B]/.test(APP_SRC), 'the old id is gone, not left alongside');
+  });
+
+  /* ── One chart, filling the window ───────────────────────────────────────
+     Flow Metrics' feature (2026-08-21), ported here on 2026-08-30 — every app in
+     the family that draws a chart carries it now. The phrase that shaped it,
+     "with the menu still visible", is why this is a plain overlay under a
+     sticky header rather than the Fullscreen API or a modal <dialog>, both of
+     which take the header away.
+
+     IT NEEDS A FRAME WITH A REAL SIZE, and MEASURE is the one this file already
+     builds for exactly that reason: the suite's own frame is 1x1px, so every
+     rectangle read from it is zero and "the chart got taller" would pass on a
+     chart that was never laid out. All the driving happens HERE, before a single
+     it() is defined, because this runner does not await a test body — an async
+     one would pass unconditionally, including on the bug it was written to
+     catch. The tests below read the record it leaves. */
+  const MAXI = { ran: false };
+  if (MEASURE) {
+    /* Clicking a tab WRITES the chosen one to localStorage, on the same origin
+       the reader's own app uses — the smoke walk above guards the same key for
+       the same reason, and this block clicks a tab too. Saved here, put back in
+       the finally whatever happens in between. */
+    const TABK = (MEASURE.__ghTestHooks || {}).TAB_KEY || 'gh-tab';
+    let savedMaxiTab = null;
+    try { savedMaxiTab = localStorage.getItem(TABK); } catch (e) { savedMaxiTab = null; }
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      MW.confirm = () => true;
+      MW.alert = () => {};
+      /* THE SMOKE WALK ABOVE LEAVES THIS FRAME ON THE LAST TAB IT VISITED, which
+         is the Leaderboard — and the trend card lives in the other panel, so
+         every rectangle read from it would be zero and this whole group would
+         pass on a button nobody can see. Back to My Handicap first, and plant a
+         single golfer with rounds through the app's own hook rather than
+         loadDemo(), which SAVES: the suite stays read-only about storage. */
+      MD.getElementById('tab-' + MHK.TABS[0]).click();
+      const demo = MW.buildDemoLeague();
+      const planted = { version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                        rounds: demo.rounds, activeGolfer: 'demo-g-3' };
+      MHK.__plant(planted);
+      await new Promise((r) => setTimeout(r, 400));
+
+      const card = MD.getElementById('trendCard');
+      const wrap = MD.getElementById('chartWrap');
+      const overlay = MD.getElementById('chartMaxi');
+      const btn = () => card.querySelector(':scope > .chart-max');
+      const vb = () => (wrap.querySelector('svg') || { getAttribute: () => null }).getAttribute('viewBox');
+      /* The COMPUTED width, never the `hidden` property. `.chart-max` declares
+         `display: flex`, and an author rule beats the browser's own
+         `[hidden] { display: none }` whatever their specificities — so the
+         attribute reads true over a button anybody can see. That is how a folded
+         card in Money Map came to offer a button that did nothing (2026-08-30),
+         and an assertion on `.hidden` is deaf to it. */
+      const btnW = () => Math.round(btn().getBoundingClientRect().width);
+      /* A REAL press, not a synthetic one. `btn.click()` makes the BUTTON the
+         target and is blind to what broke this in Money Map on the day it
+         shipped: a real pointer lands on the `<path>` inside the icon, the
+         handler rewrites that icon, and the detached path answers null to every
+         `closest()` a delegated handler further up asks. */
+      const pressTarget = () => {
+        const b = btn();
+        b.scrollIntoView({ block: 'center' });
+        const r = b.getBoundingClientRect();
+        return MD.elementFromPoint(Math.round(r.left + r.width / 2),
+                                   Math.round(r.top + r.height / 2));
+      };
+      const press = () => pressTarget().dispatchEvent(new MW.MouseEvent('click', { bubbles: true }));
+
+      MAXI.overlayIsPlainDiv = overlay && overlay.tagName === 'DIV';
+      MAXI.overlayOutsideWrap = !!overlay && !MD.querySelector('.wrap').contains(overlay);
+      MAXI.headerZ = MW.getComputedStyle(MD.querySelector('header')).zIndex;
+      MAXI.overlayZ = Number(MW.getComputedStyle(overlay).zIndex);
+      MAXI.overlayPad = Number(MW.getComputedStyle(overlay).paddingTop.replace('px', ''));
+      MAXI.offeredWithAChart = btnW() > 0;
+      MAXI.hitIsTheButton = pressTarget() === btn();
+      MAXI.pageViewBox = vb();
+      MAXI.home = { parent: card.parentElement, at: [...card.parentElement.children].indexOf(card) };
+
+      press();
+      await new Promise((r) => setTimeout(r, 400));
+      MAXI.movedIntoOverlay = card.parentElement === overlay;
+      MAXI.appKnows = MW.maxiCard() === card;
+      MAXI.inert = MD.querySelector('.wrap').inert;
+      MAXI.bodyLocked = MD.body.classList.contains('maxi-open');
+      MAXI.top = MW.getComputedStyle(MD.documentElement).getPropertyValue('--maxi-top').trim();
+      MAXI.headerH = Math.round(MD.querySelector('header').getBoundingClientRect().height) + 'px';
+      MAXI.label = btn().getAttribute('aria-label');
+      MAXI.boxH = Math.round(wrap.getBoundingClientRect().height);
+      MAXI.upViewBox = vb();
+      /* One chart, one canvas: the card is MOVED, so there is never a second
+         drawing of it left behind on the page to go stale. */
+      MAXI.oneChartOnly = MD.querySelectorAll('svg.chart').length;
+
+      /* A re-render under a maximised chart draws into the box that is up here,
+         at the size it has up here. Changing golfer from the header — which
+         this overlay deliberately leaves live — is how anyone would meet it. */
+      MW.render();
+      await new Promise((r) => setTimeout(r, 300));
+      MAXI.survivesRender = MW.maxiCard() === card;
+      MAXI.renderViewBox = vb();
+      MAXI.slotsWhileUp = MD.querySelectorAll('.chart-slot').length;
+
+      press();
+      await new Promise((r) => setTimeout(r, 400));
+      MAXI.putBack = card.parentElement === MAXI.home.parent
+                  && [...card.parentElement.children].indexOf(card) === MAXI.home.at;
+      MAXI.slotsAfter = MD.querySelectorAll('.chart-slot').length;
+      MAXI.down = MW.maxiCard() === null;
+      MAXI.inertCleared = MD.querySelector('.wrap').inert === false;
+      MAXI.backToPageViewBox = vb();
+
+      /* Escape is the second way out; a click on the margin round the card is
+         the third, which is why that margin is there at all. */
+      btn().click();
+      await new Promise((r) => setTimeout(r, 300));
+      MD.dispatchEvent(new MW.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await new Promise((r) => setTimeout(r, 200));
+      MAXI.escapeCloses = MW.maxiCard() === null;
+
+      /* …but not while a dialog is open on top of it. A ⓘ pressed on a
+         maximised chart is exactly that case. */
+      btn().click();
+      await new Promise((r) => setTimeout(r, 300));
+      const help = MD.getElementById('helpDialog');
+      help.showModal();
+      MD.dispatchEvent(new MW.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      MAXI.dialogKeepsEscape = MW.maxiCard() === card;
+      help.close();
+
+      /* The header stays live, so the case that must not be left standing is the
+         chart going away underneath it. */
+      const keptRounds = planted.rounds.slice();
+      MHK.__plant(Object.assign({}, planted, { rounds: [] }));
+      await new Promise((r) => setTimeout(r, 400));
+      MAXI.emptied = { down: MW.maxiCard() === null,
+                       inert: MD.querySelector('.wrap').inert,
+                       slots: MD.querySelectorAll('.chart-slot').length,
+                       btnW: btnW() };
+      /* One counting round draws a sentence rather than a line, and a bigger box
+         shows no more of a sentence. */
+      MHK.__plant(Object.assign({}, planted, { rounds: keptRounds.slice(0, 1) }));
+      await new Promise((r) => setTimeout(r, 300));
+      MAXI.oneRound = { hasChart: !!wrap.querySelector('svg.chart'), btnW: btnW() };
+      MHK.__plant(planted);
+      await new Promise((r) => setTimeout(r, 300));
+      MAXI.restoredBtnW = btnW();
+      MAXI.ran = true;
+    } catch (e) { MAXI.error = String(e && e.message || e); }
+    finally {
+      try {
+        if (savedMaxiTab === null) localStorage.removeItem(TABK);
+        else localStorage.setItem(TABK, savedMaxiTab);
+      } catch (e) { /* a browser refusing the write left it alone anyway */ }
+    }
+  }
+
+describe('One chart, filling the window');
+  it('the measuring frame actually drove it — everything below reads that record', () => {
+    ok(MAXI.ran, 'the walk did not finish', MAXI.error || 'no frame');
+  });
+  it('the header stays on top, and the overlay is not a dialog', () => {
+    eq(MAXI.headerZ, '20', 'the header sits on a layer of its own:');
+    ok(MAXI.overlayZ < 20,
+       'and the overlay is painted UNDER it, so the golfer picker and the theme stay '
+       + 'visible and clickable', MAXI.overlayZ);
+    ok(MAXI.overlayIsPlainDiv,
+       'it is a plain div: a real <dialog> is promoted to the top layer, which would '
+       + 'paint over the very header this exists to keep');
+    ok(MAXI.overlayOutsideWrap,
+       'and it sits outside .wrap — which is marked inert while it is open');
+  });
+  it('a real pointer lands on the BUTTON, not on the icon inside it', () => {
+    ok(MAXI.offeredWithAChart, 'the button is offered when there is a chart under it');
+    ok(MAXI.hitIsTheButton,
+       'pressing it rewrites the icon, which would orphan the event target if the icon '
+       + 'were the thing under the pointer — pointer-events: none is what stops it');
+  });
+  it('pressing it moves the card into the overlay and hands it the window', () => {
+    ok(MAXI.movedIntoOverlay, 'the card is moved, not copied');
+    ok(MAXI.appKnows, 'and the app knows which card is up');
+    eq(MAXI.oneChartOnly, 1,
+       'there is exactly one chart in the document — a copy left on the page would be '
+       + 'the one every later redraw painted:');
+    ok(MAXI.inert, 'the page underneath is out of the tab order');
+    ok(MAXI.bodyLocked, 'and it is not scrolling behind the chart');
+    eq(MAXI.top, MAXI.headerH,
+       'the overlay starts exactly where the header ends — measured, never guessed:');
+    ok(/Leave full screen/.test(MAXI.label || ''),
+       'and the button says how to get out', MAXI.label);
+  });
+  /* THE CHART ACTUALLY GOT BIGGER, and for this app that is a second claim as
+     well as a bigger box: on the page the drawing is a fixed 900×280 scaled to
+     the card's width by its viewBox, and scaling that into a 1360×800 box would
+     leave the line in a band with half the window empty above and below it. */
+  it('the drawing is remade at the box’s own size, not scaled into it', () => {
+    ok(MAXI.boxH > 400, 'the chart box fills what is left of the window', MAXI.boxH);
+    eq(MAXI.pageViewBox, '0 0 900 280', 'on the page it is the fixed drawing:');
+    ok(MAXI.upViewBox && MAXI.upViewBox !== '0 0 900 280',
+       'and up there it is drawn at the box\'s measured size', MAXI.upViewBox);
+    eq(MAXI.backToPageViewBox, '0 0 900 280',
+       'and it goes back to the fixed one on the way out:');
+  });
+  it('a re-render under it draws into the chart you are looking at', () => {
+    ok(MAXI.survivesRender, 'the chart stays up through a render');
+    ok(MAXI.renderViewBox && MAXI.renderViewBox !== '0 0 900 280',
+       'and is redrawn at the window\'s size, not the card\'s', MAXI.renderViewBox);
+    eq(MAXI.slotsWhileUp, 1,
+       'with exactly one placeholder holding its seat, not one per render:');
+  });
+  it('all three ways out put the card back where it came from', () => {
+    ok(MAXI.putBack, 'the button puts it back in the same place on the page');
+    eq(MAXI.slotsAfter, 0, 'and clears the placeholder away:');
+    ok(MAXI.down, 'nothing is maximised');
+    ok(MAXI.inertCleared, 'the page is reachable again');
+    ok(MAXI.escapeCloses, 'Escape closes it too');
+    ok(MAXI.overlayPad > 0,
+       'and there is a margin round the card for a click-outside to land on',
+       MAXI.overlayPad);
+  });
+  it('Escape belongs to a dialog opened on top of it', () => {
+    ok(MAXI.dialogKeepsEscape,
+       'a ⓘ pressed on a maximised chart takes the Escape that closes it');
+  });
+  it('a button with nothing under it actually goes', () => {
+    /* The WIDTH, not the `hidden` property: see the note where this was driven.
+       A button that does nothing is worse than no button. */
+    eq(MAXI.emptied.btnW, 0, 'no rounds, no chart, no button:');
+    ok(MAXI.emptied.down,
+       'and a render with nothing left to plot brings the window down rather than '
+       + 'leaving a dead card up');
+    eq(MAXI.emptied.inert, false, 'with the page handed back:');
+    eq(MAXI.emptied.slots, 0, 'and no placeholder left behind:');
+    eq(MAXI.oneRound.hasChart, false,
+       'one counting round draws a sentence, not a line:');
+    eq(MAXI.oneRound.btnW, 0,
+       'and a bigger box shows no more of a sentence than a small one does:');
+    ok(MAXI.restoredBtnW > 0, 'the button comes back with the rounds');
+  });
+  it('it is furniture, so it never prints', () => {
+    ok(APP_SRC.includes('@media print { .chart-max, #chartMaxi { display: none !important; } }'),
+       'a full-screen chart is a thing you do to a SCREEN — on paper the page IS the '
+       + 'window, and the card prints where it sits. This app has no print block of its '
+       + 'own beyond this line: theme.css rule 13 owns the palette and the family '
+       + 'chrome, and it cannot know a class name this app invented');
+    ok(APP_SRC.includes('.chart-max[hidden] { display: none; }'),
+       'and a hidden button actually goes — an author display:flex otherwise beats the '
+       + 'browser\'s own [hidden] rule whatever the specificities');
+    ok(APP_SRC.includes('.chart-max svg { pointer-events: none; }'),
+       'and the icon is never the event target');
   });
 
   run();

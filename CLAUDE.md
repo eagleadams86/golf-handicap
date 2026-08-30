@@ -735,6 +735,53 @@ that emphasis.
 - The scope is `./`, never absolute: on the local server the app is at the root,
   not under `/golf-handicap/`, and an absolute scope is simply invalid there.
 
+## One chart, filling the window (2026-08-30)
+
+**The trend card carries a ⤢ button that lifts it into a fixed overlay filling
+the window under the header.** Flow Metrics' feature (2026-08-21); Money Map,
+Sprint Predictability, the Lottery Portfolio and the starter carry it too, so a
+change to the behaviour belongs in all of them. It is NOT the Fullscreen API and
+NOT a modal `<dialog>`: the phrase that shaped it is "with the menu still
+visible", and both of those take the header away. `#chartMaxi` is an ordinary
+fixed div at z-index 15 against the header's 20, starting at `--maxi-top` (the
+header's MEASURED height) and outside `.wrap`, which goes `inert` while open.
+
+**The card is MOVED, not copied.** `renderChart` finds its box by id and rewrites
+it whole; a copy left on the page would be the one every later redraw painted.
+A hidden `.chart-slot` holds the card's seat. The cards here are static markup,
+so unlike Money Map and Sprint Predictability nothing needs suspending around a
+render — `syncMaxiButtons()` just runs at the end of `render()`.
+
+**THE ONE THING THIS APP DOES THAT ITS SIBLINGS DO NOT: the drawing is remade at
+the box's own size.** Their charts are canvases that Chart.js re-measures; this
+is an SVG with a fixed `viewBox="0 0 900 280"` scaled to the card's width, which
+is exactly what makes it responsive on the page and is left alone there. Scaling
+that same drawing into a 1360×800 box would leave the line in a band with half
+the window empty above and below it. So `renderChart` measures `#chartWrap` and,
+**only when it is inside `#chartMaxi` and the box states a height**, draws at
+that size — one unit is one pixel, and every coordinate already follows from W
+and H. `maxiBoxWatch`, a ResizeObserver on the box, keeps it there through a
+window resize; it is guarded on the size actually having changed, because
+renderChart rewrites the box's contents and an unguarded observer hears its own
+work. `#chartMaxi svg.chart { height: 100% }` is the other half.
+
+**Two traps, both found in Money Map the day this shipped, both closed here from
+the start:**
+- **`.chart-max svg { pointer-events: none; }`** — pressing the button rewrites
+  its own innerHTML to the arrows-in icon, which DETACHES whatever the pointer
+  landed on, and a detached node answers null to every `closest()` a delegated
+  handler further up asks.
+- **`.chart-max[hidden] { display: none; }`** — `.chart-max` declares
+  `display: flex`, and an author rule beats the browser's own
+  `[hidden] { display: none }` whatever the specificities. **A test that asserts
+  `btn.hidden` is deaf to this**: read the computed width.
+
+The suite drives it in MEASURE, the sized frame `onAppLoad` already builds — and
+has to put that frame back on the My Handicap tab first, because the smoke walk
+above leaves it on the Leaderboard, where the trend card is in a hidden panel and
+every rectangle reads zero. It also saves and restores `TAB_KEY`, for the same
+reason the smoke walk does.
+
 ## Fields, Dialogs and Scroll Boxes (2026-08-20)
 
 - **Every modal opens through `openModal(dlg)`, never `showModal()` directly.**
