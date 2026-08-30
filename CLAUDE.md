@@ -735,6 +735,40 @@ that emphasis.
 - The scope is `./`, never absolute: on the local server the app is at the root,
   not under `/golf-handicap/`, and an absolute scope is simply invalid there.
 
+## Hovering the trend chart (2026-08-30)
+
+**The chart answers a hover with a panel, the way every sibling's does.** It had
+an SVG `<title>` on each 3px mark until then — the BROWSER's tooltip: about a
+second late, in the OS's colours rather than the theme's, and never shown on a
+touch screen at all. The starter carries the family's answer for an SVG chart and
+this is that block, ported; a change to the behaviour belongs in both.
+
+- **Hit COLUMNS, not marks.** One transparent full-height `<rect class="hit">` per
+  plotted round, drawn LAST because SVG paints in document order and the thing
+  being hit-tested has to be on top. `fill: transparent`, never `fill: none` —
+  `none` would stop it being hit-tested, which is the one thing it is for. This is
+  Money Map's line-chart rule ("a 3px point is a target nobody should have to
+  hit", spelled `interaction: { mode: 'index', intersect: false }` in Chart.js),
+  drawn by hand for an SVG.
+- **Everything the panel says is written onto the rect** as `data-date`,
+  `data-roll`, `data-whs`, already formatted, so the listener never reaches back
+  into the data. The rolling method's NAME is on the wrap (`dataset.rollName`),
+  because that is the reader's own choice and can change without the chart being
+  rebuilt from a different `c`.
+- **One delegated listener on the wrap**, not one per column: the chart is rebuilt
+  on every render and every resize, and a missed rebuild would leave a dead chart.
+  `renderChart` lifts the panel out before the `innerHTML` rewrite and puts it back
+  on every path out, or those listeners would point at a node no longer in the
+  document; it fires `chartredraw`, which hides the panel.
+- **`pointerleave` is ignored for touch.** A finger leaves the screen the instant
+  the tap ends and the browser fires pointerleave to say the pointer no longer
+  exists, so the panel appeared and vanished inside the same tap. Found on a real
+  iPhone while this was written for the starter.
+- **Escape hides the panel AND leaves full screen** — both listeners get the key,
+  deliberately. Escape here has always meant "put everything back".
+- The panel is built with `createElement`/`textContent`, never `innerHTML`, and
+  is clamped inside the wrap so it never makes the page scroll sideways.
+
 ## One chart, filling the window (2026-08-30)
 
 **The trend card carries a ⤢ button that lifts it into a fixed overlay filling

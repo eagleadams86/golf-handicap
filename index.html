@@ -772,6 +772,45 @@ details > summary:focus-visible { outline: 2px solid var(--focus-border); outlin
 .chart-wrap { overflow-x: auto; position: relative; }
 svg.chart { display: block; width: 100%; min-width: 320px; height: auto; }
 
+/* ── The hover tooltip ───────────────────────────────────────────────────────
+   Every sibling's chart answers a hover with a panel naming what is under the
+   pointer. This one had only an SVG `<title>` on each 3px point — which is the
+   BROWSER's tooltip: about a second late, in the OS's colours and not the
+   theme's, and never shown on a touch screen at all. The starter carries the
+   family's answer for an SVG chart, and this is it, ported on 2026-08-30.
+
+   Every value here is the one the siblings hand Chart.js: --surface-alt on a 1px
+   --border-strong, 10px of padding, the heading in --text-primary and the detail
+   under it in --text-secondary. Written as CSS rather than passed to a library
+   because this chart is an SVG — which is also why it follows the palette and
+   the print rules for free.
+
+   `pointer-events: none` is load-bearing: a panel that follows the pointer and
+   can itself be hovered will sit under the pointer, take the next pointermove
+   for itself, and flicker between shown and hidden for as long as you hold
+   still. */
+.charttip { position: absolute; z-index: 2; pointer-events: none;
+  max-width: 260px; padding: 10px; border-radius: var(--radius-sm);
+  background: var(--surface-alt); border: 1px solid var(--border-strong);
+  font-size: var(--fs-xs); color: var(--text-secondary); }
+.charttip[hidden] { display: none; }
+.charttip .n { display: block; color: var(--text-primary);
+  font-weight: var(--fw-semibold); margin-bottom: 2px; }
+.charttip .r { display: block; }
+/* The marks under the pointer, so the panel is never the only thing saying which
+   round is being read — the same reason every sibling's chart highlights. A ring
+   rather than a bigger radius: `r` is settable from CSS, but a mark that grows
+   moves the picture under the pointer, and a ring says "this one" without it.
+   `--text-primary` and not a hue: Charles is red-green colourblind, and the two
+   series are already told apart by their shape and their dash. */
+.chart .pt.on { stroke: var(--text-primary); stroke-width: 2; }
+/* The hit columns are the full height of the plot and carry no ink at all: a
+   3px circle and a 6px square are targets nobody should have to hit, which is
+   the rule Money Map states for the same case in Chart.js ("hover anywhere in a
+   year's column"). `transparent` and not `none`, because `fill: none` would stop
+   the rectangle being hit-tested and that is the one thing it is for. */
+.chart .hit { fill: transparent; }
+
 /* ── One chart, filling the window ───────────────────────────────────────────
    Flow Metrics' feature (2026-08-21), ported here on 2026-08-30 — every app in
    the family that draws a chart carries it now. A trend line 280 units tall in a
@@ -3161,9 +3200,21 @@ function renderStats(c) {
    large flat areas, and a 2px line is not one. */
 function renderChart(c) {
   const wrap = document.getElementById('chartWrap');
+  /* innerHTML replaces everything in the wrap, the tooltip panel included, so it
+     is lifted out here and put back on every path out of this function.
+     Rebuilding it instead would leave the delegated listeners further down
+     pointing at a node that is no longer in the document. */
+  const tipEl = wrap.querySelector('.charttip');
+  const putTipBack = () => {
+    if (!tipEl) return;
+    tipEl.hidden = true;
+    wrap.appendChild(tipEl);
+    wrap.dispatchEvent(new Event('chartredraw'));
+  };
   const pts = c.history.filter((h) => h.rolling != null || h.whs != null);
   if (pts.length < 2) {
     wrap.innerHTML = '<p class="hint">Two or more counting rounds will draw a trend line here.</p>';
+    putTipBack();
     return;
   }
   /* ── The one size that is measured rather than fixed ──────────────────────
@@ -3206,11 +3257,40 @@ function renderChart(c) {
   const rollPaths = line('rolling').map((d) => `<polyline points="${d}" fill="none" stroke="var(--c-roll)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`).join('');
   const whsPaths = line('whs').map((d) => `<polyline points="${d}" fill="none" stroke="var(--c-whs)" stroke-width="2.5" stroke-dasharray="7 4" stroke-linejoin="round" stroke-linecap="round"/>`).join('');
 
+  /* ── The marks, and the columns that answer for them ──────────────────────
+     The `<title>` each of these used to carry is gone: it was the browser's own
+     tooltip, a second late, in the OS's colours, and invisible on a phone. The
+     panel further down replaces it, and these carry an index so it can ring the
+     pair it is describing. */
   const dots = pts.map((p, i) => {
     let out = '';
-    if (p.rolling != null) out += `<circle cx="${x(i).toFixed(1)}" cy="${y(p.rolling).toFixed(1)}" r="3" fill="var(--c-roll)"><title>${esc(fmtDate(p.date))} — ${esc(c.method.name)}: ${fmtIndex(p.rolling)}</title></circle>`;
-    if (p.whs != null) out += `<rect x="${(x(i) - 3).toFixed(1)}" y="${(y(p.whs) - 3).toFixed(1)}" width="6" height="6" fill="var(--c-whs)"><title>${esc(fmtDate(p.date))} — Official: ${fmtIndex(p.whs)}</title></rect>`;
+    if (p.rolling != null) out += `<circle class="pt" data-i="${i}" cx="${x(i).toFixed(1)}" cy="${y(p.rolling).toFixed(1)}" r="3" fill="var(--c-roll)"></circle>`;
+    if (p.whs != null) out += `<rect class="pt" data-i="${i}" x="${(x(i) - 3).toFixed(1)}" y="${(y(p.whs) - 3).toFixed(1)}" width="6" height="6" fill="var(--c-whs)"></rect>`;
     return out;
+  }).join('');
+
+  /* One invisible column per round, the full height of the plot, so hovering
+     anywhere above or below a round reads it out — a 3px circle is a target
+     nobody should have to hit, and on a phone there is no pointer to hit it
+     with. Money Map states the same rule for its line charts, where Chart.js
+     spells it `interaction: { mode: 'index', intersect: false }`; this is that,
+     drawn by hand. Half a step either side, clamped to the plot, so the columns
+     tile the width with no gap between them and none hanging over an axis.
+     LAST in the drawing, because SVG paints in document order and the thing
+     being hit-tested has to be on top. */
+  const colStep = pts.length > 1 ? (x(1) - x(0)) : (W - padL - padR);
+  const hits = pts.map((p, i) => {
+    const left = Math.max(padL, x(i) - colStep / 2);
+    const right = Math.min(W - padR, x(i) + colStep / 2);
+    /* Everything the panel says is written here, already formatted, so the
+       listener never has to reach back into the data for it. */
+    return `<rect class="hit" data-i="${i}"`
+      + ` x="${left.toFixed(1)}" y="${padT}" width="${Math.max(0, right - left).toFixed(1)}"`
+      + ` height="${(H - padT - padB).toFixed(1)}"`
+      + ` data-date="${esc(fmtDate(p.date))}"`
+      + (p.rolling != null ? ` data-roll="${esc(fmtIndex(p.rolling))}"` : '')
+      + (p.whs != null ? ` data-whs="${esc(fmtIndex(p.whs))}"` : '')
+      + `></rect>`;
   }).join('');
 
   const grid = gridVals.map((g) =>
@@ -3223,7 +3303,12 @@ function renderChart(c) {
     `<text x="${padL}" y="${H - 10}" font-size="11" fill="var(--text-muted)">${esc(firstDate)}</text>` +
     `<text x="${W - padR}" y="${H - 10}" text-anchor="end" font-size="11" fill="var(--text-muted)">${esc(lastDate)}</text>`;
 
-  wrap.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Handicap over ${pts.length} rounds, from ${esc(firstDate)} to ${esc(lastDate)}. ${esc(c.method.name)} is now ${fmtIndex(c.rolling.value)}; the official index is ${fmtIndex(c.whs.value)}.">${grid}${whsPaths}${rollPaths}${dots}${axis}</svg>`;
+  wrap.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Handicap over ${pts.length} rounds, from ${esc(firstDate)} to ${esc(lastDate)}. ${esc(c.method.name)} is now ${fmtIndex(c.rolling.value)}; the official index is ${fmtIndex(c.whs.value)}.">${grid}${whsPaths}${rollPaths}${dots}${axis}${hits}</svg>`;
+  /* The name of the rolling method is the reader's own choice and can change
+     without the chart being rebuilt from a different `c`, so the panel reads it
+     off the wrap rather than closing over it. */
+  wrap.dataset.rollName = c.method.name;
+  putTipBack();
 }
 
 function niceStep(raw) {
@@ -3231,6 +3316,115 @@ function niceStep(raw) {
   const n = raw / pow;
   return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * pow;
 }
+
+/* ── The hover tooltip ───────────────────────────────────────────────────────
+   The starter's block, ported on 2026-08-30, and with it this chart answers a
+   hover the way every sibling's does. What it replaces was an SVG `<title>` on
+   each mark: the browser's own tooltip, about a second late, in the OS's colours
+   rather than the theme's, and never shown on a touch screen at all.
+
+   ONE listener on the wrap, not one per column: the chart is rebuilt on every
+   render and on every resize, so per-column listeners would have to be
+   re-attached each time and one missed rebuild would leave a dead chart.
+   Delegation survives any number of redraws.
+
+   `pointermove`/`pointerdown` rather than mouseenter, so a pen and a finger are
+   the same event. On touch the first tap shows the panel and the next tap
+   anywhere takes it away, which is how a tooltip on a touch screen has to work
+   if it is to work at all. */
+(() => {
+  const wrap = document.getElementById('chartWrap');
+  if (!wrap) return;
+  const tip = document.createElement('div');
+  tip.className = 'charttip';
+  tip.hidden = true;
+  wrap.appendChild(tip);
+  let onIndex = null;
+
+  const clearRings = () => {
+    wrap.querySelectorAll('.pt.on').forEach((el) => el.classList.remove('on'));
+  };
+  const hide = () => { clearRings(); onIndex = null; tip.hidden = true; };
+
+  /* Built with DOM nodes and textContent, never innerHTML. Nothing in this panel
+     is typed by the reader today — a date and two figures the app formatted —
+     but the app's state holds course names and notes, and the rule here is that
+     a string on its way onto the page goes through textContent. */
+  const fill = (hit) => {
+    tip.textContent = '';
+    const name = document.createElement('span');
+    name.className = 'n';
+    name.textContent = hit.getAttribute('data-date');
+    tip.appendChild(name);
+    const roll = hit.getAttribute('data-roll');
+    const whs = hit.getAttribute('data-whs');
+    if (roll !== null) {
+      const r = document.createElement('span');
+      r.className = 'r';
+      r.textContent = `${wrap.dataset.rollName || 'League'}: ${roll}`;
+      tip.appendChild(r);
+    }
+    if (whs !== null) {
+      const w = document.createElement('span');
+      w.className = 'r';
+      w.textContent = `Official WHS: ${whs}`;
+      tip.appendChild(w);
+    }
+  };
+
+  const show = (hit, ev) => {
+    const i = hit.getAttribute('data-i');
+    if (i !== onIndex) {
+      clearRings();
+      onIndex = i;
+      wrap.querySelectorAll(`.pt[data-i="${CSS.escape(i)}"]`)
+        .forEach((el) => el.classList.add('on'));
+      fill(hit);
+    }
+    tip.hidden = false;
+    /* Placed against the WRAP, which is the positioned ancestor, and clamped
+       inside it: a panel that runs off the right edge of the card is a panel
+       that makes the page scroll sideways. 14px clear of the pointer so it is
+       never under the finger that summoned it. */
+    const box = wrap.getBoundingClientRect();
+    const x = ev.clientX - box.left + wrap.scrollLeft;
+    const y = ev.clientY - box.top;
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    tip.style.left = Math.max(0, Math.min(x + 14, wrap.scrollLeft + box.width - w - 2)) + 'px';
+    tip.style.top = Math.max(0, Math.min(y - h - 14, box.height - h - 2)) + 'px';
+  };
+
+  const hitAt = (ev) => {
+    const t = ev.target;
+    return (t && t.classList && t.classList.contains('hit')) ? t : null;
+  };
+
+  wrap.addEventListener('pointermove', (ev) => {
+    const hit = hitAt(ev);
+    if (hit) show(hit, ev); else hide();
+  });
+  wrap.addEventListener('pointerdown', (ev) => {
+    const hit = hitAt(ev);
+    if (hit) show(hit, ev); else hide();
+  });
+  /* NOT FOR TOUCH. A finger leaves the screen the moment the tap ends, and the
+     browser fires pointerleave to say the pointer no longer exists — so on iOS
+     the panel appeared and vanished inside the same tap, which reads as the tap
+     having done nothing. A tap has to leave it up until something else takes it
+     down: the next tap (handled above, which hides when it lands off a column),
+     Escape, or a redraw. Found on a real iPhone while this was written for the
+     starter; a desktop pointer never does it. */
+  wrap.addEventListener('pointerleave', (ev) => { if (ev.pointerType !== 'touch') hide(); });
+  /* A redraw throws away the marks the panel was ringing. */
+  wrap.addEventListener('chartredraw', hide);
+  /* Escape closes it, like everything else here that covers something. It does
+     NOT stop there: the full-screen overlay listens for the same key and closes
+     too, so one press on a maximised chart with a panel up clears both. That is
+     the starter's behaviour and it is left alone deliberately — Escape here has
+     always meant "put everything back", and making the panel swallow the key
+     would mean pressing it twice to leave a chart you are looking at. */
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+})();
 
 /* ── One chart, filling the window ───────────────────────────────────────────
    Flow Metrics' feature, ported here on 2026-08-30. The CSS above records why

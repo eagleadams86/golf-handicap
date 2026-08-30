@@ -89,6 +89,13 @@ The app has two tabs. **My handicap** is one golfer's page — the two figures, 
 chart, the course handicap and the full list of rounds. **Leaderboard** is everybody at
 once (see [The leaderboard](#the-leaderboard)).
 
+**Hover the chart and it names the round.** Anywhere in a round's column — not
+just on the 3px mark — brings up a panel with the date and both figures, and rings
+the two marks it is describing. On a phone a tap does the same and the next tap
+takes it away. (It used to be an SVG `title`, which is the browser's own tooltip:
+about a second late, in the system's colours rather than the theme's, and never
+shown on a touch screen at all.)
+
 **The trend chart fills the window.** *Handicap Over Time* carries a ⤢ button in its
 top-right corner; press it and the chart alone fills the screen under the header. **The
 header stays where it is and stays usable** — change golfer, or the theme, and the line

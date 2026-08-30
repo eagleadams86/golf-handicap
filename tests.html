@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 276;
+const EXPECTED = 283;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -2280,6 +2280,7 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
      one would pass unconditionally, including on the bug it was written to
      catch. The tests below read the record it leaves. */
   const MAXI = { ran: false };
+  const TIP = { ran: false };
   if (MEASURE) {
     /* Clicking a tab WRITES the chosen one to localStorage, on the same origin
        the reader's own app uses — the smoke walk above guards the same key for
@@ -2410,6 +2411,87 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
       await new Promise((r) => setTimeout(r, 300));
       MAXI.restoredBtnW = btnW();
       MAXI.ran = true;
+
+      /* ── The hover tooltip ─────────────────────────────────────────────────
+         Charles, 2026-08-30: "the chart tooltips in financial-plan are good —
+         check the rest of the family." This chart had an SVG `<title>` on each
+         3px mark, which is the BROWSER's tooltip: about a second late, in the
+         OS's colours, and never shown on a touch screen at all. The starter
+         carries the family's answer for an SVG chart and it is ported here.
+
+         Driven in the same sized frame, for the same reason: the panel is
+         positioned from rectangles, and the suite's own frame is 1x1px. */
+      MHK.__plant(planted);
+      await new Promise((r) => setTimeout(r, 400));
+      const tip = () => wrap.querySelector('.charttip');
+      const hitCols = () => [...wrap.querySelectorAll('.hit')];
+      const point = (el, dx, dy, kind, type) => {
+        const b = el.getBoundingClientRect();
+        el.dispatchEvent(new MW.PointerEvent(kind || 'pointermove', {
+          clientX: b.left + dx, clientY: b.top + dy, bubbles: true,
+          pointerType: type || 'mouse' }));
+      };
+      TIP.titles = wrap.querySelectorAll('title').length;
+      TIP.columns = hitCols().length;
+      /* Against the MARKS the chart drew, not against state.rounds — the demo
+         league holds every golfer's rounds and this chart is one golfer's
+         counting ones. */
+      TIP.markIndices = new Set([...wrap.querySelectorAll('.pt')]
+        .map((el) => el.getAttribute('data-i'))).size;
+      TIP.panelExists = !!tip();
+
+      /* THE WHOLE POINT: a place no mark is drawn. Ten pixels below the top of
+         the plot is nowhere near a 3px circle, and it is exactly where a reader
+         sweeping the chart puts the pointer. */
+      const col = hitCols()[5];
+      point(col, col.getBoundingClientRect().width / 2, 10);
+      await new Promise((r) => setTimeout(r, 150));
+      TIP.awayFromMarks = { shown: !tip().hidden, text: tip().textContent,
+                            rings: wrap.querySelectorAll('.pt.on').length };
+
+      /* Off the columns, Escape, and a redraw all take it away. */
+      wrap.dispatchEvent(new MW.PointerEvent('pointermove',
+        { clientX: 0, clientY: 0, bubbles: true, pointerType: 'mouse' }));
+      await new Promise((r) => setTimeout(r, 120));
+      TIP.offColumn = tip().hidden;
+      point(hitCols()[5], 5, 10);
+      await new Promise((r) => setTimeout(r, 120));
+      MD.dispatchEvent(new MW.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await new Promise((r) => setTimeout(r, 120));
+      TIP.escape = tip().hidden;
+      point(hitCols()[5], 5, 10);
+      await new Promise((r) => setTimeout(r, 120));
+      MW.render();
+      await new Promise((r) => setTimeout(r, 300));
+      TIP.survivedRedraw = !!tip();
+      TIP.hiddenAfterRedraw = tip() && tip().hidden;
+      TIP.columnsAfterRedraw = hitCols().length;
+
+      /* ON TOUCH a finger leaves the screen the moment the tap ends, and the
+         browser says so with pointerleave — so a panel that hides on leave
+         appears and vanishes inside the same tap, which reads as the tap having
+         done nothing. Found on a real iPhone while this was written for the
+         starter; a desktop pointer never does it. */
+      point(hitCols()[3], 5, 10, 'pointerdown', 'touch');
+      await new Promise((r) => setTimeout(r, 120));
+      TIP.tapShows = !tip().hidden;
+      wrap.dispatchEvent(new MW.PointerEvent('pointerleave',
+        { bubbles: true, pointerType: 'touch' }));
+      await new Promise((r) => setTimeout(r, 120));
+      TIP.touchLeaveKeeps = !tip().hidden;
+      wrap.dispatchEvent(new MW.PointerEvent('pointerleave',
+        { bubbles: true, pointerType: 'mouse' }));
+      await new Promise((r) => setTimeout(r, 120));
+      TIP.mouseLeaveHides = tip().hidden;
+
+      /* A panel that runs off the right edge of the card makes the page scroll
+         sideways, so it is clamped inside the wrap. */
+      const last = hitCols()[hitCols().length - 1];
+      point(last, last.getBoundingClientRect().width - 2, 10);
+      await new Promise((r) => setTimeout(r, 150));
+      const wb = wrap.getBoundingClientRect(), tb = tip().getBoundingClientRect();
+      TIP.clampedInside = tb.right <= wb.right + 1 && tb.left >= wb.left - 1;
+      TIP.ran = true;
     } catch (e) { MAXI.error = String(e && e.message || e); }
     finally {
       try {
@@ -2501,6 +2583,55 @@ describe('One chart, filling the window');
        'and a bigger box shows no more of a sentence than a small one does:');
     ok(MAXI.restoredBtnW > 0, 'the button comes back with the rounds');
   });
+describe('Hovering the trend chart');
+  it('the measuring frame actually drove it — everything below reads that record', () => {
+    ok(TIP.ran, 'the walk did not finish', MAXI.error || 'no frame');
+  });
+  it('the browser’s own tooltip is gone, and columns answer for the marks', () => {
+    eq(TIP.titles, 0,
+       'no <title> is left on a mark: that is the BROWSER\'s tooltip — about a second '
+       + 'late, in the OS\'s colours rather than the theme\'s, and never shown on a '
+       + 'touch screen at all:');
+    ok(TIP.columns > 1, 'the chart drew columns at all', TIP.columns);
+    eq(TIP.columns, TIP.markIndices,
+       'one invisible full-height column per round the chart plotted, so a 3px circle '
+       + 'is never the target:');
+    ok(TIP.panelExists, 'and the panel every sibling\'s chart answers with is on the page');
+  });
+  it('a hover well away from any mark still reads the round out', () => {
+    ok(TIP.awayFromMarks.shown,
+       'ten pixels below the top of the plot is nowhere near a 3px circle, and it is '
+       + 'exactly where a reader sweeping the chart puts the pointer');
+    ok(/Official WHS/.test(TIP.awayFromMarks.text || ''),
+       'and BOTH figures for that round are in it, not the nearer one',
+       TIP.awayFromMarks.text);
+    eq(TIP.awayFromMarks.rings, 2,
+       'with both marks ringed, so the panel is never the only thing saying which '
+       + 'round is being read:');
+  });
+  it('everything that should take it away does', () => {
+    ok(TIP.offColumn, 'a pointer off the columns hides it');
+    ok(TIP.escape, 'Escape hides it');
+    ok(TIP.survivedRedraw,
+       'a redraw does not destroy the panel — renderChart lifts it out and puts it '
+       + 'back, or the delegated listeners would point at a node out of the document');
+    ok(TIP.hiddenAfterRedraw, 'but it does hide, because the marks it was ringing are gone');
+    eq(TIP.columnsAfterRedraw, TIP.columns, 'and the columns are rebuilt with the chart:');
+  });
+  it('a tap on a phone leaves it up', () => {
+    ok(TIP.tapShows, 'the first tap shows it');
+    ok(TIP.touchLeaveKeeps,
+       'and the pointerleave a finger fires the instant the tap ends must NOT take it '
+       + 'away — it appeared and vanished inside the same tap on a real iPhone, which '
+       + 'reads as the tap having done nothing');
+    ok(TIP.mouseLeaveHides, 'while a mouse leaving the chart still does');
+  });
+  it('the panel is clamped inside the card', () => {
+    ok(TIP.clampedInside,
+       'a panel hanging off the right edge is a panel that makes the page scroll '
+       + 'sideways');
+  });
+
   it('it is furniture, so it never prints', () => {
     ok(APP_SRC.includes('@media print { .chart-max, #chartMaxi { display: none !important; } }'),
        'a full-screen chart is a thing you do to a SCREEN — on paper the page IS the '
