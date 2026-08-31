@@ -72,7 +72,7 @@ Rounds card's own first-run state, which knows you have somewhere to play and of
 rather than the course again. Every app in the family opens on this same card, in the same
 words and the same order.
 
-1. **Add a course.** *Courses → Add course* in the header. A course needs, for each set of tees,
+1. **Add a course.** *Golfers & Courses → + Add Course* in the header. A course needs, for each set of tees,
    a **course rating**, a **slope rating** and a **par** — all three are printed on the
    scorecard. The rating is what a scratch golfer is expected to shoot (e.g. 69.4); the
    slope is how much harder it plays for everyone else (55–155, average 113). Add as many
@@ -226,8 +226,8 @@ club and society formulas can be reproduced exactly:
 | **Multiply by** | For formulas that scale the average — the old CONGU 0.96, for instance. |
 | **Add / subtract** | A flat offset. |
 
-The name follows the settings (`Rolling last 5`, `Best 3 of last 5`) until you type your own,
-after which yours sticks.
+The name follows the settings (`Rolling last 5`, `Best 3 of last 5`) and is worked out from
+them — it can't be typed over, so it always says what the numbers actually do.
 
 Two examples:
 
@@ -681,7 +681,8 @@ tests — they need `http://localhost` because `file://` iframes are blocked in 
 **Run `tests.html` and check it says "All N tests pass"** whenever you touch `round1`,
 `scoreDifferential`, `averageLowest`, `whsIndex`/`whsSelection`,
 `rollingIndex`/`rollingSelection`, `normalizeMethod`, `clampInt`/`clampNum`, `applyCaps`,
-`courseHandicap`, `indexHistory`, `pickUsed`, `rankLeague`, `changeOverRounds`,
+`courseHandicap`, `playingHandicap`/`allowanceById`, `esrFor`, `pairNines`, `courseStats`,
+`csvRounds`/`csvCell`, `indexHistory`, `pickUsed`, `rankLeague`, `changeOverRounds`,
 `syncDecision`, `buildDemo`, `buildDemoLeague`, `encodeShare`/`decodeShare`, `buildSharePayload`,
 `windowRounds`, `sanitizeIds` or `normalizeState`.
 

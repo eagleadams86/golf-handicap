@@ -105,7 +105,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
   </div>
   <div class="card">
     <p><strong>Google sign-in / Firestore (optional, off until you choose it).</strong>
-    If you tap “Sign in to sync”, your rounds are stored in a Firebase/Firestore database
+    If you tap “Sign In to Sync”, your rounds are stored in a Firebase/Firestore database
     operated by the developer so the same data appears on your other devices, and Firebase
     Authentication records your Google account's email address and display name. Security
     rules confine every account to its own document — no other signed-in user can read
@@ -145,7 +145,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
   Google's loads on an ordinary visit: open the app, log a round, close it, and your browser
   never speaks to Google at all. The Firebase and sign-in scripts come from
   <code>www.gstatic.com</code> and <code>accounts.google.com</code> the moment you reach for
-  the "Sign in to sync" button — pointer, keyboard or press — and not before.</p>
+  the "Sign In to Sync" button — pointer, keyboard or press — and not before.</p>
   <p>There is one exception, and it is the only way this can work: if you are
   <strong>already signed in on this device</strong>, the app loads Firebase as the page opens,
   because asking Firebase whether your session is still good is the only way to find out. It

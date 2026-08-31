@@ -1851,7 +1851,7 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
     try {
       /* The three labels the sync module actually writes. The signed-in one is a
          FIRST name by design, so it is the short case, not the wide one. */
-      const widths = ['☁️ Sign in to Sync', '☁️ Charlie', '⚠️ Not syncing'].map((label) => {
+      const widths = ['☁️ Sign In to Sync', '☁️ Charlie', '⚠️ Not syncing'].map((label) => {
         btn.textContent = label;
         return { label, px: btn.getBoundingClientRect().width };
       });
