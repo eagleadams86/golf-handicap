@@ -824,6 +824,19 @@ above leaves it on the Leaderboard, where the trend card is in a hidden panel an
 every rectangle reads zero. It also saves and restores `TAB_KEY`, for the same
 reason the smoke walk does.
 
+## The League Handicap Window Takes the Family's Section Rule (2026-09-02)
+
+Its two sections — *The Calculation* and *The Official Caps* — are each in a
+`<section class="manage-sec">`, ruled off from one another by a 1px `--border-strong` line,
+with the spacing on the section rather than as an inline `margin-top` on the heading row.
+
+The part came from Flow Metrics, whose Settings window Charles read as "big and a bit hard to
+read". This window is short and would not have earned the complaint on its own; it takes the
+rule because `.manage-head` / `.manage-note` / `.grid.two` / `.manage-sec` are one shared set
+of parts across the four app-wide settings windows in the family, and a divider in some of
+them is drift rather than design. Sprint Predictability's CLAUDE.md holds the full note. No
+new colour, no fill, no shadow (pack rule 14).
+
 ## Fields, Dialogs and Scroll Boxes (2026-08-20)
 
 - **Every modal opens through `openModal(dlg)`, never `showModal()` directly.**

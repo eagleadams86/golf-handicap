@@ -1055,6 +1055,21 @@ dialog h2 { margin: 0 0 var(--sp-5); font-size: var(--fs-md); font-weight: var(-
    and a two-line label still put their inputs on the same line. */
 .manage-head { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .manage-note { color: var(--text-secondary); font-size: var(--fs-xs); margin: 4px 0 0; }
+/* ── One section of a settings window, and the rule that ends it ────────────
+   Flow Metrics' furniture, mirrored here the day it was written (2026-09-02):
+   Charles read its Settings window as "big and a bit hard to read" — a stack of
+   things you set with nothing to say where one stopped. This window has two
+   sections and would not have earned the complaint on its own; it takes the
+   rule because these three windows are one screen wearing three names, and a
+   divider in two of them and not the third is drift.
+
+   A 1px rule in `--border-strong` and nothing else: no new colour, no fill, no
+   shadow (pack rule 14), and `.manage-head` itself is untouched. */
+.manage-sec { margin-top: var(--sp-7); padding-top: var(--sp-7); border-top: 1px solid var(--border-strong); }
+/* The first section takes the spacing and not the rule — above it is the
+   window's own heading, or the sentence describing the whole window, and a line
+   under either reads as the end of a section rather than the start of one. */
+.manage-sec:first-of-type { margin-top: var(--sp-6); padding-top: 0; border-top: 0; }
 .grid.two { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   align-items: end; }
 .grid.two > div { display: flex; flex-direction: column; justify-content: flex-end; }
@@ -1805,60 +1820,64 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
   <form method="dialog" id="methodForm">
     <h2 id="methodTitle">The League Handicap</h2>
     <p class="manage-note">The calculation the app shows first, and the one the leaderboard is ranked on. It applies to <strong>every golfer here</strong> — one rule, so the table compares like with like. The official World Handicap System figure is always worked out alongside it and never changes.</p>
-    <div class="row spread" style="margin-top:16px">
-      <strong class="manage-head">The Calculation</strong>
-    </div>
-    <p class="manage-note">Which rounds it looks at, and what it does with them.</p>
-    <div class="grid two" style="margin-top:var(--sp-5)">
-      <div>
-        <label for="m_window">Look at the last … rounds</label>
-        <input type="number" id="m_window" min="1" max="60" step="1" required inputmode="numeric">
+    <section class="manage-sec">
+      <div class="row spread">
+        <strong class="manage-head">The Calculation</strong>
       </div>
-      <div>
-        <label for="m_use">…and use the best … of them</label>
-        <input type="number" id="m_use" min="1" max="60" step="1" required inputmode="numeric">
+      <p class="manage-note">Which rounds it looks at, and what it does with them.</p>
+      <div class="grid two" style="margin-top:var(--sp-5)">
+        <div>
+          <label for="m_window">Look at the last … rounds</label>
+          <input type="number" id="m_window" min="1" max="60" step="1" required inputmode="numeric">
+        </div>
+        <div>
+          <label for="m_use">…and use the best … of them</label>
+          <input type="number" id="m_use" min="1" max="60" step="1" required inputmode="numeric">
+        </div>
       </div>
-    </div>
-    <div class="grid two" style="margin-top:var(--sp-5)">
-      <div>
-        <label for="m_basis">Work from</label>
-        <select id="m_basis">
-          <option value="differential">Score differentials (uses course rating &amp; slope)</option>
-          <option value="overPar">Shots over par (ignores rating &amp; slope)</option>
-        </select>
+      <div class="grid two" style="margin-top:var(--sp-5)">
+        <div>
+          <label for="m_basis">Work from</label>
+          <select id="m_basis">
+            <option value="differential">Score differentials (uses course rating &amp; slope)</option>
+            <option value="overPar">Shots over par (ignores rating &amp; slope)</option>
+          </select>
+        </div>
       </div>
-    </div>
-    <div class="grid two" style="margin-top:var(--sp-5)">
-      <div>
-        <label for="m_mult">Then multiply by</label>
-        <input type="number" id="m_mult" min="0.1" max="2" step="0.01" required inputmode="decimal">
+      <div class="grid two" style="margin-top:var(--sp-5)">
+        <div>
+          <label for="m_mult">Then multiply by</label>
+          <input type="number" id="m_mult" min="0.1" max="2" step="0.01" required inputmode="decimal">
+        </div>
+        <div>
+          <label for="m_adj">And add (or subtract)</label>
+          <input type="number" id="m_adj" min="-20" max="20" step="0.1" required inputmode="decimal">
+        </div>
       </div>
-      <div>
-        <label for="m_adj">And add (or subtract)</label>
-        <input type="number" id="m_adj" min="-20" max="20" step="0.1" required inputmode="decimal">
+      <p class="hint" id="methodPreview"></p>
+    </section>
+    <section class="manage-sec">
+      <div class="row spread">
+        <strong class="manage-head">The Official Caps</strong>
       </div>
-    </div>
-    <p class="hint" id="methodPreview"></p>
-    <div class="row spread" style="margin-top:20px">
-      <strong class="manage-head">The Official Caps</strong>
-    </div>
-    <p class="manage-note">Parts of the WHS calculation you can switch off to see the plain
-      averaging underneath. Neither touches the league handicap.</p>
-    <div style="margin-top:var(--sp-5)">
-    <div class="field checkline">
-      <input type="checkbox" id="m_caps">
-      <label for="m_caps" style="margin:0">Apply the official soft cap and hard cap</label>
-      <button class="tile-help" type="button" data-help="caps" aria-label="About the caps">i</button>
-    </div>
-    <!-- Beside the caps, because the two are the same kind of thing: parts of
-         the OFFICIAL calculation that can be switched off to see the plain
-         averaging underneath. Neither touches the league handicap. -->
-    <div class="field checkline">
-      <input type="checkbox" id="m_esr">
-      <label for="m_esr" style="margin:0">Apply the official exceptional score reduction</label>
-      <button class="tile-help" type="button" data-help="esr" aria-label="About exceptional scores">i</button>
-    </div>
-    </div>
+      <p class="manage-note">Parts of the WHS calculation you can switch off to see the plain
+        averaging underneath. Neither touches the league handicap.</p>
+      <div style="margin-top:var(--sp-5)">
+      <div class="field checkline">
+        <input type="checkbox" id="m_caps">
+        <label for="m_caps" style="margin:0">Apply the official soft cap and hard cap</label>
+        <button class="tile-help" type="button" data-help="caps" aria-label="About the caps">i</button>
+      </div>
+      <!-- Beside the caps, because the two are the same kind of thing: parts of
+           the OFFICIAL calculation that can be switched off to see the plain
+           averaging underneath. Neither touches the league handicap. -->
+      <div class="field checkline">
+        <input type="checkbox" id="m_esr">
+        <label for="m_esr" style="margin:0">Apply the official exceptional score reduction</label>
+        <button class="tile-help" type="button" data-help="esr" aria-label="About exceptional scores">i</button>
+      </div>
+      </div>
+    </section>
     <p class="warn" id="methodWarn" role="status"></p>
     <div class="row-actions">
       <button type="button" class="danger" id="methodReset">Reset to Last 5</button>
