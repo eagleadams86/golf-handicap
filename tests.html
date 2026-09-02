@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 283;
+const EXPECTED = 284;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -2583,6 +2583,32 @@ describe('One chart, filling the window');
        'and a bigger box shows no more of a sentence than a small one does:');
     ok(MAXI.restoredBtnW > 0, 'the button comes back with the rounds');
   });
+describe('A dropped sync listener is re-opened (2026-09-01 audit)');
+  it('the error path clears the listener, schedules a retry, and a successful push re-opens it', () => {
+    /* Module-scoped and needing a signed-in account to exercise, so the shape
+       is pinned over the source, the way the sync rules above are. */
+    ok(APP_SRC, 'index.html did not load, so nothing below proves anything');
+    const start = APP_SRC.indexOf('\n<script type="module">');
+    ok(start > -1, 'the sync module tag has moved — recheck this test');
+    /* Spelled in two halves: the literal closing tag would end THIS page's script. */
+    const mod = APP_SRC.slice(start, APP_SRC.indexOf('</scr' + 'ipt>', start));
+    const listenAt = mod.indexOf('function listen()');
+    ok(listenAt > -1, 'the listener lives in its own function so it can be re-opened');
+    const errAt = mod.indexOf('setSyncError(e);\n    unsub = null;');
+    ok(errAt > listenAt, 'the error callback clears unsub — it used to hand setSyncError straight in '
+      + 'and leave unsub pointing at a dead listener');
+    ok(mod.slice(errAt, errAt + 400).includes('relistenTimer = setTimeout('), 'and schedules the retry');
+    ok(mod.slice(errAt, errAt + 400).includes('if (user && !unsub) listen()'),
+      'only while signed in and only while it is down');
+    const pushBody = mod.slice(mod.indexOf('async function pushNow()'), mod.indexOf('window.cloudPush ='));
+    ok(pushBody.indexOf('clearSyncError();') > -1
+      && pushBody.indexOf('clearSyncError();') < pushBody.indexOf('if (!unsub) listen();'),
+      'a push that got through re-opens a dropped listener, so the cleared warning is true both ways');
+    ok(mod.includes("if (unsub) { unsub(); unsub = null; }\n    clearTimeout(relistenTimer); relistenTimer = null;"),
+      'signing out cancels the retry along with the listener');
+    ok(mod.includes('if (!user || !F) return;'), 'listen() refuses to open with nobody signed in');
+  });
+
 describe('Hovering the trend chart');
   it('the measuring frame actually drove it — everything below reads that record', () => {
     ok(TIP.ran, 'the walk did not finish', MAXI.error || 'no frame');

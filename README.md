@@ -628,7 +628,9 @@ offline either way.
 - **Sync failures are shown, not logged.** The button reads "⚠️ Not syncing" with the cause
   in plain English. There is deliberately no retry button: transient failures are retried by
   the SDK, permanent ones are not fixed by pressing anything, and the next save recovers the
-  state on its own.
+  state on its own. A dropped listener is re-opened by that save, and by a once-a-minute retry
+  while it is down (since 2026-09-01 — before that it stayed dead until the next sign-in, so a
+  device that only reads was cut off from the others' updates).
 
 To go back to fully-local, set `FIREBASE_CONFIG` to `null` again.
 

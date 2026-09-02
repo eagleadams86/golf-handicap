@@ -580,6 +580,11 @@ that emphasis.
   errors is dropped by Firestore and never fires again, so without it another device's
   updates just stop arriving silently. Sync failures are surfaced on the button, never only
   logged, and only a successful push clears the state — there is deliberately no retry button.
+  **The error callback now clears `unsub` and schedules a once-a-minute `listen()` retry
+  (2026-09-01)**; a successful `pushNow()` re-opens a dropped listener too, and sign-out cancels
+  the timer. It used to hand `setSyncError` straight in, so a dropped listener stayed dead until
+  the next sign-in while the next push said everything was fine. Same fix as Money Map's and
+  PAPTrack's, pinned as source in the suite.
   The which-copy-wins rules live in the pure `syncDecision()` in the classic script so
   tests.html can pin them; the module only acts on the verdict. "Clear everything" calls
   `window.cloudFlush()` to skip the push debounce — a clear must not sit in a window the
