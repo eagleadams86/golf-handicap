@@ -788,6 +788,16 @@ visible", and both of those take the header away. `#chartMaxi` is an ordinary
 fixed div at z-index 15 against the header's 20, starting at `--maxi-top` (the
 header's MEASURED height) and outside `.wrap`, which goes `inert` while open.
 
+**THE STEP ARROWS ARE NOT HERE, AND THAT IS THE DECISION.** Flow Metrics grew a
+`‹ ›` pair beside the ⤢ on 2026-09-03 that walks the charts on the screen the
+card came from; it was ported the same day to the Lottery Portfolio, Sprint
+Predictability and Money Map. **This app draws one chart, so there is nothing to
+walk** — everywhere else the arrows hide themselves below two charts, and here
+they would be hidden always. If a second chart is ever added to this page, take
+the walk from Flow Metrics rather than inventing one: the shape is `maxiGroup()`
++ `dressStepBtns()` + `maxiStep()`, with the arrows in the OVERLAY (a button
+inside the card is detached mid-step and takes the keyboard's focus with it).
+
 **The card is MOVED, not copied.** `renderChart` finds its box by id and rewrites
 it whole; a copy left on the page would be the one every later redraw painted.
 A hidden `.chart-slot` holds the card's seat. The cards here are static markup,
