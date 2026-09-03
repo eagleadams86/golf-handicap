@@ -860,9 +860,16 @@ svg.chart { display: block; width: 100%; min-width: 320px; height: auto; }
 @media (max-width: 640px) { #chartMaxi { padding: 10px; } }
 /* The card fills what is left and the chart fills the card. `min-height: 0` is
    what lets a flex child actually shrink rather than pushing the card past the
-   bottom of the window. */
+   bottom of the window; `min-width: 0` is the same word for the other axis. The
+   overlay is a flex ROW, so without it the card's automatic minimum size is its
+   MIN-CONTENT width, and a card that arrives remembering a wider box would keep
+   it and hang over the padding, taking the ⤢ with it — which is what Money Map
+   and Sprint Predictability were doing on 2026-09-03, where a Chart.js canvas
+   carries a width in its own style attribute. This chart is an SVG redrawn at
+   the box's measured size and there is only one of it, so the word is hardening;
+   it is here so the family reads the same. */
 #chartMaxi > .card { flex: 1 1 auto; display: flex; flex-direction: column;
-  min-height: 0; width: auto; margin: 0; }
+  min-height: 0; min-width: 0; width: auto; margin: 0; }
 #chartMaxi > .card > .chart-wrap { flex: 1 1 auto; min-height: 0; }
 /* `height: 100%`, and renderChart draws the viewBox at the box's OWN measured
    size while it is up here — see the note there. The two go together: the page's
