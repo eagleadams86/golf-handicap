@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 289;
+const EXPECTED = 292;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -2762,6 +2762,66 @@ describe('Hovering the trend chart');
       await new Promise((r) => setTimeout(r, 200));
       FIND.modifierIgnored = dlg.open && MHK.__state().activeGolfer === 'demo-g-3';
       dlg.close();
+
+      /* ── …and where the keyboard is left afterwards ───────────────────────
+         A hit closes the window, and closing a <dialog> hands the focus back to
+         whatever held it when the dialog opened. After a ⌘K pressed from nowhere
+         in particular that is <body> — the reader has just been taken somewhere
+         and the keyboard is on nothing, so the next Tab starts at the top of the
+         page rather than where they landed.
+
+         `.click()` on the Find button is what makes that reachable here: a
+         SYNTHETIC click moves no focus, where a real press would put it on the
+         button, so the window opens with nothing visible focused. Both cases
+         matter and both are below. */
+      const focusNow = () => {
+        const a = MD.activeElement;
+        return {
+          id: a ? (a.id || a.tagName) : 'nothing',
+          isTab: !!(a && a.classList && a.classList.contains('tab')),
+          tab: a ? (a.dataset || {}).tab : null,
+          selected: a ? a.getAttribute('aria-selected') : null,
+          /* NOT `a !== MD.body`: <body> has a rect like anything else. Both
+             halves of the rule are read separately so a failure says which. */
+          visible: !!(a && a !== MD.body && a.getClientRects().length),
+          inRound: MD.getElementById('roundDialog').contains(a),
+          inManage: MD.getElementById('manageDialog').contains(a),
+        };
+      };
+      const fromNowhere = (q) => {
+        MD.activeElement.blur();
+        typeInFind(q);
+        MD.querySelector('#searchResults [data-hit]').click();
+      };
+
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds: demo.rounds, activeGolfer: 'demo-g-3' });
+      await new Promise((r) => setTimeout(r, 200));
+      fromNowhere('Priya Raman');
+      await new Promise((r) => setTimeout(r, 300));
+      FIND.golferFocus = focusNow();
+      FIND.golferFocusTab = MD.documentElement.getAttribute('data-tab');
+
+      /* A hit that opens a window keeps that window's own focus — the round
+         card lands on its date, Golfers & Courses on + Add Golfer — because a
+         focus that is already somewhere visible is left exactly where it is. */
+      fromNowhere('nine before the light went');
+      await new Promise((r) => setTimeout(r, 300));
+      FIND.roundFocus = focusNow();
+      MD.getElementById('roundDialog').close();
+      fromNowhere('Kilbryde');
+      await new Promise((r) => setTimeout(r, 300));
+      FIND.courseFocus = focusNow();
+      MD.getElementById('manageDialog').close();
+
+      /* And so does the Find button, when a real press on it is what opened the
+         window: there is nothing to repair, and moving the keyboard off a
+         control the reader just pressed would be the same fault backwards. */
+      MD.getElementById('findBtn').focus();
+      typeInFind('Priya Raman');
+      MD.querySelector('#searchResults [data-hit]').click();
+      await new Promise((r) => setTimeout(r, 300));
+      FIND.pressedFocus = focusNow();
       FIND.ran = true;
     } catch (e) { FIND.error = String(e && e.message || e); }
   }
@@ -2815,6 +2875,10 @@ describe('Hovering the trend chart');
     SHARED.landed = SW_.__ghTestHooks.__state().activeGolfer;
     SHARED.tab = SD.documentElement.getAttribute('data-tab');
     SHARED.roundOpened = SD.getElementById('roundDialog').open;
+    const sa = SD.activeElement;
+    SHARED.focus = { id: sa ? (sa.id || sa.tagName) : 'nothing',
+                     tab: sa ? (sa.dataset || {}).tab : null,
+                     visible: !!(sa && sa !== SD.body && sa.getClientRects().length) };
     SHARED.ran = true;
   } catch (e) { SHARED.error = String(e && e.message || e); }
   /* Both walks above are finished with storage now — put the reader's own keys
@@ -2869,6 +2933,36 @@ describe('Find: Enter opens the first hit (2026-09-03 audit, round three)');
     ok(!SHARED.roundOpened,
        'without opening the round editor — nothing here can be saved, and the Add Round '
        + 'button has already been taken away');
+  });
+
+describe('Find: the keyboard lands on the view the hit took you to (2026-09-03 audit, round three)');
+  it('after a hit the keyboard is on the tab of the view it landed on, not on <body>', () => {
+    ok(FIND.ran, 'the walk did not finish', FIND.error || 'no frame');
+    ok(FIND.golferFocus.visible,
+       'the keyboard is on something the reader can see: closing the window used to hand '
+       + 'it back to whatever had it before, which after a \u2318K pressed from nowhere in '
+       + 'particular is <body>', FIND.golferFocus.id);
+    ok(FIND.golferFocus.isTab, 'and that something is a tab in the tab row', FIND.golferFocus.id);
+    eq(FIND.golferFocus.tab, 'player', 'the tab of the view the hit landed on');
+    eq(FIND.golferFocus.tab, FIND.golferFocusTab,
+       'which is the view actually on screen \u2014 setTab() has just had the last word on it');
+    eq(FIND.golferFocus.selected, 'true', 'so the next Tab starts from where the hit took you');
+  });
+  it('a shared copy lands the same way', () => {
+    ok(SHARED.ran, 'the shared frame did not finish', SHARED.error || 'no frame');
+    ok(SHARED.focus.visible, 'not <body>', SHARED.focus.id);
+    eq(SHARED.focus.tab, 'player',
+       'a visitor gets the same landing \u2014 nothing about this depends on being able to save');
+  });
+  it('a hit that opens a window keeps that window\u2019s own focus, and so does a Find button you pressed', () => {
+    ok(FIND.roundFocus.inRound,
+       'the round card opened on its own field and keeps it: a focus that is already '
+       + 'somewhere VISIBLE is left exactly where it is', FIND.roundFocus.id);
+    ok(FIND.courseFocus.inManage,
+       'and Golfers & Courses keeps its own', FIND.courseFocus.id);
+    eq(FIND.pressedFocus.id, 'findBtn',
+       'and a real press on Find keeps the button \u2014 there is nothing to repair, and '
+       + 'moving the keyboard off a control somebody just pressed is the same fault backwards');
   });
 
   run();

@@ -392,6 +392,13 @@ card, and a course opens Golfers & Courses. (Until 2026-09-04 Enter did nothing:
 typing was wired up, so you had to Tab out of the box and down into the list.) With nothing
 matching, Enter does nothing and the window stays open with what you typed still in it.
 
+**Where the keyboard lands.** After a result, the keyboard is on the tab of the view you
+landed on, so the next Tab carries on from where the result took you — unless it was already
+somewhere you can see, which is left alone: the round card keeps its own date field, Golfers
+& Courses keeps its *+ Add Golfer*, and the *Find* button you pressed keeps the button.
+(Until 2026-09-04 it fell on the page itself, and Tab started again from the top.) The same
+rule as Money Map, Sprint Predictability and Flow Metrics.
+
 It's the same window, in the same place, with the same shortcut as
 [Money Map's](https://github.com/eagleadams86/financial-plan),
 [Sprint Predictability's](https://github.com/eagleadams86/sprint-velocity) and

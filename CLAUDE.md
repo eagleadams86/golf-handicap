@@ -1009,3 +1009,19 @@ this repo is round three. Each fix has its own commit and its own tests.
   restores `gh-state` / `gh-updated` / `gh-tab` afterwards, because `goToSearchHit` calls
   `save()`; the shared-copy half is a real `#share=` link opened in a frame of its own, since
   `viewOnly` is module-scoped and decided at boot.
+
+- **After a Find hit the keyboard lands on the view's tab, not on `<body>`.** Closing a
+  `<dialog>` hands the focus back to whatever held it when the dialog opened, and after a ⌘K
+  pressed from nowhere in particular that is `<body>` — so the reader was taken somewhere and
+  their next Tab started at the top of the page instead. `goToSearchHit()` now ends by reading
+  `document.activeElement`: null, `<body>`, or an element with no client rects (it was in
+  markup the render threw away) moves to `.tab[data-tab=…]` with `{ preventScroll: true }`,
+  and the attribute is read off `<html>` rather than assumed because `setTab()` has just had
+  the last word on which view that is. **A focus that is already somewhere VISIBLE is left
+  exactly where it is**, and that one clause is what makes the other three cases right without
+  a branch each: a round hit keeps the round card's date field, a course hit keeps Golfers &
+  Courses' *+ Add Golfer*, and a Find button somebody really pressed keeps the button — moving
+  the keyboard off a control the reader just pressed is the same fault backwards. The course
+  branch had to stop returning early for the repair to reach it; it is one exit now.
+  `<body>` is checked BY NAME and not through the rect test: body has a rect like anything
+  else, so an assertion resting on rects alone would be deaf to the whole fault.

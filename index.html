@@ -5519,16 +5519,42 @@ function renderSearchResults() {
 }
 function goToSearchHit(h) {
   searchDialog.close();
-  if (h.view === 'course') { openManage(); return; }
-  if (h.golferId && state.golfers.some(g => g.id === h.golferId))
-    state.activeGolfer = h.golferId;
-  save();          // the golfer on screen, like the picker's own change
-  setTab('player');
-  render();
-  /* A round hit opens straight into its card — the round found is the round on
-     screen. Navigation only in a shared view, where nothing saves anyway and the
-     Add Round button has already been taken away. */
-  if (h.roundId && !viewOnly) openRound(h.roundId);
+  if (h.view === 'course') {
+    openManage();
+  } else {
+    if (h.golferId && state.golfers.some(g => g.id === h.golferId))
+      state.activeGolfer = h.golferId;
+    save();          // the golfer on screen, like the picker's own change
+    setTab('player');
+    render();
+    /* A round hit opens straight into its card — the round found is the round on
+       screen. Navigation only in a shared view, where nothing saves anyway and the
+       Add Round button has already been taken away. */
+    if (h.roundId && !viewOnly) openRound(h.roundId);
+  }
+  /* Where the keyboard is left (2026-09-04). Closing a <dialog> hands the focus
+     back to whatever held it when the dialog opened — and after a ⌘K pressed from
+     nowhere in particular that is <body>, or the search box itself, now inside a
+     closed window where nothing can see it. Either way the reader has just been
+     taken somewhere and their next Tab starts at the top of the page instead of
+     where they landed.
+
+     So a focus on nothing the reader can see goes onto the TAB of the view the
+     hit landed on, without scrolling. `data-tab` is read off <html> rather than
+     assumed, because setTab() above has just had the last word on which view that
+     is — and on the course branch nothing moved, so it is the tab still on screen
+     under the Golfers & Courses window.
+
+     A focus that IS somewhere visible is left exactly where it is, and that is
+     what makes the other three cases right without a case for each: the round
+     card keeps its own date field, Golfers & Courses keeps its + Add Golfer, and
+     a Find button somebody really pressed keeps the button. Sprint
+     Predictability's 8637323 is the shape; the same rule is in all six windows. */
+  const had = document.activeElement;
+  const landing = document.querySelector('.tab[data-tab="'
+    + document.documentElement.getAttribute('data-tab') + '"]');
+  if (landing && (!had || had === document.body || !had.getClientRects().length))
+    landing.focus({ preventScroll: true });
 }
 document.getElementById('findBtn').addEventListener('click', () => {
   /* Through openModal like every other dialog — and the focus() below then
