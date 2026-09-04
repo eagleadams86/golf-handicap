@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 284;
+const EXPECTED = 289;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -2669,6 +2669,206 @@ describe('Hovering the trend chart');
        + 'browser\'s own [hidden] rule whatever the specificities');
     ok(APP_SRC.includes('.chart-max svg { pointer-events: none; }'),
        'and the icon is never the event target');
+  });
+
+  /* ── Find: Enter opens the first hit ──────────────────────────────────────
+     The family's Find window (⌕ in the header, ⌘K anywhere), the same shape in
+     Sprint Velocity, Flow Metrics and Money Map. Only an `input` listener was
+     ever wired to the box, so Enter — the one key a search box teaches — did
+     nothing at all: you had to Tab out of the box and into the list.
+
+     DRIVEN IN MEASURE, before a single it() is defined, for the two reasons
+     this file keeps repeating: the suite's own frame is 1x1px, where nothing is
+     laid out; and run() does not await a test body, so an async one would pass
+     whatever it asserts. The tests below only read the record left here.
+
+     goToSearchHit() calls save(), which WRITES — so the three keys the app owns
+     on this origin are put back in the finally, the way the walks above put back
+     the remembered tab. A suite that quietly replaced your saved rounds with the
+     example league would be a suite with a very large side effect. */
+  const FIND = { ran: false };
+  const FIND_KEYS = ['gh-state', 'gh-updated', (MEASURE && MEASURE.__ghTestHooks || {}).TAB_KEY || 'gh-tab'];
+  const findSaved = FIND_KEYS.map((k) => { try { return localStorage.getItem(k); } catch (e) { return null; } });
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const demo = MW.buildDemoLeague();
+      /* Dad, deliberately: every hit searched for below belongs to somebody
+         else, so "the app moved" is a real change and not the state it started
+         in. */
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds: demo.rounds, activeGolfer: 'demo-g-3' });
+      await new Promise((r) => setTimeout(r, 300));
+      const dlg = MD.getElementById('searchDialog');
+      const box = MD.getElementById('searchBox');
+      const hits = () => [...MD.querySelectorAll('#searchResults [data-hit]')]
+        .map((el) => el.querySelector('.hitwhere').textContent);
+      const typeInFind = (q) => {
+        if (!dlg.open) MD.getElementById('findBtn').click();
+        box.value = q;
+        box.dispatchEvent(new MW.Event('input', { bubbles: true }));
+      };
+      /* A REAL Enter: the key event a browser sends to the focused box, not a
+         call to whatever handler we hope is listening. */
+      const pressEnter = () => {
+        box.focus();
+        box.dispatchEvent(new MW.KeyboardEvent('keydown',
+          { key: 'Enter', bubbles: true, cancelable: true }));
+      };
+
+      typeInFind('zzzz-nothing');
+      FIND.emptyOpen = dlg.open && hits().length === 0;
+      pressEnter();
+      await new Promise((r) => setTimeout(r, 200));
+      FIND.emptyStaysOpen = dlg.open;
+      FIND.emptyGolfer = MHK.__state().activeGolfer;
+      dlg.close();
+
+      typeInFind('Priya Raman');
+      FIND.golferFirst = hits()[0];
+      pressEnter();
+      await new Promise((r) => setTimeout(r, 300));
+      FIND.golferClosed = !dlg.open;
+      FIND.golferLanded = MHK.__state().activeGolfer;
+      FIND.golferTab = MD.documentElement.getAttribute('data-tab');
+      FIND.golferPicker = MD.getElementById('golferSel').value;
+
+      /* A round hit opens the round it found — the same call a click on it
+         makes, which is the whole point of wiring Enter to goToSearchHit()
+         rather than to a navigation of its own. */
+      typeInFind('nine before the light went');
+      FIND.roundFirst = hits()[0];
+      pressEnter();
+      await new Promise((r) => setTimeout(r, 300));
+      FIND.roundOpened = MD.getElementById('roundDialog').open;
+      FIND.roundNote = MD.getElementById('f_note').value;
+      MD.getElementById('roundDialog').close();
+
+      /* And a course hit opens Golfers & Courses, where a course is edited. */
+      typeInFind('Kilbryde');
+      FIND.courseFirst = hits()[0];
+      pressEnter();
+      await new Promise((r) => setTimeout(r, 300));
+      FIND.courseOpened = MD.getElementById('manageDialog').open;
+      MD.getElementById('manageDialog').close();
+
+      /* Enter with a modifier held is somebody else's shortcut, not this one. */
+      typeInFind('Priya Raman');
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds: demo.rounds, activeGolfer: 'demo-g-3' });
+      box.focus();
+      box.dispatchEvent(new MW.KeyboardEvent('keydown',
+        { key: 'Enter', metaKey: true, bubbles: true, cancelable: true }));
+      await new Promise((r) => setTimeout(r, 200));
+      FIND.modifierIgnored = dlg.open && MHK.__state().activeGolfer === 'demo-g-3';
+      dlg.close();
+      FIND.ran = true;
+    } catch (e) { FIND.error = String(e && e.message || e); }
+  }
+
+  /* ── …and the same window in a shared copy ────────────────────────────────
+     `viewOnly` is module-scoped and set at boot from the hash, so the only
+     honest way to test the shared path is to make a real link with the app's
+     own codec and open a frame at it. A visitor has no Golfers & Courses
+     window, so renderSearchResults() takes course hits out of the list
+     altogether — and a round hit navigates without opening the editor, since
+     there is nothing here to save. */
+  const SHARED = { ran: false };
+  try {
+    const sharedPayload = {
+      v: H.SHARE_PAYLOAD_V, sharedAt: 1754870400000, label: 'Dad', view: 'player',
+      golfers: [{ id: 'g1', name: 'Dad' }, { id: 'g2', name: 'Sam Okafor' }],
+      activeGolfer: 'g1',
+      courses: [{ id: 'c1', name: 'Kilbryde Dunes',
+                  tees: [{ id: 't1', name: 'Medal', rating: 69.4, slope: 122, par: 71 }] }],
+      rounds: [{ id: 'r1', golferId: 'g2', date: '2026-05-01', courseId: 'c1', teeId: 't1',
+                 score: 88, pcc: 0, note: '', counts: true }],
+      settings: { method: H.DEFAULT_METHOD, applyCaps: true, primary: 'rolling' },
+    };
+    const token = await S.encodeShare(sharedPayload);
+    const sf = document.createElement('iframe');
+    sf.setAttribute('aria-hidden', 'true');
+    sf.setAttribute('data-gh-tests', '');
+    sf.style.cssText = 'position:absolute;left:-9999px;width:1280px;height:800px;border:0';
+    await new Promise((resolve) => {
+      sf.onload = resolve;
+      sf.src = 'index.html?shared=' + Date.now() + '#share=' + token;
+      document.body.appendChild(sf);
+    });
+    const SW_ = sf.contentWindow, SD = SW_.document;
+    /* The link is decoded asynchronously, so wait for the rounds to be in
+       rather than for the frame's load event. */
+    for (let i = 0; i < 60 && (SW_.__ghTestHooks.__state().golfers || []).length < 2; i++)
+      await new Promise((r) => setTimeout(r, 50));
+    SHARED.viewOnly = SW_.ghViewOnly === true;
+    const sdlg = SD.getElementById('searchDialog'), sbox = SD.getElementById('searchBox');
+    SD.getElementById('findBtn').click();
+    sbox.value = 'Kilbryde';
+    sbox.dispatchEvent(new SW_.Event('input', { bubbles: true }));
+    SHARED.hits = [...SD.querySelectorAll('#searchResults [data-hit]')]
+      .map((el) => el.querySelector('.hitwhere').textContent);
+    sbox.focus();
+    sbox.dispatchEvent(new SW_.KeyboardEvent('keydown',
+      { key: 'Enter', bubbles: true, cancelable: true }));
+    await new Promise((r) => setTimeout(r, 300));
+    SHARED.closed = !sdlg.open;
+    SHARED.landed = SW_.__ghTestHooks.__state().activeGolfer;
+    SHARED.tab = SD.documentElement.getAttribute('data-tab');
+    SHARED.roundOpened = SD.getElementById('roundDialog').open;
+    SHARED.ran = true;
+  } catch (e) { SHARED.error = String(e && e.message || e); }
+  /* Both walks above are finished with storage now — put the reader's own keys
+     back, whatever happened in between. */
+  FIND_KEYS.forEach((k, i) => {
+    try {
+      if (findSaved[i] === null) localStorage.removeItem(k);
+      else localStorage.setItem(k, findSaved[i]);
+    } catch (e) { /* a browser refusing the write left it alone anyway */ }
+  });
+
+describe('Find: Enter opens the first hit (2026-09-03 audit, round three)');
+  it('the measuring frame actually drove it — everything below reads that record', () => {
+    ok(FIND.ran, 'the walk did not finish', FIND.error || 'no frame');
+  });
+  it('Enter opens the first hit — and with nothing matching, leaves the window open', () => {
+    ok(FIND.emptyOpen, 'the window is open with nothing matching');
+    ok(FIND.emptyStaysOpen,
+       'Enter with nothing matching leaves the window open: there is nothing to go to, '
+       + 'and closing it would throw away what you typed');
+    eq(FIND.emptyGolfer, 'demo-g-3', 'and nothing moved');
+    eq(FIND.golferFirst, 'Priya Raman — golfer', 'the first hit is the golfer herself');
+    ok(FIND.golferClosed, 'Enter opened it: the window closed');
+    eq(FIND.golferLanded, 'demo-g-2', 'and the app is on Priya Raman');
+    eq(FIND.golferPicker, 'demo-g-2', 'picker included');
+    eq(FIND.golferTab, 'player', 'on My Handicap, which is where a golfer is read');
+  });
+  it('Enter does what a click on that hit does — a round opens its card, a course opens Golfers & Courses', () => {
+    /* The demo league's dates are relative to the day it is built, so the round
+       is named by its course and its shape rather than by a date that moves. */
+    ok(/^Ashfield Park · \d{4}-\d{2}-\d{2}$/.test(String(FIND.roundFirst)),
+       'the first hit for a note is the round carrying it', FIND.roundFirst);
+    ok(FIND.roundOpened, 'Enter on a round hit opens the round card');
+    eq(FIND.roundNote, 'nine before the light went', 'the round it found, not another one');
+    eq(FIND.courseFirst, 'Kilbryde Dunes — course', 'a course is offered above its own rounds');
+    ok(FIND.courseOpened, 'and Enter on it opens Golfers & Courses');
+  });
+  it('a modified Enter is left to whoever owns that shortcut', () => {
+    ok(FIND.modifierIgnored,
+       'Cmd-Enter, Ctrl-Enter, Alt-Enter and Shift-Enter are not this key: the window '
+       + 'stays open and nothing moves');
+  });
+  it('in a shared copy Enter still works — a course is never offered, and a round only navigates', () => {
+    ok(SHARED.ran, 'the shared frame did not finish', SHARED.error || 'no frame');
+    ok(SHARED.viewOnly, 'the frame really is a read-only shared copy');
+    eq(SHARED.hits, ['Kilbryde Dunes · 2026-05-01'],
+       'the course itself is filtered out of the list: a visitor has no Golfers & Courses '
+       + 'window, so it would be a row that looks clickable and silently does nothing');
+    ok(SHARED.closed, 'Enter opened the one hit there was');
+    eq(SHARED.landed, 'g2', 'and took the visitor to whoever played it');
+    eq(SHARED.tab, 'player');
+    ok(!SHARED.roundOpened,
+       'without opening the round editor — nothing here can be saved, and the Add Round '
+       + 'button has already been taken away');
   });
 
   run();

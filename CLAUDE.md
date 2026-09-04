@@ -989,3 +989,23 @@ page out of five is not a convention.
 - **Firebase is pinned in `package.json` AND in the `firebasejs/…` URL, and a test holds them
   equal.** Dependabot cannot rewrite a URL, so a manifest-only bump has to fail. All three sync
   apps move to the same version together, like the vendored Chart.js.
+
+## Fixes From the 2026-09-03 Audit
+
+The Find window (⌕ / ⌘K) is one window in six apps, and the audit found the same two faults in
+every one of them. Rounds one and two fixed Sprint Predictability, Flow Metrics and Money Map;
+this repo is round three. Each fix has its own commit and its own tests.
+
+- **Enter in the Find box opens the first hit.** `#searchBox` had ONE listener on it —
+  `input` — so Enter, the one key a search box teaches anybody who has ever used one, did
+  nothing at all: you had to Tab out of the box and down into the results to get anywhere. A
+  `keydown` listener now calls the same `goToSearchHit(searchHits[0])` that a click on the
+  first hit makes, so the two ways in cannot drift into meaning different things — a round
+  hit opens its card, a course hit opens Golfers & Courses, and in a shared copy a round hit
+  still only navigates. With nothing matching there is nothing to go to: the window stays
+  open with what you typed still in it. A modifier held (Cmd, Ctrl, Alt or Shift) is somebody
+  else's shortcut and is left alone. Sprint Predictability's `8637323` is the shape and the
+  same fix lands in all six windows. The suite drives it in MEASURE, the sized frame, and
+  restores `gh-state` / `gh-updated` / `gh-tab` afterwards, because `goToSearchHit` calls
+  `save()`; the shared-copy half is a real `#share=` link opened in a frame of its own, since
+  `viewOnly` is module-scoped and decided at boot.

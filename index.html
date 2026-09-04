@@ -5540,6 +5540,20 @@ document.getElementById('findBtn').addEventListener('click', () => {
   document.getElementById('searchBox').focus();
 });
 document.getElementById('searchBox').addEventListener('input', renderSearchResults);
+/* Enter opens the FIRST hit (2026-09-04). Until now `input` was the ONLY listener on
+   this box, so Enter — the one key a search box teaches anybody who has ever used
+   one — did nothing at all: you had to Tab out of the box and down into the list to
+   get anywhere. It calls the same `goToSearchHit` a click on that hit makes, rather
+   than navigating on its own, so the two ways in can never come to mean different
+   things; with nothing matching there is nothing to go to, and the window stays open
+   with what you typed still in it. A modifier held is somebody else's shortcut, not
+   this one. Sprint Velocity's 8637323 is the shape; the same fix lands in Flow
+   Metrics and Money Map, so the family's six Find windows stay one window. */
+document.getElementById('searchBox').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  e.preventDefault();
+  if (searchHits[0]) goToSearchHit(searchHits[0]);
+});
 document.getElementById('searchResults').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-hit]');
   if (btn && searchHits[+btn.dataset.hit]) goToSearchHit(searchHits[+btn.dataset.hit]);

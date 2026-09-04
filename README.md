@@ -386,8 +386,11 @@ columns are the numbers you remember. It appears once you have played more than 
 ## Find (⌘K)
 
 **⌕ Find** in the header — or **⌘K** / **Ctrl-K** from anywhere — opens a search box over
-every golfer, every course and every round. Type two characters, and clicking a result takes
-you to it; a round opens straight into its card.
+every golfer, every course and every round. Type two characters, and clicking a result —
+or pressing **Enter** for the top one — takes you to it; a round opens straight into its
+card, and a course opens Golfers & Courses. (Until 2026-09-04 Enter did nothing: only
+typing was wired up, so you had to Tab out of the box and down into the list.) With nothing
+matching, Enter does nothing and the window stays open with what you typed still in it.
 
 It's the same window, in the same place, with the same shortcut as
 [Money Map's](https://github.com/eagleadams86/financial-plan),
