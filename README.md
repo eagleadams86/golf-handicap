@@ -89,6 +89,17 @@ The app has two tabs. **My handicap** is one golfer's page — the two figures, 
 chart, the course handicap and the full list of rounds. **Leaderboard** is everybody at
 once (see [The leaderboard](#the-leaderboard)).
 
+**A tab press starts the new page at the top**, rather than at whatever offset the other
+one had you scrolled to — before September 2026 it kept that offset, so where the
+Leaderboard opened depended on how far down a long round list you had read. Pressing the
+tab you are already on is not a move and leaves the page alone, and a
+[Find](#find-k) result that only changes who you are reading lands the same way.
+**Changing golfer holds the scroll**, on purpose: reading the same card for one golfer and
+then the next is a comparison, and it only works if the card stays under your eye. It is
+the family's rule in one sentence — *changing what you are looking at goes to the top,
+changing whose figures you are looking at holds still* — and a Find result that opens a
+round holds too, since the card is over the round you searched for.
+
 **Hover the chart and it names the round.** Anywhere in a round's column — not
 just on the 3px mark — brings up a panel with the date and both figures, and rings
 the two marks it is describing. On a phone a tap does the same and the next tap

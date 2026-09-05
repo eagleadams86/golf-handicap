@@ -5084,7 +5084,30 @@ function setTab(name) {
 }
 
 document.querySelectorAll('.tab').forEach((tab) => {
-  tab.addEventListener('click', () => setTab(tab.dataset.tab));
+  /* A TAB PRESS STARTS THE NEW VIEW AT THE TOP (2026-09-05). Charles's rule,
+     given after the same landing was fixed on Flow Metrics, Money Map and
+     Sprint Predictability: CHANGING WHAT YOU ARE LOOKING AT GOES TO THE TOP,
+     CHANGING WHOSE FIGURES OR WHICH PERIOD YOU ARE LOOKING AT HOLDS STILL.
+     Nothing moved the page here, so the League opened still scrolled to
+     wherever a long round list had left you, and what that showed was never
+     twice the same: the two views are different heights, so the browser clamps
+     a position that no longer exists.
+
+     THE GOLFER PICKER IS THE OTHER HALF OF THE RULE and is deliberately left
+     alone — reading the same card for one golfer and then the next is a
+     comparison, and it needs the card to stay under your eye.
+
+     The scroll goes HERE rather than in setTab() because setTab also runs at
+     boot and from a search hit, and a page that jumped to the top while it was
+     still being set up would be a second thing happening that nobody asked for.
+     Only when the tab actually changed: pressing the tab you are already on
+     must not throw the page about. Instant, never smooth — a scripted smooth
+     scroll is out of the reduced-motion rule's reach. */
+  tab.addEventListener('click', () => {
+    const moved = document.documentElement.getAttribute('data-tab') !== tab.dataset.tab;
+    setTab(tab.dataset.tab);
+    if (moved) window.scrollTo(0, 0);
+  });
   /* Arrow keys move along the tabs and switch as they go, which is what a
      tablist is expected to do once only one of its tabs is in the tab order.
      Sprint Velocity's handler, ported. */
@@ -5530,7 +5553,18 @@ function goToSearchHit(h) {
     /* A round hit opens straight into its card — the round found is the round on
        screen. Navigation only in a shared view, where nothing saves anyway and the
        Add Round button has already been taken away. */
-    if (h.roundId && !viewOnly) openRound(h.roundId);
+    const opensRecord = !!(h.roundId && !viewOnly);
+    /* AND WHERE THE PAGE LANDS (2026-09-05). A hit that only changes who or what
+       you are looking at is a tab press by another route, so it starts at the top
+       of what it opened rather than at the offset the last view left behind.
+
+       A hit that OPENS A ROUND is the exception Charles settled: the page behind
+       the card is left where it is, because the reader asked for that round, the
+       card is over it, and moving the page would strand them at the top of a long
+       list the moment they closed it. The course branch above scrolls nothing at
+       all — it moved nothing, it opened a window over what was already there. */
+    if (!opensRecord) window.scrollTo(0, 0);
+    if (opensRecord) openRound(h.roundId);
   }
   /* Where the keyboard is left (2026-09-04). Closing a <dialog> hands the focus
      back to whatever held it when the dialog opened — and after a ⌘K pressed from

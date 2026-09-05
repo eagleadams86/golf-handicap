@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 292;
+const EXPECTED = 297;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -2501,6 +2501,72 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
     }
   }
 
+/* ── WHERE A PRESS LEAVES THE PAGE ──────────────────────────────────────────
+   Charles's rule, given on 2026-09-05 after the same landing was fixed on Flow
+   Metrics, Money Map and Sprint Predictability: CHANGING WHAT YOU ARE LOOKING
+   AT GOES TO THE TOP, CHANGING WHOSE FIGURES YOU ARE LOOKING AT HOLDS STILL.
+   A tab press is the first; the golfer picker is the second, because reading
+   the same card for one golfer and then the next is a comparison and it needs
+   the card to stay under your eye.
+
+   DRIVEN IN MEASURE, before a single it() is defined, for the two reasons this
+   file keeps repeating: the suite's own frame is 1x1px, where nothing scrolls
+   and every line below would pass with the app doing nothing at all; and run()
+   does not await a test body, so an async one would pass whatever it asserts.
+   Both tabs are taller than this frame with the example league planted, so
+   there is a real scroll to keep — the `down` figure recorded first is what
+   proves it, and the test on it fails rather than waving a flat frame through.
+
+   The picker's change handler SAVES, so save() is stubbed and the remembered
+   tab is put back in the finally — the same care the walks above take. */
+  const LANDING = { ran: false };
+  if (MEASURE) {
+    const LTABK = (MEASURE.__ghTestHooks || {}).TAB_KEY || 'gh-tab';
+    let savedLandingTab = null;
+    try { savedLandingTab = localStorage.getItem(LTABK); } catch (e) { savedLandingTab = null; }
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      MW.confirm = () => true;
+      MW.alert = () => {};
+      MW.save = () => {};
+      const demo = MW.buildDemoLeague();
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds: demo.rounds, activeGolfer: demo.golfers[0].id });
+      await new Promise((r) => setTimeout(r, 400));
+      const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+      const settle = async (y) => { MW.scrollTo(0, y); await pause(120); return MW.scrollY; };
+      const press = async (t) => { MD.getElementById('tab-' + t).click(); await pause(300); };
+
+      await press(MHK.TABS[0]);
+      LANDING.down = await settle(300);
+      await press(MHK.TABS[1]);
+      LANDING.afterOtherTab = MW.scrollY;
+
+      LANDING.held = await settle(300);
+      await press(MHK.TABS[1]);
+      LANDING.afterSameTab = MW.scrollY;
+
+      await press(MHK.TABS[0]);
+      LANDING.onGolfer = await settle(300);
+      const sel = MD.getElementById('golferSel');
+      const other = [...sel.options].find((o) => o.value !== sel.value);
+      LANDING.hadASecondGolfer = !!other;
+      if (other) {
+        sel.value = other.value;
+        sel.dispatchEvent(new MW.Event('change', { bubbles: true }));
+        await pause(300);
+      }
+      LANDING.afterGolfer = MW.scrollY;
+      LANDING.ran = true;
+    } catch (e) { LANDING.error = String((e && e.message) || e); }
+    finally {
+      try {
+        if (savedLandingTab === null) localStorage.removeItem(LTABK);
+        else localStorage.setItem(LTABK, savedLandingTab);
+      } catch (e) { /* a browser refusing the write left it alone anyway */ }
+    }
+  }
+
 describe('One chart, filling the window');
   it('the measuring frame actually drove it — everything below reads that record', () => {
     ok(MAXI.ran, 'the walk did not finish', MAXI.error || 'no frame');
@@ -2724,10 +2790,16 @@ describe('Hovering the trend chart');
       FIND.emptyGolfer = MHK.__state().activeGolfer;
       dlg.close();
 
+      /* Scrolled down first, so "landed at the top" can be told from "left
+         alone" — the two landings recorded below. */
+      MW.scrollTo(0, 300);
+      await new Promise((r) => setTimeout(r, 120));
+      FIND.golferScrollBefore = MW.scrollY;
       typeInFind('Priya Raman');
       FIND.golferFirst = hits()[0];
       pressEnter();
       await new Promise((r) => setTimeout(r, 300));
+      FIND.golferScrollAfter = MW.scrollY;
       FIND.golferClosed = !dlg.open;
       FIND.golferLanded = MHK.__state().activeGolfer;
       FIND.golferTab = MD.documentElement.getAttribute('data-tab');
@@ -2736,10 +2808,14 @@ describe('Hovering the trend chart');
       /* A round hit opens the round it found — the same call a click on it
          makes, which is the whole point of wiring Enter to goToSearchHit()
          rather than to a navigation of its own. */
+      MW.scrollTo(0, 300);
+      await new Promise((r) => setTimeout(r, 120));
+      FIND.roundScrollBefore = MW.scrollY;
       typeInFind('nine before the light went');
       FIND.roundFirst = hits()[0];
       pressEnter();
       await new Promise((r) => setTimeout(r, 300));
+      FIND.roundScrollAfter = MW.scrollY;
       FIND.roundOpened = MD.getElementById('roundDialog').open;
       FIND.roundNote = MD.getElementById('f_note').value;
       MD.getElementById('roundDialog').close();
@@ -2890,6 +2966,29 @@ describe('Hovering the trend chart');
     } catch (e) { /* a browser refusing the write left it alone anyway */ }
   });
 
+describe('Where a press leaves the page (2026-09-05)');
+  it('the measuring frame actually drove it — everything below reads that record', () => {
+    ok(LANDING.ran, 'the walk did not finish', LANDING.error || 'no frame');
+    ok(LANDING.down > 0,
+       'and it really can scroll: a frame with nothing to scroll would pass this whole '
+       + 'group on its own', LANDING.down);
+  });
+  it('a tab press starts the new view at the top', () => {
+    eq(LANDING.afterOtherTab, 0,
+       'pressing the other tab lands at the top of it, not at the offset the last view left');
+  });
+  it('pressing the tab you are already on leaves the page where it is', () => {
+    ok(LANDING.held > 0, 'the Leaderboard is taller than the frame too', LANDING.held);
+    eq(LANDING.afterSameTab, LANDING.held,
+       'that is not a move, so it must not throw the page about');
+  });
+  it('changing golfer HOLDS the scroll — the exception, and the reason for it', () => {
+    ok(LANDING.hadASecondGolfer, 'the example league has more than one golfer');
+    eq(LANDING.afterGolfer, LANDING.onGolfer,
+       'reading the same card for one golfer and then the next is a comparison, and it '
+       + 'only works if the card stays under your eye');
+  });
+
 describe('Find: Enter opens the first hit (2026-09-03 audit, round three)');
   it('the measuring frame actually drove it — everything below reads that record', () => {
     ok(FIND.ran, 'the walk did not finish', FIND.error || 'no frame');
@@ -2915,6 +3014,19 @@ describe('Find: Enter opens the first hit (2026-09-03 audit, round three)');
     eq(FIND.roundNote, 'nine before the light went', 'the round it found, not another one');
     eq(FIND.courseFirst, 'Kilbryde Dunes — course', 'a course is offered above its own rounds');
     ok(FIND.courseOpened, 'and Enter on it opens Golfers & Courses');
+  });
+  it('a hit that only changes who you are reading lands at the top; one that opens a round holds', () => {
+    ok(FIND.golferScrollBefore > 0,
+       'the frame was scrolled down before the golfer hit, so the two landings can be told '
+       + 'apart at all', FIND.golferScrollBefore);
+    eq(FIND.golferScrollAfter, 0,
+       'a hit that only changes the view is a tab press by another route, and lands the same way');
+    ok(FIND.roundScrollBefore > 0, 'and scrolled down again before the round hit',
+       FIND.roundScrollBefore);
+    eq(FIND.roundScrollAfter, FIND.roundScrollBefore,
+       'a hit that OPENS A ROUND leaves the page alone: the reader asked for that round, the '
+       + 'card is over it, and moving the page would strand them at the top of a long list '
+       + 'the moment they closed it');
   });
   it('a modified Enter is left to whoever owns that shortcut', () => {
     ok(FIND.modifierIgnored,
