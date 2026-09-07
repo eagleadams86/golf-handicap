@@ -129,6 +129,14 @@ line beside it says out loud: both handicaps always use every round. A round can
 it — useful for a practice round or a scramble — and the app says so on the front page
 rather than quietly leaving it out.
 
+**Deleting a course keeps its rounds.** They stay in the list marked *course deleted* and
+stop counting. Open one to edit it and the course box reads *(deleted course)* — or the
+tee box *(deleted tee)*, if only the tees went — with a line saying so; correct the note or
+the score and save, and the round stays exactly as orphaned as it was. Pick a real course
+for it and it counts again. (Until September 2026 the editor pre-selected the first course
+in the list, worked out a differential as though the round had been played there, and a
+corrected note quietly re-homed it.)
+
 ### Trying It Out — The Example League
 
 **Load Sample Data** on the welcome card loads the example league: eight golfers, six courses

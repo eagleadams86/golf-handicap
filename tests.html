@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 317;
+const EXPECTED = 322;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -3218,8 +3218,74 @@ describe('Hovering the trend chart');
       ADOPT.ran = true;
     } catch (e) { ADOPT.error = String(e && e.message || e); }
   }
-  /* The three walks above all wrote through save() — put the reader's own keys
-     back before anything else runs. */
+
+  /* ── Editing an orphaned round keeps it orphaned (2026-09-07 audit) ──────
+     `fillCourseSelects` pre-selected the FIRST course when a round's course no
+     longer existed (and the first tee when its tee was gone), the hint showed a
+     live differential as though the round had been played there, and Save
+     stored it — a note corrected on an orphan re-homed it to whichever course
+     happened to be listed first, and it started counting against figures it
+     was never played to. Driven in MEASURE through the real openRound. */
+  const ORPHAN = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const demo = MW.buildDemoLeague();
+      const g = demo.golfers[0].id;
+      const realCourse = demo.courses[0];
+      const rounds = demo.rounds.concat([
+        { id: 'orph-1', golferId: g, date: '2026-05-01', courseId: 'gone-course', teeId: 'gone-tee',
+          score: 88, pcc: 0, note: '', counts: true, holes: 18 },
+        { id: 'orph-2', golferId: g, date: '2026-05-02', courseId: realCourse.id, teeId: 'gone-tee',
+          score: 90, pcc: 0, note: '', counts: true, holes: 18 },
+      ]);
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds, activeGolfer: g });
+      const dlg = MD.getElementById('roundDialog');
+      const sel = (id) => MD.getElementById(id);
+      const chosen = (id) => (sel(id).selectedOptions[0] || {}).textContent || '';
+      const find = (id) => MHK.__state().rounds.find((r) => r.id === id);
+
+      /* The course is gone. */
+      MW.openRound('orph-1');
+      await new Promise((r) => setTimeout(r, 40));
+      ORPHAN.course = { value: sel('f_course').value, text: chosen('f_course'),
+                        tee: chosen('f_tee'), hint: sel('roundHint').textContent };
+      sel('f_note').value = 'corrected note';
+      sel('roundSave').click();
+      await new Promise((r) => setTimeout(r, 40));
+      const o1 = find('orph-1');
+      ORPHAN.afterNote = { closed: !dlg.open, courseId: o1.courseId, teeId: o1.teeId, note: o1.note,
+                           warn: sel('roundWarn').textContent };
+      ORPHAN.stillOut = !MW.computeAll(g).counted.some((e) => e.round.id === 'orph-1');
+
+      /* Picking a real course is the way back in. */
+      MW.openRound('orph-1');
+      await new Promise((r) => setTimeout(r, 40));
+      sel('f_course').value = realCourse.id;
+      sel('f_course').dispatchEvent(new MW.Event('change', { bubbles: true }));
+      ORPHAN.pickedTee = sel('f_tee').value;
+      sel('roundSave').click();
+      await new Promise((r) => setTimeout(r, 40));
+      ORPHAN.rehomed = { courseId: find('orph-1').courseId, teeId: find('orph-1').teeId,
+                         counted: MW.computeAll(g).counted.some((e) => e.round.id === 'orph-1') };
+
+      /* Only the tee is gone. */
+      MW.openRound('orph-2');
+      await new Promise((r) => setTimeout(r, 40));
+      ORPHAN.tee = { course: sel('f_course').value, value: sel('f_tee').value, text: chosen('f_tee'),
+                     hint: sel('roundHint').textContent };
+      sel('roundSave').click();
+      await new Promise((r) => setTimeout(r, 40));
+      ORPHAN.teeAfter = { teeId: find('orph-2').teeId, closed: !dlg.open };
+      if (dlg.open) dlg.close();
+      await new Promise((r) => setTimeout(r, 40));
+      ORPHAN.ran = true;
+    } catch (e) { ORPHAN.error = String(e && e.message || e); }
+  }
+
+  /* The walks above all wrote through save() — put the reader's own keys back
+     before anything else runs. */
   FIND_KEYS.forEach((k, i) => {
     try {
       if (findSaved[i] === null) localStorage.removeItem(k);
@@ -3342,6 +3408,40 @@ describe('A sync adoption while League Rules is open refills the boxes (2026-09-
   it('mid-way through a box when the SAME rule arrives: the typing is left alone', () => {
     eq(ADOPT.sameRule.adj, '3', 'a sync that changed a round, not the rule, must not wipe a box');
     eq(ADOPT.sameRule.toast, '', 'and there is nothing to say');
+  });
+
+describe('Editing an orphaned round keeps it orphaned (2026-09-07 audit)');
+  it('the walk actually drove it — everything below reads that record', () => {
+    ok(ORPHAN.ran, 'the walk did not finish', ORPHAN.error || 'no frame');
+  });
+  it('the editor says the course is gone, rather than pre-selecting the first one', () => {
+    eq(ORPHAN.course.value, '', 'no real course is selected');
+    ok(/deleted course/.test(ORPHAN.course.text), 'the option says so', ORPHAN.course.text);
+    ok(/deleted tee/.test(ORPHAN.course.tee), 'and so does the tee box', ORPHAN.course.tee);
+    ok(/deleted/.test(ORPHAN.course.hint) && /pick/i.test(ORPHAN.course.hint),
+       'and the hint is an instruction, not a differential worked out at a course the round '
+       + 'was never played on', ORPHAN.course.hint);
+  });
+  it('changing only the note saves the note and leaves the round orphaned', () => {
+    ok(ORPHAN.afterNote.closed, 'the save went through', ORPHAN.afterNote.warn);
+    eq(ORPHAN.afterNote.note, 'corrected note', 'the note was kept');
+    eq(ORPHAN.afterNote.courseId, 'gone-course',
+       'the course id is untouched — it used to become whichever course was listed first');
+    eq(ORPHAN.afterNote.teeId, 'gone-tee', 'and so is the tee id');
+    ok(ORPHAN.stillOut, 'so it still does not count');
+  });
+  it('picking a real course is the way back in', () => {
+    ok(ORPHAN.pickedTee, 'the tee list fills for the course picked', ORPHAN.pickedTee);
+    ok(ORPHAN.rehomed.courseId !== 'gone-course' && ORPHAN.rehomed.teeId === ORPHAN.pickedTee,
+       'the round is re-homed on the reader’s say-so', JSON.stringify(ORPHAN.rehomed));
+    ok(ORPHAN.rehomed.counted, 'and counts again');
+  });
+  it('a round whose tee alone is gone keeps its course and says the tee was deleted', () => {
+    ok(ORPHAN.tee.course, 'the course is still selected', ORPHAN.tee.course);
+    eq(ORPHAN.tee.value, '', 'no real tee is selected');
+    ok(/deleted tee/.test(ORPHAN.tee.text), 'the option says so', ORPHAN.tee.text);
+    ok(ORPHAN.teeAfter.closed, 'saving as it is goes through');
+    eq(ORPHAN.teeAfter.teeId, 'gone-tee', 'and the tee id is untouched');
   });
 
 describe('Where a press leaves the page (2026-09-05)');

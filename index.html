@@ -4466,14 +4466,29 @@ const roundDialog = document.getElementById('roundDialog');
 const searchDialog = document.getElementById('searchDialog');
 let editingRound = null;
 
-function fillCourseSelects(courseSel, teeSel, courseId, teeId) {
-  courseSel.innerHTML = state.courses.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
-  if (courseId && state.courses.some((c) => c.id === courseId)) courseSel.value = courseId;
+/* `orphanOk` is true when EDITING: a round whose course or tee has been deleted
+   is shown as exactly that — an option reading "(deleted course)" / "(deleted
+   tee)", value '', selected — rather than pre-selecting whichever course is
+   listed first. Before 2026-09-07 it did the latter, the hint worked out a
+   differential as though the round had been played there, and a note corrected
+   on an orphan re-homed it to that course and it started counting against
+   figures it was never played to. A NEW round never takes the option:
+   `lastUsed()` can point at a course deleted since, and the first course is
+   the right pre-fill for a round that has not been placed yet. */
+const ORPHAN_OPTION = (what) => `<option value="">(deleted ${what})</option>`;
+function fillCourseSelects(courseSel, teeSel, courseId, teeId, orphanOk) {
+  const courseGone = !!(orphanOk && courseId && !state.courses.some((c) => c.id === courseId));
+  courseSel.innerHTML = (courseGone ? ORPHAN_OPTION('course') : '')
+    + state.courses.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+  if (courseGone) courseSel.value = '';
+  else if (courseId && state.courses.some((c) => c.id === courseId)) courseSel.value = courseId;
   const course = courseById(courseSel.value);
-  teeSel.innerHTML = course
+  const teeGone = !!(orphanOk && (courseGone || (teeId && course && !course.tees.some((t) => t.id === teeId))));
+  teeSel.innerHTML = (teeGone ? ORPHAN_OPTION('tee') : '') + (course
     ? course.tees.map((t) => `<option value="${esc(t.id)}">${esc(t.name)} — CR ${t.rating}, SR ${t.slope}, par ${t.par}</option>`).join('')
-    : '';
-  if (teeId && course && course.tees.some((t) => t.id === teeId)) teeSel.value = teeId;
+    : '');
+  if (teeGone) teeSel.value = '';
+  else if (teeId && course && course.tees.some((t) => t.id === teeId)) teeSel.value = teeId;
 }
 
 /* The score rows. One golfer, or an edit, gets exactly the single box this
@@ -4530,7 +4545,7 @@ function openRound(id) {
      boot the rest of the app survives. Losing the dialog to it would not be. */
   const scoreEl = document.getElementById('f_score');
   if (scoreEl) scoreEl.value = r ? r.score : '';
-  fillCourseSelects(document.getElementById('f_course'), document.getElementById('f_tee'), r ? r.courseId : lastUsed('courseId'), r ? r.teeId : lastUsed('teeId'));
+  fillCourseSelects(document.getElementById('f_course'), document.getElementById('f_tee'), r ? r.courseId : lastUsed('courseId'), r ? r.teeId : lastUsed('teeId'), !!r);
   document.getElementById('f_pcc').value = String(r ? r.pcc : 0);
   document.getElementById('f_note').value = r ? r.note : '';
   document.getElementById('f_counts').checked = r ? r.counts !== false : true;
@@ -4555,6 +4570,15 @@ function updateRoundHint() {
   const rawPcc = Number(document.getElementById('f_pcc').value) || 0;
   const nine = document.getElementById('f_holes').value === '9';
   const el = document.getElementById('roundHint');
+  /* The "(deleted course)" / "(deleted tee)" option is selected: the round is
+     an orphan and stays one unless a real course is picked. An instruction,
+     not a calculation — see fillCourseSelects. */
+  if (editingRound && (document.getElementById('f_course').value === '' || document.getElementById('f_tee').value === '')) {
+    el.textContent = document.getElementById('f_course').value === ''
+      ? 'This round\u2019s course was deleted \u2014 pick one for it to count again. It can be saved as it is.'
+      : 'This round\u2019s tees were deleted \u2014 pick a set for it to count again. It can be saved as it is.';
+    return;
+  }
   /* A nine off tees with no 9-hole figures is the one case where the hint has
      to stop being a calculation and become an instruction — the round can still
      be saved, and it will sit in the table saying what it is waiting for. */
@@ -4595,19 +4619,29 @@ document.getElementById('roundScores').addEventListener('change', (e) => {
 document.getElementById('f_pcc').addEventListener('input', updateRoundHint);
 document.getElementById('f_holes').addEventListener('change', updateRoundHint);
 document.getElementById('f_course').addEventListener('change', () => {
-  fillCourseSelects(document.getElementById('f_course'), document.getElementById('f_tee'), document.getElementById('f_course').value, null);
+  const picked = document.getElementById('f_course').value;
+  /* Back onto "(deleted course)" — the round is orphaned again, as it was. */
+  const back = !picked && editingRound;
+  fillCourseSelects(document.getElementById('f_course'), document.getElementById('f_tee'),
+    back ? editingRound.courseId : picked, back ? editingRound.teeId : null, !!back);
   updateRoundHint();
 });
 document.getElementById('f_tee').addEventListener('change', updateRoundHint);
 
 document.getElementById('roundSave').addEventListener('click', () => {
   const date = document.getElementById('f_date').value;
-  const courseId = document.getElementById('f_course').value;
-  const teeId = document.getElementById('f_tee').value;
+  let courseId = document.getElementById('f_course').value;
+  let teeId = document.getElementById('f_tee').value;
   const holes = document.getElementById('f_holes').value === '9' ? 9 : 18;
   const warn = document.getElementById('roundWarn');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { warn.textContent = 'Pick a date.'; return; }
-  if (!teeOf(courseById(courseId), teeId)) { warn.textContent = 'Pick a course and a set of tees.'; return; }
+  /* An orphan being edited with its "(deleted course)" / "(deleted tee)" option
+     still selected keeps the ids it had: the note or the score is what is being
+     corrected, and the round stays out of the figures until a real course is
+     picked for it. Only a NEW round, or a real pick, has to name a tee. */
+  const stillOrphan = !!(editingRound && (courseId === '' || teeId === ''));
+  if (stillOrphan) { courseId = editingRound.courseId; teeId = editingRound.teeId; }
+  else if (!teeOf(courseById(courseId), teeId)) { warn.textContent = 'Pick a course and a set of tees.'; return; }
 
   /* One entry per score box that is in play: the single box when editing or
      when there is one golfer, and every ticked row otherwise. Read as a list

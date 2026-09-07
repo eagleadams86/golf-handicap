@@ -1116,3 +1116,19 @@ stand on it.
   while a reader is mid-way through one, and that difference must not read as an adoption.
   The suite drives it in MEASURE through the real `ghAdopt`, and puts `gh-state` /
   `gh-updated` / `gh-tab` back afterwards for all three League Rules walks.
+- **Editing an orphaned round keeps it orphaned.** `fillCourseSelects` pre-selected the
+  FIRST course when the round's `courseId` no longer existed (and the first tee when its tee
+  was gone), the hint showed a live differential as though the round had been played there,
+  and `roundSave` stored it — correcting a note on an orphan re-homed it to whichever course
+  was listed first and it started counting against figures it was never played to. The
+  function takes an `orphanOk` flag now, true only when EDITING: a gone course puts a
+  `(deleted course)` option (value `''`) first and selects it, with `(deleted tee)` alone in
+  the tee box; a gone tee under a live course does the same in the tee box only. The hint is
+  an instruction while either is selected — *pick one for it to count again. It can be saved
+  as it is* — and `roundSave` keeps the round's own ids when the option is still selected,
+  skipping the pick-a-tee check for that case alone. The course select's `change` handler
+  re-orphans through the same flag when the reader moves back onto the option, so it cannot
+  snap to the first course by way of a second look. A NEW round never takes the option:
+  `lastUsed()` can point at a course deleted since, and the first course is the right
+  pre-fill for a round that has not been placed yet. The suite drives `openRound` on a
+  course-gone round and a tee-gone round in MEASURE and reads the stored ids back.
