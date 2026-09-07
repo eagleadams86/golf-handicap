@@ -834,6 +834,59 @@ above leaves it on the Leaderboard, where the trend card is in a hidden panel an
 every rectangle reads zero. It also saves and restores `TAB_KEY`, for the same
 reason the smoke walk does.
 
+## The League Handicap Window Saves As You Go (2026-09-07)
+
+**It stopped asking**: each box is written when you finish with it, and **Done** closes.
+Money Map's row editor went first that day and Sprint Predictability's Targets and Business
+Value the same afternoon; the guards below are that work applied here, and the note under
+the buttons reads *Saved as you go* in all three apps, in those words. `save()` re-renders,
+so the leaderboard behind the window re-ranks as you answer — which is the whole reason to
+be in there, and the feedback that replaces the button.
+
+- **`change`, NOT `input`.** `change` is "finished with this box"; `input` would rewrite the
+  rule at 1, 1_ and 15 on the way to 15 and re-rank every golfer at each. `updateMethodPreview`
+  keeps its own `input` listener — it reads the boxes and writes nothing.
+- **`commitMethod` is the one write**, reached by a finished box and by the window closing.
+  It rebuilds the whole rule from the form every time, so committing twice with nothing
+  changed in between writes the same thing twice — which is what lets Done and the last
+  box's `change` both fire without either knowing about the other.
+- **AN EMPTY BOX IS NOT AN ANSWER, and this one is sharp.** `clampInt`/`clampNum` read `''`
+  as absent and hand back the DEFAULT — deliberately, for a hand-edited backup — so clearing
+  *look at the last 20* to retype it and then tabbing away would silently re-rank every
+  golfer in the league against the last 5. `methodBlank()` refuses the write and the note
+  says *Not saved while a box is empty*; the close says the rule was left as it was.
+- **`methodDraft()` reads the boxes RAW, deliberately not through `readMethodForm()`.** That
+  function normalizes, so a cleared multiplier and a multiplier of 1 come back identical and
+  a window closed with a box emptied would look untouched and say nothing. Raw, an empty box
+  is a change like any other: it reaches the commit, is refused there, and the close reports
+  it. It is also what makes a GLANCE free — opening the window to read the rule and closing
+  again writes nothing, where without it a look would re-rank the league and toast about it.
+- **The one rule BETWEEN the boxes now CORRECTS AND STORES, where Save refused.** You cannot
+  use the best 30 of only 20; `normalizeMethod` clamps it, and the window says so and fixes
+  the box as it always did — but it then writes the corrected rule instead of returning. With
+  no Save button to press a second time, a refusal would strand the correction on screen and
+  off the leaderboard.
+- **`if (methodDialog.open) return;` in the close handler is load-bearing, not defensive.**
+  A dialog's `close` event is a QUEUED TASK, so the event from one window can arrive after
+  the next is already up and end ITS context instead — leaving a window that looks exactly
+  right and quietly saves nothing. Found in Money Map's row editor, in the browser.
+- **`methodReset` needed no change beyond what it already did.** It writes for itself and
+  re-enters `openMethod()`, which refills the boxes AND retakes the snapshot — so the close
+  behind it finds nothing moved rather than writing the defaults a second time. A test pins
+  that second half. (`showModal()` on an already-open modal dialog is a no-op in the current
+  spec, which is why re-entering `openMethod()` is safe; it used to throw.)
+
+**THE OTHER TWO EDITORS DELIBERATELY STILL ASK**, and the reasons are specific:
+- **Add Round.** Validation gates the save — a date, a set of tees, a score between 30 and
+  200, at least one golfer ticked — and it writes MULTIPLE RECORDS, one round per ticked
+  golfer. Auto-save has no defined meaning there: what becomes of a golfer's round when you
+  untick them afterwards? And a score typed 1 → 10 → 102 would move the handicap, which is
+  the app's whole output, on the way past.
+- **The course editor.** Its tees are a repeating sub-list, and a half-entered set (a rating
+  with no slope) divides into every differential that uses it. It also opens ON TOP of the
+  courses window and backs out through its own Cancel so Escape, Cancel and a backdrop click
+  take one route — a route that means "put the list back", not "keep what I typed".
+
 ## The League Handicap Window Takes the Family's Section Rule (2026-09-02)
 
 Its two sections — *The Calculation* and *The Official Caps* — are each in a

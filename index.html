@@ -1885,11 +1885,18 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
       </div>
     </section>
     <p class="warn" id="methodWarn" role="status"></p>
+    <!-- Saves as you go, so the leaderboard behind the window is re-ranked by
+         each answer as it is given — which is the whole reason to be in here.
+         There is nothing left for a Save button to do and no half-typed state a
+         Cancel could throw away, so Done is the only way out; Money Map's row
+         editor and Sprint Predictability's Targets say the same in the same
+         words. The note carries the one qualification: every box here is
+         required, and an empty one is not an answer. -->
     <div class="row-actions">
       <button type="button" class="danger" id="methodReset">Reset to Last 5</button>
       <span class="spacer"></span>
-      <button type="button" id="methodCancel">Cancel</button>
-      <button type="button" class="primary" id="methodSave">Save Rule</button>
+      <p class="muted" id="methodAutoNote" style="margin:0">Saved as you go</p>
+      <button type="button" class="primary" id="methodDone">Done</button>
     </div>
   </form>
 </dialog>
@@ -4886,6 +4893,27 @@ function autoName(m) {
   return m.use < m.window ? `Best ${m.use} of last ${m.window}` : `Rolling last ${m.window}`;
 }
 
+/* The five method boxes are all `required`, and an EMPTY one is not an answer.
+   It matters more than it looks: `clampInt`/`clampNum` read '' as absent and
+   hand back the DEFAULT, so clearing "look at the last 20" to retype it and
+   then tabbing away would quietly re-rank every golfer in the league against
+   the last 5. Nothing is written while one is empty, and the note says so. */
+const METHOD_BOXES = ['m_window', 'm_use', 'm_mult', 'm_adj'];
+const methodBlank = () =>
+  METHOD_BOXES.some((id) => document.getElementById(id).value.trim() === '');
+
+/* What is ON SCREEN, read RAW and deliberately not through `readMethodForm()`.
+   That function normalizes, which reads an empty box as the default — so a
+   cleared multiplier and a multiplier of 1 come back identical, and a window
+   closed with a box emptied would look untouched and say nothing. Raw, an empty
+   box is a change like any other: it reaches the commit, is refused there, and
+   the close says so. */
+const methodDraft = () => JSON.stringify(
+  ['m_window', 'm_use', 'm_basis', 'm_mult', 'm_adj'].map((id) => document.getElementById(id).value)
+    .concat([document.getElementById('m_caps').checked, document.getElementById('m_esr').checked]));
+
+let methoding = null;   // { written } while the window is up
+
 function openMethod() {
   const m = normalizeMethod(state.settings.method);
   document.getElementById('m_window').value = m.window;
@@ -4897,6 +4925,12 @@ function openMethod() {
   document.getElementById('m_esr').checked = state.settings.applyEsr !== false;
   document.getElementById('methodWarn').textContent = '';
   updateMethodPreview();
+  /* What the window opened holding, so opening it to READ the rule and closing
+     again writes nothing: `normalizeMethod` rebuilds the whole rule from the
+     boxes, so a glance would otherwise re-rank the league and toast about it.
+     Taken after the boxes are filled. Reset re-enters through here, which is
+     what keeps this in step with the boxes it just changed. */
+  methoding = { written: methodDraft() };
   openModal(methodDialog);
 }
 
@@ -4917,31 +4951,87 @@ function updateMethodPreview() {
   const tail = (m.multiplier !== 1 ? `, multiplied by ${m.multiplier}` : '') + (m.adjustment !== 0 ? `, then ${m.adjustment > 0 ? 'plus' : 'minus'} ${Math.abs(m.adjustment)}` : '');
   document.getElementById('methodPreview').textContent =
     `In words: average ${best}the last ${m.window} rounds' ${basis}${tail}.`;
+  /* THE NOTE ANSWERS THE ONE QUESTION AN AUTO-SAVING WINDOW HAS TO ANSWER: is
+     what I am typing being kept? Saying "Saved as you go" over a box the app is
+     deliberately ignoring would be a lie. */
+  document.getElementById('methodAutoNote').textContent =
+    methodBlank() ? 'Not saved while a box is empty' : 'Saved as you go';
 }
 ['m_window', 'm_use', 'm_basis', 'm_mult', 'm_adj'].forEach((id) =>
   document.getElementById(id).addEventListener('input', updateMethodPreview));
-document.getElementById('methodSave').addEventListener('click', () => {
+
+/* THE ONE WRITE, reached by a box you finished with and by the window closing.
+   It rebuilds the whole rule from the form every time, so committing twice with
+   nothing changed in between writes the same thing twice — which is what lets
+   Done and the last box's `change` both fire without either knowing about the
+   other. Returns false when nothing was stored.
+
+   The one rule BETWEEN these boxes is that you cannot use the best 10 of only 5
+   rounds. `normalizeMethod` clamps it, and this says so and corrects the box
+   rather than letting the clamp happen silently — then writes what the boxes
+   now say, which is the honest reading of them. That is a change from the Save
+   button, which refused and left you to press it again: with no Save button to
+   press, a refusal here would strand the correction on screen and off the
+   leaderboard. */
+function commitMethod(ctx, speak) {
+  if (methodBlank()) return false;
   const m = readMethodForm();
   const rawUse = Math.round(Number(document.getElementById('m_use').value));
   if (rawUse > m.window) {
     document.getElementById('methodWarn').textContent = `You can't use the best ${rawUse} of only ${m.window} rounds — it has been set to ${m.use}.`;
     document.getElementById('m_use').value = m.use;
-    return;
+  } else {
+    document.getElementById('methodWarn').textContent = '';
   }
   state.settings.method = m;
   state.settings.applyCaps = document.getElementById('m_caps').checked;
   state.settings.applyEsr = document.getElementById('m_esr').checked;
-  save();
-  methodDialog.close();
-  toast('Method updated');
+  ctx.written = methodDraft();
+  save();                                  // save() re-renders, so the league re-ranks
+  if (speak) toast('Method updated');
+  return true;
+}
+
+/* `change`, not `input`: it is the event that means "finished with this box",
+   where `input` would rewrite the rule at 1, 1_ and 15 on the way to 15 and
+   re-rank every golfer at each. */
+['m_window', 'm_use', 'm_basis', 'm_mult', 'm_adj', 'm_caps', 'm_esr'].forEach((id) =>
+  document.getElementById(id).addEventListener('change', () => {
+    if (methoding && methodDraft() !== methoding.written) commitMethod(methoding, false);
+    updateMethodPreview();                 // the clamp above may have moved a box
+  }));
+
+/* Done, Escape and a click on the backdrop all end an auto-saving window the
+   same way, so this hangs off `close` rather than off the button.
+   THE OPEN CHECK IS LOAD-BEARING, not defensive (found in Money Map's row
+   editor, in the browser): `close` is dispatched as a QUEUED TASK, so the event
+   from one window can arrive after the next is already up and end ITS context
+   instead — leaving a window that looks exactly right and quietly saves
+   nothing. */
+methodDialog.addEventListener('close', () => {
+  if (methodDialog.open) return;
+  const ctx = methoding;
+  methoding = null;
+  /* Nothing moved — most often a window opened to read the rule — so there is
+     nothing to write and nothing to say. It still catches a box that was never
+     blurred, which is the only way a real edit could reach here uncommitted. */
+  if (!ctx || methodDraft() === ctx.written) return;
+  if (!commitMethod(ctx, true))
+    toast('The rule was left as it was — a box was empty');
 });
+
+/* Done only has to close: the `close` handler above does the writing, which is
+   what keeps it identical to Escape and to a click on the backdrop. */
+document.getElementById('methodDone').addEventListener('click', () => methodDialog.close());
+
+/* This one already wrote for itself, so it needs no change beyond re-entering
+   openMethod(), which refills the boxes AND retakes the snapshot. */
 document.getElementById('methodReset').addEventListener('click', () => {
   state.settings.method = Object.assign({}, DEFAULT_METHOD);
   save();
   openMethod();
   toast('Back to the last 5 rounds');
 });
-document.getElementById('methodCancel').addEventListener('click', () => methodDialog.close());
 document.getElementById('methodBtn').addEventListener('click', openMethod);
 
 /* ── Golfers ────────────────────────────────────────────────────────────── */

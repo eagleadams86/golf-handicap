@@ -240,6 +240,21 @@ club and society formulas can be reproduced exactly:
 The name follows the settings (`Rolling last 5`, `Best 3 of last 5`) and is worked out from
 them — it can't be typed over, so it always says what the numbers actually do.
 
+**The window saves as you go** (2026-09-07). Finish with a box — tab out of it, pick from a
+list, tick a tick — and the rule is in, with the leaderboard behind the window re-ranked by
+it; the way out is **Done**. There is no Save button, and no Cancel, because by the time you
+could press one the change is made. Two things it will tell you about rather than do quietly:
+
+- **An empty box is not an answer.** Clear one to retype it and nothing is written until it
+  holds a figure again — the note under the buttons says *Not saved while a box is empty*
+  meanwhile. Without that, clearing *look at the last 20* and tabbing away would re-rank the
+  whole league against the last 5, which is what an empty box otherwise means.
+- **You can't use the best 30 of only 20 rounds.** It corrects the box to what the rule can
+  mean, says so, and then stores the corrected rule — the correction ends up on the
+  leaderboard rather than stranded on screen.
+
+*Reset to Last 5* writes immediately, as it always has.
+
 Two examples:
 
 - *Average of my last 5 cards*: window 5, use 5, differentials, ×1, +0. **This is the

@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 297;
+const EXPECTED = 307;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -2964,6 +2964,193 @@ describe('Hovering the trend chart');
       if (findSaved[i] === null) localStorage.removeItem(k);
       else localStorage.setItem(k, findSaved[i]);
     } catch (e) { /* a browser refusing the write left it alone anyway */ }
+  });
+
+
+  /* ── The League Handicap window saves as you go (2026-09-07) ──────────────
+     It stopped asking: each box is written when you finish with it, Done
+     closes, and the leaderboard behind re-ranks as you go — which is the whole
+     reason to be in there. Money Map's row editor went first and Sprint
+     Predictability's Targets the same day; the guards below are that work
+     applied here.
+
+     DRIVEN IN MEASURE for the reasons this file keeps repeating — the suite's
+     own frame is 1x1px, and run() does not await a test body. It WRITES, so it
+     borrows the same three keys and the same finally the Find walk uses. */
+  const METHOD = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const demo = MW.buildDemoLeague();
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds: demo.rounds, activeGolfer: demo.golfers[0].id });
+      await new Promise((r) => setTimeout(r, 250));
+      const dlg = MD.getElementById('methodDialog');
+      const rule = () => MHK.__state().settings.method;
+      const note = () => MD.getElementById('methodAutoNote').textContent;
+      /* `change`, the event that means "finished with this box". `input` goes
+         with it because the preview and the note listen to that one. */
+      const fire = (id, v) => {
+        const el = MD.getElementById(id);
+        el.value = v;
+        el.dispatchEvent(new MW.Event('input', { bubbles: true }));
+        el.dispatchEvent(new MW.Event('change', { bubbles: true }));
+      };
+      /* A dialog's `close` event is dispatched as a QUEUED TASK, so anything
+         asserted about what closing did has to let that task run first. */
+      const shut = async () => { dlg.close(); await new Promise((r) => setTimeout(r, 40)); };
+
+      MD.getElementById('methodBtn').click();
+      await new Promise((r) => setTimeout(r, 40));
+      METHOD.doneLabel = (MD.getElementById('methodDone') || {}).textContent;
+      METHOD.noCancel = !MD.getElementById('methodCancel');
+      METHOD.noSave = !MD.getElementById('methodSave');
+      METHOD.noteAtOpen = note();
+
+      /* A GLANCE. Opening the window to read the rule and closing again must
+         write nothing: the commit rebuilds the whole rule from the boxes, so
+         without a comparison against what it opened holding, looking at it
+         would re-rank the league and toast about it. */
+      let writes = 0;
+      const realSave = MW.save;
+      MW.save = function () { writes += 1; return realSave.apply(this, arguments); };
+      METHOD.beforeGlance = JSON.stringify(rule());
+      await shut();
+      METHOD.glanceWrites = writes;
+      METHOD.afterGlance = JSON.stringify(rule());
+
+      /* A finished box writes, with nothing pressed. */
+      MD.getElementById('methodBtn').click();
+      await new Promise((r) => setTimeout(r, 40));
+      fire('m_window', '12');
+      METHOD.windowStored = rule().window;
+      METHOD.writesAfterBox = writes;
+
+      /* AN EMPTY BOX IS NOT AN ANSWER, and this is the sharp one: clampInt
+         reads '' as absent and hands back the DEFAULT, so clearing "look at the
+         last 12" to retype it would otherwise re-rank every golfer against the
+         last 5 the moment the box lost focus. */
+      fire('m_window', '');
+      METHOD.noteWhileBlank = note();
+      METHOD.blankHeld = rule().window;
+      fire('m_window', '20');
+      METHOD.blankRecovered = rule().window;
+
+      /* The one rule BETWEEN the boxes: you cannot use the best 30 of only 20.
+         It is corrected, said out loud, and then STORED — with no Save button
+         to press again, a refusal would strand the correction on screen and off
+         the leaderboard. */
+      fire('m_use', '30');
+      METHOD.useBox = MD.getElementById('m_use').value;
+      METHOD.useWarn = MD.getElementById('methodWarn').textContent;
+      METHOD.useStored = rule().use;
+
+      /* A tick is a finished answer as much as a typed figure is. */
+      const caps = MD.getElementById('m_caps');
+      const wanted = !caps.checked;
+      caps.checked = wanted;
+      caps.dispatchEvent(new MW.Event('change', { bubbles: true }));
+      METHOD.capsStored = MHK.__state().settings.applyCaps === wanted;
+
+      /* Closing over an empty box SAYS SO — the rule was left as it was, and a
+         reader not told would believe the boxes in front of them. */
+      fire('m_mult', '');
+      MD.getElementById('toast').textContent = '';
+      METHOD.multBefore = rule().multiplier;
+      await shut();
+      METHOD.blankCloseToast = MD.getElementById('toast').textContent;
+      METHOD.multAfter = rule().multiplier;
+
+      /* THE STALE CLOSE. All three in ONE task, so the first window's queued
+         close event cannot run until after the second is up — it then arrives
+         to end a context that belongs to the second, and what is left looks
+         exactly right and quietly saves nothing. */
+      MD.getElementById('methodBtn').click();
+      dlg.close();
+      MD.getElementById('methodBtn').click();
+      await new Promise((r) => setTimeout(r, 40));
+      fire('m_adj', '3');
+      METHOD.afterStaleClose = rule().adjustment;
+      await shut();
+
+      /* Reset writes for itself and re-enters openMethod(), which refills the
+         boxes AND retakes the snapshot — so the close that follows finds
+         nothing moved rather than writing the defaults a second time. */
+      MD.getElementById('methodBtn').click();
+      await new Promise((r) => setTimeout(r, 40));
+      MD.getElementById('methodReset').click();
+      await new Promise((r) => setTimeout(r, 40));
+      METHOD.afterReset = JSON.stringify(rule());
+      const beforeResetClose = writes;
+      await shut();
+      METHOD.resetCloseWrites = writes - beforeResetClose;
+      METHOD.defaults = JSON.stringify(MW.normalizeMethod(MHK.DEFAULT_METHOD));
+
+      MW.save = realSave;
+      METHOD.totalWrites = writes;
+      METHOD.ran = true;
+    } catch (e) { METHOD.error = String(e && e.message || e); }
+  }
+
+describe('The League Handicap window saves as you go (2026-09-07)');
+  it('the walk actually drove it — everything below reads that record', () => {
+    ok(METHOD.ran, 'the walk did not finish', METHOD.error || 'no frame');
+    ok(METHOD.totalWrites > 0,
+       'and it really did reach code that writes, so the checks below are not passing over '
+       + 'a window that never saves at all', METHOD.totalWrites);
+  });
+  it('the way out is Done — there is no Save and no Cancel', () => {
+    eq(METHOD.doneLabel, 'Done', 'a window that saves as you go closes on Done');
+    ok(METHOD.noSave, 'and has nothing left for a Save button to do');
+    ok(METHOD.noCancel, 'nor a Cancel — by the time you could press one the change is made');
+    eq(METHOD.noteAtOpen, 'Saved as you go',
+       'the note says so, because nothing else in the window would');
+  });
+  it('opening the window to READ the rule and closing again writes nothing', () => {
+    eq(METHOD.glanceWrites, 0, 'a glance saved nothing');
+    eq(METHOD.afterGlance, METHOD.beforeGlance,
+       'and the rule is the one it opened on — the commit rebuilds it from the boxes, so '
+       + 'without this a look at it would re-rank the whole league');
+  });
+  it('finishing with a box is what writes it — no button in between', () => {
+    eq(METHOD.windowStored, 12, 'the rule follows the box');
+    ok(METHOD.writesAfterBox > METHOD.glanceWrites, 'and it wrote to do it');
+  });
+  it('an empty box is not an answer, and the note stops promising otherwise', () => {
+    eq(METHOD.noteWhileBlank, 'Not saved while a box is empty',
+       'the note says which of the two states the window is in');
+    eq(METHOD.blankHeld, 12,
+       'and the rule is untouched — clampInt reads an empty box as the DEFAULT, so writing '
+       + 'one would silently re-rank every golfer against the last 5');
+    eq(METHOD.blankRecovered, 20, 'filling it in again writes normally');
+  });
+  it('“the best 30 of only 20” is corrected, said out loud, and then stored', () => {
+    eq(METHOD.useBox, '20', 'the box is corrected to what the rule can mean');
+    ok(/best 30 of only 20/.test(METHOD.useWarn), 'and the window says what it did',
+       METHOD.useWarn);
+    eq(METHOD.useStored, 20,
+       'then it STORES the corrected rule: with no Save button to press again, refusing '
+       + 'would leave the correction on screen and off the leaderboard');
+  });
+  it('a tick is a finished answer too', () => {
+    ok(METHOD.capsStored, 'the caps checkbox writes on change like every box beside it');
+  });
+  it('closing over an empty box says the rule was left as it was', () => {
+    eq(METHOD.multAfter, METHOD.multBefore, 'nothing was written');
+    ok(/left as it was/.test(METHOD.blankCloseToast),
+       'and the reader is told, rather than being left believing the boxes in front of them',
+       METHOD.blankCloseToast);
+  });
+  it('a stale close event cannot silence the window that replaced it', () => {
+    eq(METHOD.afterStaleClose, 3,
+       'a `close` event is a QUEUED TASK, so one from a window already gone can arrive after '
+       + 'the next is up — and end ITS context, leaving a window that looks right and '
+       + 'quietly saves nothing');
+  });
+  it('“Reset to Last 5” writes, and the close behind it does not write again', () => {
+    eq(METHOD.afterReset, METHOD.defaults, 'the reset stores the defaults');
+    eq(METHOD.resetCloseWrites, 0,
+       'and re-entering openMethod() retook the snapshot, so closing finds nothing moved');
   });
 
 describe('Where a press leaves the page (2026-09-05)');
