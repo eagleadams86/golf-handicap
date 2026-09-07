@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 307;
+const EXPECTED = 355;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -129,6 +129,12 @@ const EXPECTED = 307;
    can be fooled about what is commented out is a test that can miss a live
    off-origin script, so it is worth doing properly. Same helper, same wording,
    in every sibling repo’s suite. */
+/* Today as the app writes it — local, not UTC: toISOString() is a day out
+   either side of midnight in any zone but Greenwich. */
+const todayLocal = () => {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+};
 const stripHtmlComments = (s) => {
   let out = String(s), prev;
   do { prev = out; out = out.replace(/<!--[\s\S]*?-->/g, ''); } while (out !== prev);
@@ -398,14 +404,35 @@ async function onAppLoad() {
     eq(W.courseHandicap(18, 113, 72, 72), 18));
   it('has nothing to convert without an index', () =>
     eq(W.courseHandicap(null, 122, 69.4, 71), null));
+  it('rounds a half UP — toward the higher number — for a plus handicap too (WHS Rule 6.1)', () => {
+    /* The Rules of Handicapping round a Course Handicap to the nearest whole
+       number with .5 going UP, and "up" means toward the higher number, not
+       away from zero: a raw −2.5 is a course handicap of +2, not +3. That is
+       Math.round's behaviour exactly. */
+    eq(W.courseHandicap(-2.5, 113, 72, 72), -2);
+    eq(W.courseHandicap(2.5, 113, 72, 72), 3);
+  });
 
   /* ── playingHandicap ─────────────────────────────────────────────────── */
   describe('playingHandicap');
   it('leaves a full handicap alone', () => eq(W.playingHandicap(18, 100), 18));
   it('takes the four-ball allowance off', () => eq(W.playingHandicap(20, 90), 18));
-  it('rounds a half AWAY from zero, so a plus handicap is not handed a shot', () => {
+  it('rounds a half UP, the same rule as courseHandicap (WHS Rule 6.2)', () => {
+    /* Until 2026-09-07 this rounded half AWAY from zero (−2.5 → −3) on the
+       reasoning that Math.round would hand a plus player a shot. The Rules say
+       otherwise: .5 rounds up toward the higher number for a Playing Handicap
+       exactly as for a Course Handicap, so a plus player's −2.5 is +2, and the
+       two functions disagreeing on the same half was the real fault. */
     eq(W.playingHandicap(5, 50), 3);            // 2.5 → 3
-    eq(W.playingHandicap(-5, 50), -3);          // −2.5 → −3, not −2
+    eq(W.playingHandicap(-5, 50), -2);          // −2.5 → −2, the same rule as courseHandicap
+    eq(W.playingHandicap(-5, 50), W.courseHandicap(-2.5, 113, 72, 72),
+       'one rounding rule for the pair');
+  });
+  it('a plus handicap is written with a plus, as the index it came from is', () => {
+    eq(W.fmtShots(-3), '+3');
+    eq(W.fmtShots(3), '3');
+    eq(W.fmtShots(0), '0');
+    eq(W.fmtShots(null), '—');
   });
   it('has nothing to reduce without a course handicap', () =>
     eq(W.playingHandicap(null, 90), null));
@@ -651,6 +678,56 @@ async function onAppLoad() {
   });
   it('pushes when both sides are empty — nothing to adopt', () =>
     eq(W.syncDecision(0, 0, false, true), 'push'));
+
+  /* ── makePushGate — no push before the verdict (2026-09-07 audit) ──────────
+     startSync awaits getDoc before syncDecision can say which copy wins, and
+     window.cloudPush was live the whole time — so an edit made in that
+     window, or a push already debounced when sign-in completed, could overwrite
+     the cloud copy before the which-copy dialog had asked. The gate is the pure
+     part: held until released, remembering that a push was wanted meanwhile. */
+  describe('makePushGate — no push before the verdict');
+  it('starts held, and a push asked for while held is remembered, not run', () => {
+    const g = W.makePushGate();
+    let n = 0;
+    const push = () => { n += 1; };
+    ok(g.held(), 'held from the start');
+    eq(g.request(push), false, 'request says it did not run');
+    eq(n, 0, 'and it did not');
+  });
+  it('release runs ONE push if any was wanted, however many were asked for', () => {
+    const g = W.makePushGate();
+    let n = 0;
+    const push = () => { n += 1; };
+    g.request(push); g.request(push); g.request(push);
+    g.release(push);
+    eq(n, 1, 'three requests while held are one push after the verdict');
+    ok(!g.held(), 'and the gate is open');
+    g.release(push);
+    eq(n, 1, 'a second release does not push again');
+  });
+  it('release with nothing wanted runs nothing, and a request afterwards runs at once', () => {
+    const g = W.makePushGate();
+    let n = 0;
+    const push = () => { n += 1; };
+    g.release(push);
+    eq(n, 0, 'nothing was asked for');
+    eq(g.request(push), true, 'open: the request runs');
+    eq(n, 1);
+  });
+  it('hold closes it again for the next sign-in, forgetting anything wanted before', () => {
+    const g = W.makePushGate();
+    let n = 0;
+    const push = () => { n += 1; };
+    g.release(push);
+    g.request(push);
+    g.hold();
+    ok(g.held(), 'held again');
+    g.request(push);
+    eq(n, 1, 'the request after hold did not run');
+    g.hold();
+    g.release(push);
+    eq(n, 1, 'and hold() forgot it — a push wanted under the OLD account is not sent under the new');
+  });
 
   /* ── data coming in from outside ─────────────────────────────────────── */
   describe('sanitizeIds');
@@ -931,6 +1008,24 @@ async function onAppLoad() {
 
   const fullRoundsOf = (name) => roundsOf(name).filter((r) => r.holes !== 9);
 
+  it('hands out a COPY of the demo courses, so a rename cannot survive a reload of the example', () => {
+    /* `loadDemoLeague` upserts what this returns straight into state. Returned by
+       reference (as it was until 2026-09-07), renaming Ashfield in Golfers &
+       Courses renamed the constant, and loading the example again — the very
+       thing that is meant to put it back — kept the rename and regenerated every
+       score off the mutated rating. */
+    const a = W.buildDemoLeague(), b = W.buildDemoLeague();
+    ok(a.courses !== b.courses, 'two calls, two course lists');
+    ok(a.courses[0] !== b.courses[0], 'and two course objects');
+    ok(a.courses[0].tees[0] !== b.courses[0].tees[0], 'down to the tees');
+    const name = a.courses[0].name, rating = a.courses[0].tees[0].rating;
+    a.courses[0].name = 'Mutated';
+    a.courses[0].tees[0].rating = 1;
+    const c = W.buildDemoLeague();
+    eq(c.courses[0].name, name, 'the next build is untouched by the last one’s edits');
+    eq(c.courses[0].tees[0].rating, rating, 'rating included');
+    eq(c.rounds[0].score, LEAGUE.rounds[0].score, 'and its scores still come off the real rating');
+  });
   it('fills a whole league, which is the half of the app one golfer cannot show', () => {
     eq(LEAGUE.golfers.length, 8);
     eq(LEAGUE.courses.length, 6);
@@ -1664,6 +1759,33 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
     ok(guardAt < afterHalt || afterHalt === -1, 'the check must run before any handler is attached');
     ok(firstListener > -1, 'sanity: the app does attach listeners');
   });
+  it('the sync module holds every push behind the gate until startSync has its verdict', () => {
+    /* The module's functions are not reachable from here (it is a module, and
+       Firebase never loads in the suite), so its wiring is pinned at the source:
+       the gate is made, both push entry points go through request(), startSync
+       releases it AFTER the verdict and BEFORE the listener opens, and every
+       auth report holds it again — a new account is a new verdict. */
+    const mod = APP_SRC.slice(APP_SRC.indexOf('<script type="module">'));
+    ok(mod.indexOf('const pushGate = makePushGate();') > -1, 'the module makes the gate');
+    const cp = mod.indexOf('window.cloudPush = () => {');
+    const cf = mod.indexOf('window.cloudFlush = () => {');
+    ok(cp > -1 && mod.slice(cp, mod.indexOf('};', cp)).indexOf('pushGate.request(') > -1,
+       'cloudPush asks the gate');
+    ok(cf > -1 && mod.slice(cf, mod.indexOf('};', cf)).indexOf('pushGate.request(') > -1,
+       'and so does cloudFlush');
+    const ss = mod.indexOf('async function startSync() {');
+    const body = mod.slice(ss, mod.indexOf('\n}\n', ss));
+    const verdict = body.indexOf('syncDecision(');
+    const release = body.indexOf('pushGate.release(');
+    const listenAt = body.lastIndexOf('listen();');
+    ok(verdict > -1 && release > verdict && listenAt > release,
+       'startSync releases the gate after the verdict and before listen()',
+       JSON.stringify({ verdict, release, listenAt }));
+    const auth = mod.indexOf('A.onAuthStateChanged(auth, (u) => {');
+    const authBody = mod.slice(auth, mod.indexOf('startSync()', auth));
+    ok(auth > -1 && authBody.indexOf('pushGate.hold();') > -1,
+       'every auth report holds the gate again before startSync can run');
+  });
   it('ghAdopt stores the newer copy verbatim, then halts instead of adopting', () => {
     const at = APP_SRC.indexOf('window.ghAdopt =');
     const body = APP_SRC.slice(at, APP_SRC.indexOf('window.ghCount'));
@@ -2117,10 +2239,18 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
        'the virgin test no longer asks about courses'));
   /* A visitor must never be offered three buttons that write to their own
      browser: renderEmptyState leaves before any of this in a shared view. */
-  it('never appears over a shared link', () =>
-    ok(APP_SRC.indexOf('if (window.ghViewOnly) return;')
-       < APP_SRC.indexOf('const virgin = state.rounds.length'),
-       'the shared-view guard must come first in renderEmptyState'));
+  it('never appears over a shared link', () => {
+    /* The guard is a block now, not an early return (2026-09-07): the
+       one-golfer rule at the foot of renderEmptyState is everybody's, and the
+       return was what kept a one-golfer share's Leaderboard tab up. The welcome
+       card still has to sit INSIDE the owner-only block. */
+    const guard = APP_SRC.indexOf('if (!window.ghViewOnly) {');
+    const virgin = APP_SRC.indexOf('const virgin = state.rounds.length');
+    ok(guard > -1 && guard < virgin,
+       'the shared-view guard must open before the welcome card in renderEmptyState');
+    ok(VISITOR.ran && VISITOR.bare.viewOnly
+       && !VISITOR.bare.welcome, 'and a shared frame with nothing in it draws no welcome card');
+  });
 
   /* ── the info dot and the help window ─────────────────────────────────────
      Both are family-wide blocks as of 2026-08-23, and both were this app's
@@ -3091,6 +3221,508 @@ describe('Hovering the trend chart');
       METHOD.ran = true;
     } catch (e) { METHOD.error = String(e && e.message || e); }
   }
+  /* ── The League Rules boxes always show the rule that is STORED (2026-09-07 audit) ──
+     `normalizeMethod` clamps: a window of 99 is stored as 60, a multiplier of 5
+     as 2, an adjustment of 50 as 20, a window of 2.5 as 3. The window used to
+     correct the box for ONE of its rules (use > window) and leave the others
+     showing what was typed over a rule that said something else — so after a
+     commit every box is refilled from what was actually stored. The preview
+     under the boxes describes the STORED rule while a box is empty rather than
+     the default `clampInt` reads an empty box as, and "1 rounds" is "1 round".
+     Driven in MEASURE like the walk above; the keys it writes are put back
+     below, together with that walk's. */
+  const REFILL = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const dlg = MD.getElementById('methodDialog');
+      const rule = () => MHK.__state().settings.method;
+      const box = (id) => MD.getElementById(id).value;
+      const fire = (id, v) => {
+        const el = MD.getElementById(id);
+        el.value = v;
+        el.dispatchEvent(new MW.Event('input', { bubbles: true }));
+        el.dispatchEvent(new MW.Event('change', { bubbles: true }));
+      };
+      if (dlg.open) dlg.close();
+      await new Promise((r) => setTimeout(r, 40));
+      MD.getElementById('methodBtn').click();
+      await new Promise((r) => setTimeout(r, 40));
+
+      fire('m_window', '99');
+      REFILL.win99 = { box: box('m_window'), stored: rule().window };
+      fire('m_window', '0');
+      REFILL.win0 = { box: box('m_window'), stored: rule().window };
+      fire('m_window', '2.5');
+      REFILL.win25 = { box: box('m_window'), stored: rule().window };
+      fire('m_mult', '5');
+      REFILL.mult5 = { box: box('m_mult'), stored: rule().multiplier };
+      fire('m_adj', '50');
+      REFILL.adj50 = { box: box('m_adj'), stored: rule().adjustment };
+
+      /* An emptied box: the preview must describe what is STORED (60, from the
+         first step), not the 5 that clampInt reads an empty string as. */
+      fire('m_window', '60');
+      fire('m_use', '5');
+      fire('m_window', '');
+      REFILL.previewWhileBlank = MD.getElementById('methodPreview').textContent;
+      REFILL.storedWhileBlank = rule().window;
+
+      /* Singular. use is 5 by now, so "the best 5 of only 1" is corrected too. */
+      fire('m_window', '1');
+      REFILL.previewAtOne = MD.getElementById('methodPreview').textContent;
+      REFILL.warnAtOne = MD.getElementById('methodWarn').textContent;
+
+      dlg.close();
+      await new Promise((r) => setTimeout(r, 40));
+      REFILL.ran = true;
+    } catch (e) { REFILL.error = String(e && e.message || e); }
+  }
+
+  /* ── A sync adoption while League Rules is open refills the boxes (2026-09-07 audit) ──
+     `commitMethod` rebuilds the WHOLE rule from the boxes. After `ghAdopt`
+     replaced `state` with a copy holding window 12 / use 4 / caps off, the boxes
+     still read 5 / 5 / caps on, and finishing with the multiplier alone stored
+     5 / 5 / 0.96 / caps on — the adopted rule reverted and pushed straight
+     back. The golfer and course name boxes re-find their record by id on every
+     keystroke; this window's equivalent is to refill from the new
+     `state.settings` wherever an adoption lands. Driven in MEASURE, through the
+     real `window.ghAdopt`. */
+  const ADOPT = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const dlg = MD.getElementById('methodDialog');
+      const rule = () => MHK.__state().settings.method;
+      const box = (id) => MD.getElementById(id).value;
+      const fire = (id, v) => {
+        const el = MD.getElementById(id);
+        el.value = v;
+        el.dispatchEvent(new MW.Event('input', { bubbles: true }));
+        el.dispatchEvent(new MW.Event('change', { bubbles: true }));
+      };
+      /* Typing that has not finished: `input` only, no `change`. */
+      const typing = (id, v) => {
+        const el = MD.getElementById(id);
+        el.value = v;
+        el.dispatchEvent(new MW.Event('input', { bubbles: true }));
+      };
+      const adoptWith = (method, caps) => {
+        const next = JSON.parse(JSON.stringify(MHK.__state()));
+        next.settings.method = method;
+        next.settings.applyCaps = caps;
+        MW.ghAdopt(next, Date.now());
+      };
+      const demo = MW.buildDemoLeague();
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds: demo.rounds, activeGolfer: demo.golfers[0].id });
+      if (dlg.open) dlg.close();
+      await new Promise((r) => setTimeout(r, 40));
+      MD.getElementById('methodBtn').click();
+      await new Promise((r) => setTimeout(r, 40));
+      ADOPT.before = { window: box('m_window'), use: box('m_use'), caps: MD.getElementById('m_caps').checked };
+
+      /* Another device changed the rule while this window was up. */
+      adoptWith({ window: 12, use: 4, basis: 'differential', multiplier: 1, adjustment: 0 }, false);
+      ADOPT.boxesAfter = { window: box('m_window'), use: box('m_use'), caps: MD.getElementById('m_caps').checked };
+      fire('m_mult', '0.96');
+      ADOPT.stored = { window: rule().window, use: rule().use, multiplier: rule().multiplier,
+                       caps: MHK.__state().settings.applyCaps };
+
+      /* Mid-way through a box when a DIFFERENT rule arrives: the box is
+         refilled and the reader is told, because what they typed is gone. */
+      MD.getElementById('toast').textContent = '';
+      typing('m_adj', '3');
+      adoptWith({ window: 10, use: 4, basis: 'differential', multiplier: 0.96, adjustment: 0 }, false);
+      ADOPT.midway = { adj: box('m_adj'), window: box('m_window'), toast: MD.getElementById('toast').textContent };
+
+      /* Mid-way through a box when the SAME rule arrives (a sync that changed
+         a round, not the rule): the typing is left alone and nothing is said. */
+      MD.getElementById('toast').textContent = '';
+      typing('m_adj', '3');
+      adoptWith({ window: 10, use: 4, basis: 'differential', multiplier: 0.96, adjustment: 0 }, false);
+      ADOPT.sameRule = { adj: box('m_adj'), toast: MD.getElementById('toast').textContent };
+
+      dlg.close();
+      await new Promise((r) => setTimeout(r, 40));
+      ADOPT.ran = true;
+    } catch (e) { ADOPT.error = String(e && e.message || e); }
+  }
+
+  /* ── Editing an orphaned round keeps it orphaned (2026-09-07 audit) ──────
+     `fillCourseSelects` pre-selected the FIRST course when a round's course no
+     longer existed (and the first tee when its tee was gone), the hint showed a
+     live differential as though the round had been played there, and Save
+     stored it — a note corrected on an orphan re-homed it to whichever course
+     happened to be listed first, and it started counting against figures it
+     was never played to. Driven in MEASURE through the real openRound. */
+  const ORPHAN = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const demo = MW.buildDemoLeague();
+      const g = demo.golfers[0].id;
+      const realCourse = demo.courses[0];
+      const rounds = demo.rounds.concat([
+        { id: 'orph-1', golferId: g, date: '2026-05-01', courseId: 'gone-course', teeId: 'gone-tee',
+          score: 88, pcc: 0, note: '', counts: true, holes: 18 },
+        { id: 'orph-2', golferId: g, date: '2026-05-02', courseId: realCourse.id, teeId: 'gone-tee',
+          score: 90, pcc: 0, note: '', counts: true, holes: 18 },
+      ]);
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds, activeGolfer: g });
+      const dlg = MD.getElementById('roundDialog');
+      const sel = (id) => MD.getElementById(id);
+      const chosen = (id) => (sel(id).selectedOptions[0] || {}).textContent || '';
+      const find = (id) => MHK.__state().rounds.find((r) => r.id === id);
+
+      /* The course is gone. */
+      MW.openRound('orph-1');
+      await new Promise((r) => setTimeout(r, 40));
+      ORPHAN.course = { value: sel('f_course').value, text: chosen('f_course'),
+                        tee: chosen('f_tee'), hint: sel('roundHint').textContent };
+      sel('f_note').value = 'corrected note';
+      sel('roundSave').click();
+      await new Promise((r) => setTimeout(r, 40));
+      const o1 = find('orph-1');
+      ORPHAN.afterNote = { closed: !dlg.open, courseId: o1.courseId, teeId: o1.teeId, note: o1.note,
+                           warn: sel('roundWarn').textContent };
+      ORPHAN.stillOut = !MW.computeAll(g).counted.some((e) => e.round.id === 'orph-1');
+
+      /* Picking a real course is the way back in. */
+      MW.openRound('orph-1');
+      await new Promise((r) => setTimeout(r, 40));
+      sel('f_course').value = realCourse.id;
+      sel('f_course').dispatchEvent(new MW.Event('change', { bubbles: true }));
+      ORPHAN.pickedTee = sel('f_tee').value;
+      sel('roundSave').click();
+      await new Promise((r) => setTimeout(r, 40));
+      ORPHAN.rehomed = { courseId: find('orph-1').courseId, teeId: find('orph-1').teeId,
+                         counted: MW.computeAll(g).counted.some((e) => e.round.id === 'orph-1') };
+
+      /* Only the tee is gone. */
+      MW.openRound('orph-2');
+      await new Promise((r) => setTimeout(r, 40));
+      ORPHAN.tee = { course: sel('f_course').value, value: sel('f_tee').value, text: chosen('f_tee'),
+                     hint: sel('roundHint').textContent };
+      sel('roundSave').click();
+      await new Promise((r) => setTimeout(r, 40));
+      ORPHAN.teeAfter = { teeId: find('orph-2').teeId, closed: !dlg.open };
+      if (dlg.open) dlg.close();
+      await new Promise((r) => setTimeout(r, 40));
+      ORPHAN.ran = true;
+    } catch (e) { ORPHAN.error = String(e && e.message || e); }
+  }
+
+  /* ── A name box that is emptied stores nothing (2026-09-07 audit) ─────────
+     Both list boxes in Golfers & Courses wrote `el.value.slice(…)` on every
+     keystroke, blank included: the golfer picker grew a blank option, the
+     leaderboard's name button lost its text, and `normalizeState` renamed the
+     record "Golfer" / "Course" on the next load. The course EDITOR already
+     refused a blank; the list boxes now do the equivalent — an emptied box is
+     not a rename, and leaving the box puts the last name back in it. */
+  const BLANK = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const demo = MW.buildDemoLeague();
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds: demo.rounds, activeGolfer: demo.golfers[0].id });
+      MW.openManage();
+      await new Promise((r) => setTimeout(r, 40));
+      const gid = demo.golfers[0].id, cid = demo.courses[0].id;
+      const gBox = MD.querySelector('#golferList [data-name="' + gid + '"]');
+      const cBox = MD.querySelector('#courseList [data-name="' + cid + '"]');
+      const type = (el, v) => { el.value = v; el.dispatchEvent(new MW.Event('input', { bubbles: true })); };
+      const leave = (el) => el.dispatchEvent(new MW.Event('blur'));
+      const golfer = () => MHK.__state().golfers.find((g) => g.id === gid).name;
+      const course = () => MHK.__state().courses.find((c) => c.id === cid).name;
+
+      type(gBox, 'Renamed Golfer');
+      BLANK.golferRenamed = golfer();
+      type(gBox, '');
+      BLANK.golferEmptied = golfer();
+      type(gBox, '   ');
+      BLANK.golferSpaces = golfer();
+      leave(gBox);
+      BLANK.golferBoxAfterBlur = gBox.value;
+      BLANK.pickerBlank = [...MD.getElementById('golferSel').options].some((o) => !o.textContent.trim());
+
+      type(cBox, 'Renamed Course');
+      BLANK.courseRenamed = course();
+      type(cBox, '');
+      BLANK.courseEmptied = course();
+      leave(cBox);
+      BLANK.courseBoxAfterBlur = cBox.value;
+
+      MD.getElementById('manageDialog').close();
+      await new Promise((r) => setTimeout(r, 40));
+      BLANK.ran = true;
+    } catch (e) { BLANK.error = String(e && e.message || e); }
+  }
+
+  /* ── A plus handicap shows as "+3", not "-3", wherever it is turned into shots ──
+     (2026-09-07 audit). The index was already written "+2.7" by fmtIndex; the
+     course handicap and playing handicap beside it came out of String(), so
+     the same golfer read "+2.7" on one line and "-3" on the next. Planted, not
+     saved: __plant never touches storage. */
+  const PLUS = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const rounds = [];
+      for (let i = 1; i <= 5; i++) rounds.push({ id: 'p' + i, golferId: 'g1', date: '2026-04-0' + i,
+        courseId: 'c1', teeId: 't1', score: 65, pcc: 0, note: '', counts: true, holes: 18 });
+      MHK.__plant({ version: MHK.SCHEMA,
+        golfers: [{ id: 'g1', name: 'Plus Player' }], activeGolfer: 'g1',
+        courses: [{ id: 'c1', name: 'Flat Links', tees: [{ id: 't1', name: 'White', rating: 72, slope: 113, par: 72 }] }],
+        rounds, settings: { method: MHK.DEFAULT_METHOD, applyCaps: true, primary: 'rolling' } });
+      MD.getElementById('tab-player').click();
+      await new Promise((r) => setTimeout(r, 40));
+      PLUS.index = MW.computeAll('g1').rolling.value;
+      PLUS.card = MD.getElementById('chValue').textContent;
+      PLUS.sub = MD.getElementById('chSub').textContent;
+      PLUS.row = [...MD.querySelectorAll('#strokesTable tbody td')].map((td) => td.textContent);
+      PLUS.ran = true;
+    } catch (e) { PLUS.error = String(e && e.message || e); }
+  }
+
+  /* ── A nine waiting to be paired is not "counting towards handicap" (2026-09-07 audit) ──
+     `renderStats`' tile and the leaderboard's Rounds column both read
+     `counted.length`, which is the list BEFORE pairing — so Alex's single nine,
+     which the note beside the tile says "counts as soon as you log another
+     nine", was counted in the very figure that note qualifies. Planted, never
+     saved. */
+  const WAITING = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const demo = MW.buildDemoLeague();
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds: demo.rounds, activeGolfer: 'demo-g-1' });
+      const c = MW.computeAll('demo-g-1');
+      WAITING.logged = c.all.length;
+      WAITING.pending = !!c.pendingNine;
+      MD.getElementById('tab-player').click();
+      await new Promise((r) => setTimeout(r, 40));
+      const tile = [...MD.querySelectorAll('#stats .stat')]
+        .find((el) => /Counting towards handicap/.test(el.textContent));
+      WAITING.tile = tile ? tile.querySelector('.v').textContent : null;
+      MD.getElementById('tab-league').click();
+      await new Promise((r) => setTimeout(r, 40));
+      const row = MD.querySelector('#leagueTable tr[data-golfer="demo-g-1"]');
+      WAITING.leagueRounds = row ? row.children[4].textContent : null;
+      MD.getElementById('tab-player').click();
+      WAITING.ran = true;
+    } catch (e) { WAITING.error = String(e && e.message || e); }
+  }
+
+  /* ── The league warning names all three exclusion causes (2026-09-07 audit) ──
+     `counted` drops three kinds of round — the course deleted, marked don't
+     count, and a nine off tees with no 9-hole figures — and the golfer's own
+     page names each. The league page's line named two. Planted, never saved. */
+  const CAUSES = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const demo = MW.buildDemoLeague();
+      const bare = demo.courses.find((c) => c.tees.every((t) => t.rating9 == null));
+      const rounds = demo.rounds.concat([{ id: 'nine-no9', golferId: 'demo-g-2', date: '2026-06-01',
+        courseId: bare.id, teeId: bare.tees[0].id, score: 44, pcc: 0, note: '', counts: true, holes: 9 }]);
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds, activeGolfer: 'demo-g-2' });
+      CAUSES.no9 = MW.computeAll('demo-g-2').all.some((e) => e.no9);
+      MD.getElementById('tab-league').click();
+      await new Promise((r) => setTimeout(r, 40));
+      CAUSES.warn = MD.getElementById('leagueWarn').textContent;
+      MD.getElementById('tab-player').click();
+      CAUSES.ran = true;
+    } catch (e) { CAUSES.error = String(e && e.message || e); }
+  }
+
+  /* ── A round can't be in the future (2026-09-07 audit) ────────────────────
+     roundSave checked only the SHAPE of the date, so a round dated next year
+     saved silently and sat at the top of the list as the newest round played.
+     Driven in MEASURE through the real dialog; it writes on the second save,
+     so it sits with the walks whose keys are put back below. */
+  const FUTURE = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const demo = MW.buildDemoLeague();
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds: demo.rounds, activeGolfer: 'demo-g-3' });
+      const dlg = MD.getElementById('roundDialog');
+      const count = () => MHK.__state().rounds.length;
+      const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+      MW.openRound(null);
+      await new Promise((r) => setTimeout(r, 40));
+      FUTURE.max = MD.getElementById('f_date').max;
+      MD.getElementById('f_date').value = MW.isoOf(tomorrow);
+      MD.getElementById('f_score').value = '85';
+      const before = count();
+      MD.getElementById('roundSave').click();
+      await new Promise((r) => setTimeout(r, 40));
+      FUTURE.refused = { open: dlg.open, warn: MD.getElementById('roundWarn').textContent,
+                         added: count() - before };
+      /* Today is fine. */
+      MD.getElementById('f_date').value = MW.todayISO();
+      MD.getElementById('roundSave').click();
+      await new Promise((r) => setTimeout(r, 40));
+      FUTURE.today = { open: dlg.open, added: count() - before };
+      if (dlg.open) dlg.close();
+      await new Promise((r) => setTimeout(r, 40));
+      FUTURE.ran = true;
+    } catch (e) { FUTURE.error = String(e && e.message || e); }
+  }
+
+  /* ── A truncated share link fails ONCE, through the card (2026-09-07 audit) ──
+     `squeeze` neither awaited nor caught the writer's write() and close(), so a
+     token cut in half by a mail app produced the correct error card AND an
+     unhandled rejection in the console beside it — the same failure reported
+     twice, once through a path nothing owned. The codec is called directly with
+     a rejection listener on the frame it runs in, and a share frame is opened
+     at the same token for the card. */
+  const TRUNC = { ran: false };
+  try {
+    const whole = await S.encodeShare({
+      v: H.SHARE_PAYLOAD_V, sharedAt: 1754870400000, label: 'Cut', view: 'player',
+      golfers: [{ id: 'g1', name: 'Dad' }], activeGolfer: 'g1',
+      courses: [{ id: 'c1', name: 'Kilbryde Dunes',
+                  tees: [{ id: 't1', name: 'Medal', rating: 69.4, slope: 122, par: 71 }] }],
+      rounds: [], settings: { method: H.DEFAULT_METHOD, applyCaps: true, primary: 'rolling' },
+    });
+    /* Half the token, trimmed so atob does not refuse it for its length alone:
+       the failure has to be the deflate stream's, not base64's. */
+    let cut = whole.slice(0, Math.floor(whole.length / 2));
+    while ((cut.length - cut.indexOf('.') - 1) % 4 === 1) cut = cut.slice(0, -1);
+    TRUNC.compressed = whole.indexOf('0.') !== 0;
+    let unhandled = 0;
+    const onRej = (e) => { unhandled += 1; e.preventDefault(); };
+    W.addEventListener('unhandledrejection', onRej);
+    try { await S.decodeShare(cut); TRUNC.threw = false; }
+    catch (e) { TRUNC.threw = true; }
+    /* unhandledrejection is dispatched from a later task, so let a few run. */
+    await new Promise((r) => setTimeout(r, 150));
+    W.removeEventListener('unhandledrejection', onRej);
+    TRUNC.unhandled = unhandled;
+
+    const cf = document.createElement('iframe');
+    cf.setAttribute('aria-hidden', 'true');
+    cf.style.cssText = 'position:absolute;left:-9999px;width:1280px;height:800px;border:0';
+    await new Promise((resolve) => {
+      cf.onload = resolve;
+      cf.src = 'index.html?cut=' + Date.now() + '#share=' + cut;
+      document.body.appendChild(cf);
+    });
+    const CD = cf.contentWindow.document;
+    for (let i = 0; i < 60 && !/Couldn.t Be Opened/.test(CD.getElementById('playerPanel').textContent); i++)
+      await new Promise((r) => setTimeout(r, 50));
+    TRUNC.card = /Couldn.t Be Opened/.test(CD.getElementById('playerPanel').textContent);
+    TRUNC.ran = true;
+  } catch (e) { TRUNC.error = String(e && e.message || e); }
+
+  /* ── A shared view says what a visitor can do (2026-09-07 audit) ──────────
+     Four lines of copy pointed a visitor at buttons `viewOnly` hides — "the
+     Golfers button in the header", "the Courses button is in the header",
+     "Golfers & Courses is in the header", "Select a date to edit that round"
+     — one of them with a doubled word, and the Leaderboard tab stayed up for a
+     one-golfer share because renderEmptyState() returned before the line that
+     hides it. Two real links, each opened in a frame of its own, since
+     `viewOnly` is decided at boot. */
+  const VISITOR = { ran: false };
+  const openShare = async (payload) => {
+    const token = await S.encodeShare(payload);
+    const f = document.createElement('iframe');
+    f.setAttribute('aria-hidden', 'true');
+    f.style.cssText = 'position:absolute;left:-9999px;width:1280px;height:800px;border:0';
+    await new Promise((resolve) => {
+      f.onload = resolve;
+      f.src = 'index.html?visitor=' + Date.now() + Math.random() + '#share=' + token;
+      document.body.appendChild(f);
+    });
+    const FW = f.contentWindow;
+    for (let i = 0; i < 60 && !(FW.__ghTestHooks.__state().golfers || []).length; i++)
+      await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 60));
+    return FW;
+  };
+  try {
+    const base = { v: H.SHARE_PAYLOAD_V, sharedAt: 1754870400000, label: 'Dad', activeGolfer: 'g1',
+                   golfers: [{ id: 'g1', name: 'Dad' }],
+                   settings: { method: H.DEFAULT_METHOD, applyCaps: true, primary: 'rolling' } };
+    /* One golfer, a course, rounds — and the link asked for the league view. */
+    const A = await openShare(Object.assign({}, base, {
+      view: 'league',
+      courses: [{ id: 'c1', name: 'Kilbryde Dunes',
+                  tees: [{ id: 't1', name: 'Medal', rating: 69.4, slope: 122, par: 71 }] }],
+      rounds: [1, 2, 3].map((i) => ({ id: 'r' + i, golferId: 'g1', date: '2026-05-0' + i, courseId: 'c1',
+                                       teeId: 't1', score: 85 + i, pcc: 0, note: '', counts: true, holes: 18 })),
+    }));
+    const AD = A.document;
+    VISITOR.one = {
+      viewOnly: A.ghViewOnly === true,
+      leagueTabHidden: AD.getElementById('tab-league').hidden,
+      tab: AD.documentElement.getAttribute('data-tab'),
+      leagueNote: AD.getElementById('leagueNote').textContent,
+      caption: (AD.querySelector('#roundsTable caption') || {}).textContent || '',
+      /* innerText, not textContent: the app's script is INSIDE body, so
+         textContent would read every string in the source, hidden dialogs
+         included, and fail on the owner's copy the visitor never sees. */
+      doubled: /with with/.test(AD.body.innerText),
+      pointsAtHeader: /in the header/.test(AD.body.innerText),
+    };
+    /* One golfer and nothing else. */
+    const B = await openShare(Object.assign({}, base, { view: 'player', courses: [], rounds: [] }));
+    const BD = B.document;
+    VISITOR.bare = {
+      viewOnly: B.ghViewOnly === true,
+      welcome: !BD.getElementById('welcomeCard').hidden,
+      chSub: BD.getElementById('chSub').textContent,
+      strokes: BD.getElementById('strokesTable').textContent,
+      rounds: BD.getElementById('roundsTable').textContent,
+      pointsAtHeader: /in the header/.test(BD.body.innerText),
+    };
+    VISITOR.ran = true;
+  } catch (e) { VISITOR.error = String(e && e.message || e); }
+
+  /* ── The example league is offered only to an EMPTY app (2026-09-07 audit) ──
+     The first-run block under Rounds offered "Or Load the Example League" to
+     any golfer with no rounds — including the eighth golfer of the example
+     league itself, who has none by design. Planted, never saved. */
+  const OFFER = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const demo = MW.buildDemoLeague();
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds: demo.rounds, activeGolfer: 'demo-g-8' });
+      MD.getElementById('tab-player').click();
+      await new Promise((r) => setTimeout(r, 40));
+      OFFER.member = {
+        rounds: MHK.__state().rounds.filter((r) => r.golferId === 'demo-g-8').length,
+        league: !!MD.getElementById('demoLeagueBtn'),
+        single: !!MD.getElementById('demoBtn'),
+        first: (MD.getElementById('firstCourseBtn') || {}).textContent,
+        text: MD.getElementById('roundsTable').textContent,
+      };
+      MHK.__plant({ version: MHK.SCHEMA, golfers: [{ id: 'g1', name: 'Only Me' }], activeGolfer: 'g1',
+                    courses: [demo.courses[0]], rounds: [] });
+      await new Promise((r) => setTimeout(r, 40));
+      OFFER.empty = { league: !!MD.getElementById('demoLeagueBtn'), single: !!MD.getElementById('demoBtn') };
+      OFFER.ran = true;
+    } catch (e) { OFFER.error = String(e && e.message || e); }
+  }
+
+  /* The walks above all wrote through save() — put the reader's own keys back
+     before anything else runs. */
+  FIND_KEYS.forEach((k, i) => {
+    try {
+      if (findSaved[i] === null) localStorage.removeItem(k);
+      else localStorage.setItem(k, findSaved[i]);
+    } catch (e) { /* a browser refusing the write left it alone anyway */ }
+  });
+
 
 describe('The League Handicap window saves as you go (2026-09-07)');
   it('the walk actually drove it — everything below reads that record', () => {
@@ -3151,6 +3783,227 @@ describe('The League Handicap window saves as you go (2026-09-07)');
     eq(METHOD.afterReset, METHOD.defaults, 'the reset stores the defaults');
     eq(METHOD.resetCloseWrites, 0,
        'and re-entering openMethod() retook the snapshot, so closing finds nothing moved');
+  });
+
+describe('The League Rules boxes always show the rule that is stored (2026-09-07 audit)');
+  it('the walk actually drove it — everything below reads that record', () => {
+    ok(REFILL.ran, 'the walk did not finish', REFILL.error || 'no frame');
+  });
+  it('a window of 99 is stored as 60, and the box says 60', () => {
+    eq(REFILL.win99.stored, 60, 'normalizeMethod clamps to 60');
+    eq(REFILL.win99.box, '60',
+       'and the box is refilled from what was stored — a box reading 99 over a rule of 60 '
+       + 'is a window lying about the leaderboard behind it');
+  });
+  it('every clamp is shown, not just the one between the boxes', () => {
+    eq(REFILL.win0, { box: '1', stored: 1 }, 'window 0 → 1');
+    eq(REFILL.win25, { box: '3', stored: 3 }, 'window 2.5 → 3 (whole rounds)');
+    eq(REFILL.mult5, { box: '2', stored: 2 }, 'multiplier 5 → 2');
+    eq(REFILL.adj50, { box: '20', stored: 20 }, 'adjustment 50 → 20');
+  });
+  it('with a box empty the preview describes the STORED rule, not the default', () => {
+    eq(REFILL.storedWhileBlank, 60, 'nothing was written for the empty box');
+    ok(/the last 60 rounds/.test(REFILL.previewWhileBlank),
+       'the preview names the window that is actually in force', REFILL.previewWhileBlank);
+    ok(/as saved/.test(REFILL.previewWhileBlank),
+       'and says that is what it is describing', REFILL.previewWhileBlank);
+  });
+  it('one round is "1 round", in the preview and in the correction', () => {
+    ok(/the last 1 round’s|the last 1 round's/.test(REFILL.previewAtOne),
+       'the preview is singular', REFILL.previewAtOne);
+    ok(/of only 1 round\b(?!s)/.test(REFILL.warnAtOne),
+       'and so is the correction', REFILL.warnAtOne);
+  });
+
+describe('A sync adoption while League Rules is open refills the boxes (2026-09-07 audit)');
+  it('the walk actually drove it — everything below reads that record', () => {
+    ok(ADOPT.ran, 'the walk did not finish', ADOPT.error || 'no frame');
+    eq(ADOPT.before, { window: '5', use: '5', caps: true }, 'and it opened on the default rule');
+  });
+  it('the boxes follow the adopted rule', () => {
+    eq(ADOPT.boxesAfter, { window: '12', use: '4', caps: false },
+       'after ghAdopt the window shows the rule that is now stored');
+  });
+  it('finishing with one box then stores the ADOPTED rule plus that box, not the stale boxes', () => {
+    eq(ADOPT.stored, { window: 12, use: 4, multiplier: 0.96, caps: false },
+       'commitMethod rebuilds the whole rule from the boxes, so stale boxes would revert the '
+       + 'adoption and push it straight back to the device it came from');
+  });
+  it('mid-way through a box when a different rule arrives: refilled, and told', () => {
+    eq(ADOPT.midway.window, '10', 'the boxes show the new rule');
+    eq(ADOPT.midway.adj, '0', 'including the one the reader was typing in');
+    ok(/changed/.test(ADOPT.midway.toast),
+       'and a toast says the rule changed under them', ADOPT.midway.toast);
+  });
+  it('mid-way through a box when the SAME rule arrives: the typing is left alone', () => {
+    eq(ADOPT.sameRule.adj, '3', 'a sync that changed a round, not the rule, must not wipe a box');
+    eq(ADOPT.sameRule.toast, '', 'and there is nothing to say');
+  });
+
+describe('Editing an orphaned round keeps it orphaned (2026-09-07 audit)');
+  it('the walk actually drove it — everything below reads that record', () => {
+    ok(ORPHAN.ran, 'the walk did not finish', ORPHAN.error || 'no frame');
+  });
+  it('the editor says the course is gone, rather than pre-selecting the first one', () => {
+    eq(ORPHAN.course.value, '', 'no real course is selected');
+    ok(/deleted course/.test(ORPHAN.course.text), 'the option says so', ORPHAN.course.text);
+    ok(/deleted tee/.test(ORPHAN.course.tee), 'and so does the tee box', ORPHAN.course.tee);
+    ok(/deleted/.test(ORPHAN.course.hint) && /pick/i.test(ORPHAN.course.hint),
+       'and the hint is an instruction, not a differential worked out at a course the round '
+       + 'was never played on', ORPHAN.course.hint);
+  });
+  it('changing only the note saves the note and leaves the round orphaned', () => {
+    ok(ORPHAN.afterNote.closed, 'the save went through', ORPHAN.afterNote.warn);
+    eq(ORPHAN.afterNote.note, 'corrected note', 'the note was kept');
+    eq(ORPHAN.afterNote.courseId, 'gone-course',
+       'the course id is untouched — it used to become whichever course was listed first');
+    eq(ORPHAN.afterNote.teeId, 'gone-tee', 'and so is the tee id');
+    ok(ORPHAN.stillOut, 'so it still does not count');
+  });
+  it('picking a real course is the way back in', () => {
+    ok(ORPHAN.pickedTee, 'the tee list fills for the course picked', ORPHAN.pickedTee);
+    ok(ORPHAN.rehomed.courseId !== 'gone-course' && ORPHAN.rehomed.teeId === ORPHAN.pickedTee,
+       'the round is re-homed on the reader’s say-so', JSON.stringify(ORPHAN.rehomed));
+    ok(ORPHAN.rehomed.counted, 'and counts again');
+  });
+  it('a round whose tee alone is gone keeps its course and says the tee was deleted', () => {
+    ok(ORPHAN.tee.course, 'the course is still selected', ORPHAN.tee.course);
+    eq(ORPHAN.tee.value, '', 'no real tee is selected');
+    ok(/deleted tee/.test(ORPHAN.tee.text), 'the option says so', ORPHAN.tee.text);
+    ok(ORPHAN.teeAfter.closed, 'saving as it is goes through');
+    eq(ORPHAN.teeAfter.teeId, 'gone-tee', 'and the tee id is untouched');
+  });
+
+describe('A name box that is emptied stores nothing (2026-09-07 audit)');
+  it('the walk actually drove it — everything below reads that record', () => {
+    ok(BLANK.ran, 'the walk did not finish', BLANK.error || 'no frame');
+    eq(BLANK.golferRenamed, 'Renamed Golfer', 'a real rename still lands as you type');
+    eq(BLANK.courseRenamed, 'Renamed Course', 'in both lists');
+  });
+  it('an emptied golfer box keeps the last name, and blur puts it back in the box', () => {
+    eq(BLANK.golferEmptied, 'Renamed Golfer', 'an empty box is not a rename');
+    eq(BLANK.golferSpaces, 'Renamed Golfer', 'nor is a box of spaces');
+    eq(BLANK.golferBoxAfterBlur, 'Renamed Golfer', 'leaving the box puts the name back');
+    ok(!BLANK.pickerBlank, 'and the golfer picker never grew a blank option');
+  });
+  it('the course box does the same', () => {
+    eq(BLANK.courseEmptied, 'Renamed Course', 'an empty box is not a rename');
+    eq(BLANK.courseBoxAfterBlur, 'Renamed Course', 'leaving the box puts the name back');
+  });
+
+describe('A plus handicap is written "+3", not "-3" (2026-09-07 audit)');
+  it('the frame actually drew it — everything below reads that record', () => {
+    ok(PLUS.ran, 'the walk did not finish', PLUS.error || 'no frame');
+    eq(PLUS.index, -7, 'five 65s at a par-72, rating-72, slope-113 tee is an index of +7.0');
+  });
+  it('the course handicap card writes the plus', () => {
+    eq(PLUS.card, '+7', 'the big figure');
+    ok(/\+7\.0 .*= \+7 shots/.test(PLUS.sub),
+       'and the sentence under it agrees with the index it starts from', PLUS.sub);
+  });
+  it('and so does the strokes table', () => {
+    eq(PLUS.row.slice(0, 3), ['+7.0', '+7', '+7'], 'index, course handicap, playing handicap');
+  });
+
+describe('A nine waiting to be paired is not "counting towards handicap" (2026-09-07 audit)');
+  it('the frame actually drew it — everything below reads that record', () => {
+    ok(WAITING.ran, 'the walk did not finish', WAITING.error || 'no frame');
+    eq(WAITING.logged, 27, 'Alex has 27 rounds logged');
+    ok(WAITING.pending, 'and one of them is a nine waiting for its partner');
+  });
+  it('the tile counts 26, not 27', () => {
+    eq(WAITING.tile, '26',
+       'the note beside it says the nine counts towards nothing yet, and the figure has to agree');
+  });
+  it('and so does the leaderboard’s Rounds column', () => {
+    eq(WAITING.leagueRounds, '26', 'the same figure, from the same predicate');
+  });
+
+describe('The league warning names all three exclusion causes (2026-09-07 audit)');
+  it('the frame actually drew it — everything below reads that record', () => {
+    ok(CAUSES.ran, 'the walk did not finish', CAUSES.error || 'no frame');
+    ok(CAUSES.no9, 'and the planted nine really is one the app cannot score');
+  });
+  it('the line under the leaderboard names the nine with no 9-hole figures too', () => {
+    ok(/left out/.test(CAUSES.warn), 'the warning is up', CAUSES.warn);
+    ok(/deleted/.test(CAUSES.warn) && /don.t count/.test(CAUSES.warn),
+       'the two causes it always named', CAUSES.warn);
+    ok(/9-hole/.test(CAUSES.warn),
+       'and the third, which counted drops just the same and the golfer’s own page names',
+       CAUSES.warn);
+  });
+
+describe('A round can’t be in the future (2026-09-07 audit)');
+  it('the walk actually drove it — everything below reads that record', () => {
+    ok(FUTURE.ran, 'the walk did not finish', FUTURE.error || 'no frame');
+  });
+  it('a round dated tomorrow is refused, in the dialog’s own words', () => {
+    ok(FUTURE.refused.open, 'the dialog stays up');
+    eq(FUTURE.refused.added, 0, 'and nothing was saved');
+    ok(/future/.test(FUTURE.refused.warn), 'the warning line says why', FUTURE.refused.warn);
+  });
+  it('the date box says so before you press anything', () => {
+    eq(FUTURE.max, todayLocal(), 'its max is today');
+  });
+  it('a round dated today saves', () => {
+    ok(!FUTURE.today.open, 'the dialog closed');
+    eq(FUTURE.today.added, 1, 'and one round was added');
+  });
+
+describe('A truncated share link fails once, through the card (2026-09-07 audit)');
+  it('the codec was actually driven — everything below reads that record', () => {
+    ok(TRUNC.ran, 'the walk did not finish', TRUNC.error || 'no frame');
+    ok(TRUNC.compressed, 'the token went through the deflate stream, which is the path in question');
+    ok(TRUNC.threw, 'and decodeShare refused the cut token');
+  });
+  it('the error card is shown', () => {
+    ok(TRUNC.card, 'the frame opened at the cut token drew “This Shared Link Couldn’t Be Opened”');
+  });
+  it('and nothing else is reported — no unhandled rejection beside the card', () => {
+    eq(TRUNC.unhandled, 0,
+       'squeeze must await, or catch, the writer’s write() and close(): a rejection from either '
+       + 'that nothing awaits is the same failure reported twice');
+  });
+
+describe('A shared view says what a visitor can do (2026-09-07 audit)');
+  it('both links actually opened as shared views — everything below reads that record', () => {
+    ok(VISITOR.ran, 'the walk did not finish', VISITOR.error || 'no frame');
+    ok(VISITOR.one.viewOnly && VISITOR.bare.viewOnly, 'both frames booted read-only');
+  });
+  it('a one-golfer share has no Leaderboard tab, as a one-golfer app has none', () => {
+    ok(VISITOR.one.leagueTabHidden, 'the tab is hidden');
+    eq(VISITOR.one.tab, 'player', 'and the link that asked for the league view lands on the golfer');
+  });
+  it('nothing points a visitor at a button they do not have', () => {
+    ok(!VISITOR.one.doubled, 'the doubled "with with" is gone');
+    ok(!/Golfers button|Golfers & Courses/.test(VISITOR.one.leagueNote),
+       'the leaderboard-of-one note does not send a visitor to a hidden button', VISITOR.one.leagueNote);
+    ok(/shared/i.test(VISITOR.one.leagueNote), 'it says what this is instead', VISITOR.one.leagueNote);
+    ok(!VISITOR.one.pointsAtHeader && !VISITOR.bare.pointsAtHeader,
+       'nothing on either page says "in the header"');
+    ok(!/Add a course/.test(VISITOR.bare.chSub), 'the course handicap card does not ask for a course', VISITOR.bare.chSub);
+    ok(!/Add a course/.test(VISITOR.bare.strokes), 'nor does Strokes on the Day', VISITOR.bare.strokes);
+    ok(/shared/i.test(VISITOR.bare.chSub) && /shared/i.test(VISITOR.bare.strokes),
+       'both say what was (not) shared', VISITOR.bare.chSub + ' | ' + VISITOR.bare.strokes);
+  });
+  it('the rounds table does not tell a screen reader to select a date that is plain text', () => {
+    ok(VISITOR.one.caption.length > 0, 'the caption is still there', VISITOR.one.caption);
+    ok(!/Select a date/.test(VISITOR.one.caption), 'without the edit instruction', VISITOR.one.caption);
+  });
+
+describe('The example league is offered only to an empty app (2026-09-07 audit)');
+  it('the frame actually drew it — everything below reads that record', () => {
+    ok(OFFER.ran, 'the walk did not finish', OFFER.error || 'no frame');
+    eq(OFFER.member.rounds, 0, 'the eighth golfer of the example has no rounds, by design');
+  });
+  it('a golfer with no rounds inside a populated app is offered a round, not the example', () => {
+    ok(!OFFER.member.league, 'no "Load the Example League" — it is already loaded');
+    ok(!OFFER.member.single, 'and no single-golfer example either');
+    eq(OFFER.member.first, '+ Add round', 'the one thing to do is offered');
+    ok(/for this golfer/.test(OFFER.member.text), 'and the line says whose rounds are missing', OFFER.member.text);
+  });
+  it('an app with no rounds at all still gets both examples', () => {
+    ok(OFFER.empty.league && OFFER.empty.single, 'both offers are up');
   });
 
 describe('Where a press leaves the page (2026-09-05)');

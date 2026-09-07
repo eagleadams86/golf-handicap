@@ -65,7 +65,9 @@ A browser with nothing in it opens on one card — no tabs, no panels:
 **Start Fresh** opens the course editor, because a score means nothing until the app knows the
 rating and slope it was shot against. **Load Sample Data** loads
 [the example league](#trying-it-out--the-example-league). **Restore a Backup** opens the same
-[*Back Up & Restore*](#backups) window the ⇩ button does.
+[*Back Up & Restore*](#backups) window the ⇩ button does. The Rounds card offers the two
+examples again while the app has no rounds at all; a golfer with no rounds in an app that
+has some — a new member, say — is offered a round and nothing else.
 
 The card is up only while the app is completely bare. Save a course and it steps aside for the
 Rounds card's own first-run state, which knows you have somewhere to play and offers the round
@@ -80,7 +82,8 @@ words and the same order.
 2. **Log a round.** *+ Add round.* Date, holes, course, tees, then a score for everyone who
    played — the whole fourball goes in through one window, with nobody ticked but you until
    you say otherwise. The next round pre-fills with whatever the last one used, so a regular
-   game at the same club is a few taps.
+   game at the same club is a few taps. A round is something that was played: a date after
+   today is refused, and the picker greys tomorrow out.
 3. **Read the two numbers.** Both figures update as you type, and *How these are worked out*
    shows the actual arithmetic — which rounds were used, what they averaged to, and every
    step in between.
@@ -120,7 +123,9 @@ Metrics, Sprint Predictability, Money Map and the Lottery Portfolio.
 Multiple golfers are supported: use **Golfers & Courses** in the header, which is also where
 courses and their tees are added and edited. Each golfer keeps their own rounds and their own
 handicap. Courses and the league rule are shared between everyone, which is what makes the
-leaderboard a fair comparison.
+leaderboard a fair comparison. Renaming happens in the box beside the name, as you type; a
+box cleared to retype stores nothing until it holds a name again, and if you leave it empty
+the last name comes back — a golfer or a course is never nameless.
 
 Under **Rounds**, the *Used in* column shows which rounds each figure actually leaned on, so
 it is always visible why a number moved. Past eight rounds a filter appears above the table —
@@ -128,6 +133,14 @@ by course, or by anything the row shows — and it changes only what is on scree
 line beside it says out loud: both handicaps always use every round. A round can be marked *don't count* when you edit
 it — useful for a practice round or a scramble — and the app says so on the front page
 rather than quietly leaving it out.
+
+**Deleting a course keeps its rounds.** They stay in the list marked *course deleted* and
+stop counting. Open one to edit it and the course box reads *(deleted course)* — or the
+tee box *(deleted tee)*, if only the tees went — with a line saying so; correct the note or
+the score and save, and the round stays exactly as orphaned as it was. Pick a real course
+for it and it counts again. (Until September 2026 the editor pre-selected the first course
+in the list, worked out a differential as though the round had been played there, and a
+corrected note quietly re-homed it.)
 
 ### Trying It Out — The Example League
 
@@ -159,8 +172,9 @@ answers are reachable: a nine that scores, and a nine the app says it cannot sco
 
 **It adds, and destroys nothing.** Your own golfer, courses and rounds are left exactly
 where they were — your golfer simply joins the leaderboard. The `demo-` ids are stable, so
-loading it twice refreshes the example league rather than stacking a second copy. *Clear
-everything*, in the Back up dialog, is the way back out.
+loading it twice refreshes the example league rather than stacking a second copy — a demo
+course you renamed or re-rated comes back as it was, scores included. *Clear everything*,
+in the Back up dialog, is the way back out.
 
 **The dates are counted from the day you load it**, so the league is never stale, and the
 scores come from a seeded generator — the same league on every device and in every run, so
@@ -200,7 +214,7 @@ The **Leaderboard** tab puts every golfer in one table, lowest handicap first:
 | **Golfer** | Select a name to open that golfer's own page. |
 | *The league rule's name* | Their league handicap — the figure the app leads with. |
 | **Official** | Their World Handicap System index. |
-| **Rounds** | How many of their rounds count towards the figures. |
+| **Rounds** | How many of their rounds count towards the figures. A nine still waiting for its partner is not among them — nor in the *Counting towards handicap* tile on the golfer's own page — until the second nine is logged. |
 | **Best diff** | Their lowest score differential ever logged. |
 | **Change over 5** | A sparkline of their last few games, and how far their handicap has moved over their last 5 counting rounds. ▼ is improving — and the figure, not the line, is what a screen reader reads and what the CSV carries. |
 | **Last round** | When they last played. |
@@ -213,7 +227,9 @@ Every row goes through exactly the same calculation as that golfer's own page, s
 can never disagree. A golfer with no figure yet — fewer than 3 counting rounds gets no
 official index, and someone who has never played gets neither — sits at the foot with no
 position, rather than being ranked first for having no number. Rounds left out of the
-figures are counted up underneath the table, as they are on the front page.
+figures are counted up underneath the table, as they are on the front page, with all three
+reasons a round can be left out — the course was deleted, it is marked *don't count*, or it
+is a nine off tees with no 9-hole rating yet.
 
 Underneath it, **Strokes on the Day** turns those handicaps into shots at one course, off one
 set of tees, in one format: each golfer's course handicap, what they play off after the
@@ -252,6 +268,11 @@ could press one the change is made. Two things it will tell you about rather tha
 - **You can't use the best 30 of only 20 rounds.** It corrects the box to what the rule can
   mean, says so, and then stores the corrected rule — the correction ends up on the
   leaderboard rather than stranded on screen.
+- **Every box shows what was stored.** The window runs from 1 to 60 rounds, the multiplier
+  from 0.1 to 2 and the offset from −20 to +20, and a figure typed outside those is stored
+  at the nearer end — after each change every box is refilled from the stored rule, so a
+  box never reads 99 over a leaderboard ranked on 60. While a box is empty the *In words*
+  line describes the rule as saved, and says so.
 
 *Reset to Last 5* writes immediately, as it always has.
 
@@ -374,7 +395,9 @@ of tees — the shots those tees give you:
 index × (slope ÷ 113) + (course rating − par)
 ```
 
-rounded to a whole number. It follows whichever figure you have set as primary, so switching
+rounded to a whole number — a half rounds up toward the higher number, as the Rules of
+Handicapping say, so a plus player's −2.5 is +2, and a plus handicap is written *+2* here
+just as a plus index is. It follows whichever figure you have set as primary, so switching
 between the league handicap and the official one changes it.
 
 What a competition actually gives you is a **percentage of that**, and the percentage depends
@@ -451,7 +474,10 @@ editor that would refuse to save.
 **Share** in the header builds a link that shows someone the handicaps you pick, with no
 sign-in and no way for them to change anything. Tick the golfers to include — **Select all**
 takes the lot, and the count above the list says where you are — and pick more than one and
-the link opens on the leaderboard.
+the link opens on the leaderboard. A link for one golfer has no Leaderboard tab, as an app
+with one golfer has none, and every line of copy the visitor sees describes the link rather
+than the buttons they do not have — *No course was shared* where the owner would be told to
+add one, and no "select a date to edit" over dates that are plain text.
 
 **How many rounds** decides how much history rides along: every round, each golfer's last 20
 or 10, the last 12 or 6 months, or everything from a date you choose. "Last N" counts *per
@@ -653,6 +679,11 @@ offline either way.
 
 - The **first time a Google account syncs in a browser**, if both sides already hold rounds
   you are asked which copy to keep. It does not guess by timestamp.
+- **Nothing is pushed until that question has been answered.** Between sign-in and the
+  answer the app is reading the cloud copy; an edit made in that gap, or one still waiting
+  to be sent when sign-in completed, is held and goes up once the verdict is in — as part of
+  whichever copy the verdict chose — rather than overwriting the cloud copy before the
+  dialog could ask.
 - Underneath that, **an empty copy never beats a copy with data in it**, whatever the
   timestamps say. Without this rule, signing in on a fresh browser pushes an empty state
   stamped *now*, and the device that actually had the rounds — carrying an older timestamp —
@@ -661,6 +692,11 @@ offline either way.
 - A device clearing everything **asks** the others rather than silently wiping them.
 - Two tabs of the **same browser** share one copy: an edit saved in one appears in the
   other immediately, signed in or not.
+- **A change to the league rule arriving while League Rules is open** refills the boxes
+  with the rule that arrived, and says so if you were half-way through typing in one. The
+  window writes the whole rule from its boxes, so boxes left showing the old rule would
+  have put it back on your next change and sent it to the device the new one came from.
+  A sync that changed a round and not the rule leaves the boxes alone.
 - **Sync failures are shown, not logged.** The button reads "⚠️ Not syncing" with the cause
   in plain English. There is deliberately no retry button: transient failures are retried by
   the SDK, permanent ones are not fixed by pressing anything, and the next save recovers the

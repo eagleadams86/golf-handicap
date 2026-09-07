@@ -2512,7 +2512,18 @@ function applyCaps(calculated, lowIndex) {
 
 /* Course Handicap = Index × (Slope ÷ 113) + (Course Rating − Par).
    The index is portable; this is what it turns into on one particular set of
-   tees on one particular course, i.e. the shots you actually get. */
+   tees on one particular course, i.e. the shots you actually get.
+
+   ROUNDED WITH Math.round, DELIBERATELY, and playingHandicap below uses the
+   same. The Rules of Handicapping round a Course Handicap and a Playing
+   Handicap to the nearest whole number with .5 going UP — and "up" is toward
+   the higher number, not away from zero — so a plus player's raw −2.5 is a
+   course handicap of +2 (−2 here), which is exactly what Math.round gives.
+   Until 2026-09-07 playingHandicap rounded half AWAY from zero instead, on the
+   reasoning that Math.round "hands the better player a shot", and the two
+   functions disagreed on the same half. round1 is different: it is a
+   score-differential / index rounding, where the Rules do round to the
+   nearest tenth with .5 away from zero. */
 function courseHandicap(index, slope, rating, par) {
   if (index == null || !(Number(slope) > 0)) return null;
   const raw = index * (Number(slope) / 113) + (Number(rating) - Number(par));
@@ -2544,13 +2555,11 @@ const DEFAULT_ALLOWANCE = 'full';
 function allowanceById(id) {
   return ALLOWANCES.find((a) => a.id === id) || ALLOWANCES[0];
 }
-/* Rounded half AWAY from zero, not with Math.round, for the same reason round1
-   is: a plus handicap is negative, and Math.round(-2.5) is -2, which would hand
-   the better player a shot they have not earned while rounding +2.5 up to 3. */
+/* Math.round, the same rule as courseHandicap — see the note there. */
 function playingHandicap(courseHcp, pct) {
   if (courseHcp == null) return null;
   const raw = courseHcp * ((Number(pct) || 0) / 100);
-  return raw < 0 ? -Math.round(-raw) : Math.round(raw);
+  return Math.round(raw);
 }
 
 /* ── Sync decision ───────────────────────────────────────────────────────────
@@ -2565,6 +2574,39 @@ function syncDecision(localCount, remoteCount, remoteIsNewer, firstSyncForAccoun
   if (remoteCount && !localCount) return 'adopt';
   if (localCount && !remoteCount) return 'push';
   return remoteCount && remoteIsNewer ? 'adopt' : 'push';
+}
+
+/* ── The push gate ───────────────────────────────────────────────────────────
+   No push reaches the cloud before syncDecision has said which copy wins
+   (2026-09-07 audit). startSync awaits getDoc before it can ask, and until then
+   `window.cloudPush` was live: an edit made in that window, or a push already
+   debounced when sign-in completed, wrote this device's copy over the cloud
+   one BEFORE the which-copy dialog had asked — the exact overwrite the verdict
+   exists to prevent, through a side door. Pure, so tests.html pins it; the
+   sync module makes one and threads every push through it.
+
+   `request(push)` runs the push at once when the gate is open; while it is
+   held it remembers that one was wanted and runs nothing. `release(push)`
+   opens the gate and runs ONE push if any was wanted meanwhile — the current
+   state, which by then is whichever copy the verdict chose. `hold()` closes
+   it again and forgets: every auth report is a new account and a new verdict,
+   and a push wanted under the old account must not be sent under the new.
+─────────────────────────────────────────────────────────────────────────── */
+function makePushGate() {
+  let held = true, wanted = false;
+  return {
+    held: () => held,
+    request(push) {
+      if (held) { wanted = true; return false; }
+      push();
+      return true;
+    },
+    release(push) {
+      held = false;
+      if (wanted) { wanted = false; push(); }
+    },
+    hold() { held = true; wanted = false; },
+  };
 }
 
 const DAY = 86400000;
@@ -2746,6 +2788,11 @@ function fmtDate(iso) {
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 function fmtIndex(v) { return v == null ? '—' : (v < 0 ? '+' + Math.abs(v).toFixed(1) : v.toFixed(1)); }
+/* The whole-number sibling, for a course or playing handicap: a plus player's
+   −3 is written "+3", as the "+2.7" index it came from is. Until 2026-09-07 those
+   figures went through String() and the same golfer read "+2.7" on one line
+   and "-3" on the next. */
+function fmtShots(v) { return v == null ? '—' : (v < 0 ? '+' + Math.abs(v) : String(v)); }
 /* A movement, read as one: down is an improving handicap. The arrow is never
    the only cue — the number carries the size and "level" is spelled out. */
 function trendLabel(v) { return v == null ? '—' : (v === 0 ? 'level' : (v < 0 ? '▼ ' : '▲ ') + Math.abs(v).toFixed(1)); }
@@ -2976,6 +3023,14 @@ function computeAll(golferId) {
      same things. */
   const paired = pairNines(counted);
   const games = paired.games;
+  /* What is actually COUNTING: `counted` minus a nine still waiting for its
+     partner. `counted` is the list before pairing and stays so — it is what
+     the exclusion notes reckon against, and a waiting nine is not an exclusion,
+     it has a note of its own. Until 2026-09-07 the "Counting towards handicap"
+     tile and the leaderboard's Rounds column read `counted.length`, so the
+     nine the note beside them said "counts towards nothing yet" was counted in
+     the very figure the note qualified. */
+  const counting = paired.pending ? counted.filter((e) => e !== paired.pending) : counted;
 
   const forHistory = games.map((g) => ({
     date: g.date,
@@ -3001,7 +3056,7 @@ function computeAll(golferId) {
   const usedRoll = pickUsed(newestFirst, values, rollPick);
 
   return {
-    all, counted, games, pendingNine: paired.pending, method, useCaps, useEsr, history, latest,
+    all, counted, counting, games, pendingNine: paired.pending, method, useCaps, useEsr, history, latest,
     whs: {
       value: latest ? latest.whs : null,
       uncapped: latest ? latest.whsUncapped : null,
@@ -3085,38 +3140,44 @@ function render() {
 }
 
 function renderEmptyState() {
-  if (window.ghViewOnly) return;
-  /* ── The welcome card ──────────────────────────────────────────────────────
-     Up only while the app is completely bare. NOT just "no rounds": add a
-     course and the Rounds card's own first-run state is the right next
-     instruction — it knows you have somewhere to play and offers the round
-     rather than the course again — so this steps aside at exactly that point.
+  /* A shared view keeps its cards whatever the link carried — renderRounds
+     says "No rounds were shared" in the table's place — so the welcome card
+     and the bare-app hiding are the owner's alone. The one-golfer rule at the
+     foot is EVERYBODY'S: until 2026-09-07 this returned before reaching it,
+     so a one-golfer share kept a Leaderboard tab a one-golfer app never has. */
+  if (!window.ghViewOnly) {
+    /* ── The welcome card ────────────────────────────────────────────────────
+       Up only while the app is completely bare. NOT just "no rounds": add a
+       course and the Rounds card's own first-run state is the right next
+       instruction — it knows you have somewhere to play and offers the round
+       rather than the course again — so this steps aside at exactly that point.
 
-     What it hides is hidden in CSS off `data-welcome`; setTab() writes the
-     panels' `hidden` property and would put them back a tick later. */
-  const virgin = state.rounds.length === 0 && state.courses.length === 0;
-  document.getElementById('welcomeCard').hidden = !virgin;
-  document.documentElement.toggleAttribute('data-welcome', virgin);
+       What it hides is hidden in CSS off `data-welcome`; setTab() writes the
+       panels' `hidden` property and would put them back a tick later. */
+    const virgin = state.rounds.length === 0 && state.courses.length === 0;
+    document.getElementById('welcomeCard').hidden = !virgin;
+    document.documentElement.toggleAttribute('data-welcome', virgin);
 
-  const bare = state.rounds.length === 0;
-  /* `strokesCard` joins them for the same reason: with no rounds there are no
-     handicaps to turn into shots, so it is a course picker above a column of
-     dashes. `leagueCard` stays — it is the tab's whole content, and its own note
-     explains an empty table. `courseStatsCard` is deliberately NOT here: it
-     decides its own visibility on how many courses have been played, and this
-     loop would then un-hide it a moment later on every render with rounds in. */
-  ['handicapCard', 'statsCard', 'trendCard', 'playingCard', 'strokesCard'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.hidden = bare;
-  });
-  /* The Rounds card STAYS — it is what holds the empty state — but its heading
-     row goes with the rest. "Rounds" over a card that says there are none, beside
-     an "+ Add round" the empty state offers again in the right order, is two
-     controls competing with the one thing a first-time visitor is being asked to
-     do. The card keeps its own heading for a screen reader either way: the empty
-     state's lede is the first thing in it. */
-  const head = document.getElementById('roundsHead');
-  if (head) head.hidden = bare;
+    const bare = state.rounds.length === 0;
+    /* `strokesCard` joins them for the same reason: with no rounds there are no
+       handicaps to turn into shots, so it is a course picker above a column of
+       dashes. `leagueCard` stays — it is the tab's whole content, and its own note
+       explains an empty table. `courseStatsCard` is deliberately NOT here: it
+       decides its own visibility on how many courses have been played, and this
+       loop would then un-hide it a moment later on every render with rounds in. */
+    ['handicapCard', 'statsCard', 'trendCard', 'playingCard', 'strokesCard'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.hidden = bare;
+    });
+    /* The Rounds card STAYS — it is what holds the empty state — but its heading
+       row goes with the rest. "Rounds" over a card that says there are none, beside
+       an "+ Add round" the empty state offers again in the right order, is two
+       controls competing with the one thing a first-time visitor is being asked to
+       do. The card keeps its own heading for a screen reader either way: the empty
+       state's lede is the first thing in it. */
+    const head = document.getElementById('roundsHead');
+    if (head) head.hidden = bare;
+  }
   const solo = state.golfers.length < 2;
   const tab = document.getElementById('tab-league');
   if (tab) tab.hidden = solo;
@@ -3216,7 +3277,7 @@ function renderStats(c) {
      last unless something longer arrives. */
   const tiles = [
     ['Rounds logged', String(c.all.length)],
-    ['Counting towards handicap', String(c.counted.length)],
+    ['Counting towards handicap', String(c.counting.length)],
     ['Best differential', best == null ? '—' : best.toFixed(1)],
     [`Change over ${TREND_ROUNDS} rounds`, trendLabel(trend)],
     ['Last round', last ? `${last.round.score} on ${fmtDate(last.date)}` : '—'],
@@ -3705,7 +3766,11 @@ function renderCourseHandicap(c) {
   const sub = document.getElementById('chSub');
   if (!tee) {
     el.textContent = '—'; el.classList.add('na');
-    sub.textContent = state.courses.length ? 'Pick a course and tee.' : 'Add a course first — the Courses button is in the header.';
+    /* A visitor has no Golfers & Courses button to be sent to (2026-09-07
+       audit): say what the link carried instead. */
+    sub.textContent = state.courses.length ? 'Pick a course and tee.'
+      : viewOnly ? 'No course was shared, so there is nothing to convert the index at.'
+      : 'Add a course first — Golfers & Courses is in the header.';
     return;
   }
   const ch = courseHandicap(index, tee.slope, tee.rating, tee.par);
@@ -3715,14 +3780,14 @@ function renderCourseHandicap(c) {
     return;
   }
   const ph = playingHandicap(ch, allow.pct);
-  el.textContent = String(ph); el.classList.remove('na');
+  el.textContent = fmtShots(ph); el.classList.remove('na');
   /* The full course handicap is always in the sentence, even when the allowance
      is 100% and the two numbers are the same. The big figure is what you play
      off; the line under it is where it came from, and a percentage that silently
      takes shots away is the one thing here that has to be visible. */
   const cut = allow.pct === 100 ? '' :
-    ` Then ${allow.pct}% for ${allow.label.replace(/\s*\(\d+%\)$/, '').toLowerCase()} = ${ph}.`;
-  sub.textContent = `${fmtIndex(index)} (${which}) × ${tee.slope} ÷ 113 + (${tee.rating} − ${tee.par}) = ${ch} shots off the tee at ${course.name}, ${tee.name}.${cut}`;
+    ` Then ${allow.pct}% for ${allow.label.replace(/\s*\(\d+%\)$/, '').toLowerCase()} = ${fmtShots(ph)}.`;
+  sub.textContent = `${fmtIndex(index)} (${which}) × ${tee.slope} ÷ 113 + (${tee.rating} − ${tee.par}) = ${fmtShots(ch)} shots off the tee at ${course.name}, ${tee.name}.${cut}`;
 }
 
 function renderRounds(c) {
@@ -3748,23 +3813,32 @@ function renderRounds(c) {
        course" is an instruction the visitor has followed, and the round they
        cannot otherwise reach is the thing to offer. */
     const haveCourse = state.courses.length > 0;
+    /* The examples are for an EMPTY APP, not an empty golfer (2026-09-07 audit):
+       this block is drawn per golfer, and it offered "Load the Example League"
+       to the eighth golfer of the example league itself, who has no rounds by
+       design. With rounds anywhere in the app the one thing to offer is theirs. */
+    const anyRounds = state.rounds.length > 0;
     box.innerHTML = `<div class="empty first-run">
-      <p class="lede">${haveCourse
+      <p class="lede">${anyRounds
+        ? 'No rounds yet for this golfer. Log one and both handicaps appear straight away.'
+        : haveCourse
         ? 'No rounds yet. Log one and both handicaps appear straight away.'
         : 'No rounds yet. Add a course first, then log a round — both handicaps appear as soon as there is something to work from.'}</p>
       <div class="first-run-actions">
         <button type="button" class="primary" id="firstCourseBtn">${haveCourse ? '+ Add round' : 'Add your first course'}</button>
-        <button type="button" class="link" id="demoLeagueBtn">Or Load the Example League</button>
+        ${anyRounds ? '' : '<button type="button" class="link" id="demoLeagueBtn">Or Load the Example League</button>'}
       </div>
-      <p class="hint">Eight golfers, six courses and a season
+      ${anyRounds ? '' : `<p class="hint">Eight golfers, six courses and a season
         of rounds, so every figure and the whole leaderboard have something behind them.
         Just want one populated page?
-        <button type="button" class="link" id="demoBtn">Load a Single Golfer's Season</button></p>
+        <button type="button" class="link" id="demoBtn">Load a Single Golfer's Season</button></p>`}
     </div>`;
     document.getElementById('firstCourseBtn').addEventListener('click',
       () => (haveCourse ? openRound(null) : openCourseEdit(null)));
-    document.getElementById('demoLeagueBtn').addEventListener('click', loadDemoLeague);
-    document.getElementById('demoBtn').addEventListener('click', loadDemo);
+    if (!anyRounds) {
+      document.getElementById('demoLeagueBtn').addEventListener('click', loadDemoLeague);
+      document.getElementById('demoBtn').addEventListener('click', loadDemo);
+    }
     return;
   }
   /* Newest first: the last round played is the one you came to look at. */
@@ -3809,7 +3883,7 @@ function renderRounds(c) {
   }
 
   box.innerHTML = `<table>
-    <caption class="sr-only">Every round logged, newest first. Select a date to edit that round.</caption>
+    <caption class="sr-only">Every round logged, newest first.${viewOnly ? '' : ' Select a date to edit that round.'}</caption>
     <thead><tr>
       <th scope="col">Date</th><th scope="col">Course</th><th scope="col">Tee</th>
       <th scope="col" class="num">Score</th>
@@ -4075,7 +4149,7 @@ function leagueRows() {
       rolling: c.rolling.value,
       whs: c.whs.value,
       rounds: c.all.length,
-      counted: c.counted.length,
+      counted: c.counting.length,
       excluded: c.all.length - c.counted.length,
       best: diffs.length ? Math.min.apply(null, diffs) : null,
       change: changeOverRounds(c.history, state.settings.primary, TREND_ROUNDS),
@@ -4146,6 +4220,7 @@ function renderStrokes(rows) {
   if (!tee) {
     box.innerHTML = '<div class="empty"><p>' + (state.courses.length
       ? 'Pick a course and a set of tees.'
+      : viewOnly ? 'No course was shared, so there are no shots to work out.'
       : 'Add a course first — Golfers &amp; Courses is in the header.') + '</p></div>';
     return;
   }
@@ -4175,8 +4250,8 @@ function renderStrokes(rows) {
     return `<tr class="${x.id === state.activeGolfer ? 'is-you' : ''}">
       <th scope="row">${esc(x.name)}</th>
       <td class="num">${fmtIndex(x.index)}</td>
-      <td class="num">${x.ch == null ? '—' : x.ch}</td>
-      <td class="num">${x.ph == null ? '—' : x.ph}</td>
+      <td class="num">${fmtShots(x.ch)}</td>
+      <td class="num">${fmtShots(x.ph)}</td>
       <td class="num">${gives == null ? '—' : (gives === 0 ? 'scratch' : '+' + gives)}</td>
     </tr>`;
   }).join('');
@@ -4272,12 +4347,16 @@ function renderLeague() {
   });
 
   /* Exclusions are never silent here either: a round left out of a figure is
-     named on the league page as well as on the golfer's own. */
+     named on the league page as well as on the golfer's own. THREE causes,
+     because `counted` drops three kinds of round — this line named two until
+     2026-09-07, and the golfer's own page named all three. A nine waiting for
+     its partner is deliberately not among them: it is not in `excluded`, and
+     the golfer's page gives it a note of its own. */
   const excluded = rows.reduce((n, r) => n + r.excluded, 0);
   const affected = rows.filter((r) => r.excluded).length;
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
   document.getElementById('leagueWarn').textContent = excluded
-    ? `${plural(excluded, 'round')} across ${plural(affected, 'golfer')} ${excluded === 1 ? 'is' : 'are'} left out of these figures — the course was deleted, or the round is marked “don't count”.`
+    ? `${plural(excluded, 'round')} across ${plural(affected, 'golfer')} ${excluded === 1 ? 'is' : 'are'} left out of these figures — the course was deleted, the round is marked “don't count”, or it is a nine off tees with no 9-hole rating yet.`
     : '';
 
   const notes = [`Ranked by ${rankedName}${primary === 'whs' ? '' : ` (${method.name})`}, lowest first.`];
@@ -4287,7 +4366,12 @@ function renderLeague() {
       + `${primary === 'whs' ? ` (it is not issued below ${WHS_MIN_ROUNDS} counting rounds)` : ''}, so they sit at the foot of the table.`);
   }
   if (rows.length === 1) {
-    notes.push('A leaderboard of one so far — add the people you play with with the Golfers button in the header. Courses and the league rule are shared by everyone, so their rounds slot straight in.');
+    /* A visitor cannot add anybody, and the tab is hidden for them anyway (see
+       renderEmptyState) — but the note is drawn regardless, and copy that sends a
+       reader to a button they do not have is wrong wherever it ends up. */
+    notes.push(viewOnly
+      ? 'This shared view has one golfer, so there is nobody to rank them against.'
+      : 'A leaderboard of one so far — add the people you play with under Golfers & Courses in the header. Courses and the league rule are shared by everyone, so their rounds slot straight in.');
   }
   document.getElementById('leagueNote').textContent = notes.join(' ');
 
@@ -4466,14 +4550,29 @@ const roundDialog = document.getElementById('roundDialog');
 const searchDialog = document.getElementById('searchDialog');
 let editingRound = null;
 
-function fillCourseSelects(courseSel, teeSel, courseId, teeId) {
-  courseSel.innerHTML = state.courses.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
-  if (courseId && state.courses.some((c) => c.id === courseId)) courseSel.value = courseId;
+/* `orphanOk` is true when EDITING: a round whose course or tee has been deleted
+   is shown as exactly that — an option reading "(deleted course)" / "(deleted
+   tee)", value '', selected — rather than pre-selecting whichever course is
+   listed first. Before 2026-09-07 it did the latter, the hint worked out a
+   differential as though the round had been played there, and a note corrected
+   on an orphan re-homed it to that course and it started counting against
+   figures it was never played to. A NEW round never takes the option:
+   `lastUsed()` can point at a course deleted since, and the first course is
+   the right pre-fill for a round that has not been placed yet. */
+const ORPHAN_OPTION = (what) => `<option value="">(deleted ${what})</option>`;
+function fillCourseSelects(courseSel, teeSel, courseId, teeId, orphanOk) {
+  const courseGone = !!(orphanOk && courseId && !state.courses.some((c) => c.id === courseId));
+  courseSel.innerHTML = (courseGone ? ORPHAN_OPTION('course') : '')
+    + state.courses.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+  if (courseGone) courseSel.value = '';
+  else if (courseId && state.courses.some((c) => c.id === courseId)) courseSel.value = courseId;
   const course = courseById(courseSel.value);
-  teeSel.innerHTML = course
+  const teeGone = !!(orphanOk && (courseGone || (teeId && course && !course.tees.some((t) => t.id === teeId))));
+  teeSel.innerHTML = (teeGone ? ORPHAN_OPTION('tee') : '') + (course
     ? course.tees.map((t) => `<option value="${esc(t.id)}">${esc(t.name)} — CR ${t.rating}, SR ${t.slope}, par ${t.par}</option>`).join('')
-    : '';
-  if (teeId && course && course.tees.some((t) => t.id === teeId)) teeSel.value = teeId;
+    : '');
+  if (teeGone) teeSel.value = '';
+  else if (teeId && course && course.tees.some((t) => t.id === teeId)) teeSel.value = teeId;
 }
 
 /* The score rows. One golfer, or an edit, gets exactly the single box this
@@ -4523,6 +4622,10 @@ function openRound(id) {
   const r = editingRound;
   document.getElementById('roundTitle').textContent = r ? 'Edit Round' : 'Add Round';
   document.getElementById('f_date').value = r ? r.date : todayISO();
+  /* The picker greys out tomorrow onward; roundSave still checks, since a date
+     can be typed. Set at open rather than in the markup, because the page can
+     be left open across midnight. */
+  document.getElementById('f_date').max = todayISO();
   document.getElementById('f_holes').value = String(r ? r.holes : (lastUsed('holes') || 18));
   renderScoreRows();
   /* Guarded rather than assumed: the box carrying this id is the row for the
@@ -4530,7 +4633,7 @@ function openRound(id) {
      boot the rest of the app survives. Losing the dialog to it would not be. */
   const scoreEl = document.getElementById('f_score');
   if (scoreEl) scoreEl.value = r ? r.score : '';
-  fillCourseSelects(document.getElementById('f_course'), document.getElementById('f_tee'), r ? r.courseId : lastUsed('courseId'), r ? r.teeId : lastUsed('teeId'));
+  fillCourseSelects(document.getElementById('f_course'), document.getElementById('f_tee'), r ? r.courseId : lastUsed('courseId'), r ? r.teeId : lastUsed('teeId'), !!r);
   document.getElementById('f_pcc').value = String(r ? r.pcc : 0);
   document.getElementById('f_note').value = r ? r.note : '';
   document.getElementById('f_counts').checked = r ? r.counts !== false : true;
@@ -4555,6 +4658,15 @@ function updateRoundHint() {
   const rawPcc = Number(document.getElementById('f_pcc').value) || 0;
   const nine = document.getElementById('f_holes').value === '9';
   const el = document.getElementById('roundHint');
+  /* The "(deleted course)" / "(deleted tee)" option is selected: the round is
+     an orphan and stays one unless a real course is picked. An instruction,
+     not a calculation — see fillCourseSelects. */
+  if (editingRound && (document.getElementById('f_course').value === '' || document.getElementById('f_tee').value === '')) {
+    el.textContent = document.getElementById('f_course').value === ''
+      ? 'This round\u2019s course was deleted \u2014 pick one for it to count again. It can be saved as it is.'
+      : 'This round\u2019s tees were deleted \u2014 pick a set for it to count again. It can be saved as it is.';
+    return;
+  }
   /* A nine off tees with no 9-hole figures is the one case where the hint has
      to stop being a calculation and become an instruction — the round can still
      be saved, and it will sit in the table saying what it is waiting for. */
@@ -4595,19 +4707,34 @@ document.getElementById('roundScores').addEventListener('change', (e) => {
 document.getElementById('f_pcc').addEventListener('input', updateRoundHint);
 document.getElementById('f_holes').addEventListener('change', updateRoundHint);
 document.getElementById('f_course').addEventListener('change', () => {
-  fillCourseSelects(document.getElementById('f_course'), document.getElementById('f_tee'), document.getElementById('f_course').value, null);
+  const picked = document.getElementById('f_course').value;
+  /* Back onto "(deleted course)" — the round is orphaned again, as it was. */
+  const back = !picked && editingRound;
+  fillCourseSelects(document.getElementById('f_course'), document.getElementById('f_tee'),
+    back ? editingRound.courseId : picked, back ? editingRound.teeId : null, !!back);
   updateRoundHint();
 });
 document.getElementById('f_tee').addEventListener('change', updateRoundHint);
 
 document.getElementById('roundSave').addEventListener('click', () => {
   const date = document.getElementById('f_date').value;
-  const courseId = document.getElementById('f_course').value;
-  const teeId = document.getElementById('f_tee').value;
+  let courseId = document.getElementById('f_course').value;
+  let teeId = document.getElementById('f_tee').value;
   const holes = document.getElementById('f_holes').value === '9' ? 9 : 18;
   const warn = document.getElementById('roundWarn');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { warn.textContent = 'Pick a date.'; return; }
-  if (!teeOf(courseById(courseId), teeId)) { warn.textContent = 'Pick a course and a set of tees.'; return; }
+  /* A round is something that was played. Until 2026-09-07 only the SHAPE was
+     checked, so a round dated next year saved silently and sat at the top of the
+     list as the newest round played. Compared as strings: both are YYYY-MM-DD,
+     and todayISO() is local, as the date box is. */
+  if (date > todayISO()) { warn.textContent = 'A round can\u2019t be in the future.'; return; }
+  /* An orphan being edited with its "(deleted course)" / "(deleted tee)" option
+     still selected keeps the ids it had: the note or the score is what is being
+     corrected, and the round stays out of the figures until a real course is
+     picked for it. Only a NEW round, or a real pick, has to name a tee. */
+  const stillOrphan = !!(editingRound && (courseId === '' || teeId === ''));
+  if (stillOrphan) { courseId = editingRound.courseId; teeId = editingRound.teeId; }
+  else if (!teeOf(courseById(courseId), teeId)) { warn.textContent = 'Pick a course and a set of tees.'; return; }
 
   /* One entry per score box that is in play: the single box when editing or
      when there is one golfer, and every ticked row otherwise. Read as a list
@@ -4696,16 +4823,10 @@ function renderCourseList() {
      this window already lives. Neutral, not `.danger`: editing tees is not
      destructive and must not light up as though it were.
 
-     Renaming is in the box, on the same three rules as the golfer list above it:
-     re-found by id every keystroke, the cap applied in code as well as in
-     `maxlength` because a paste ignores the attribute, and `render()` WITHOUT
-     redrawing this list — which would replace the input being typed in. */
-  box.querySelectorAll('[data-name]').forEach((el) => el.addEventListener('input', () => {
-    const live = state.courses.find((x) => x.id === el.dataset.name);
-    if (!live) return;   // gone since the list was drawn (sync, other tab)
-    live.name = el.value.slice(0, 80);
-    save();
-  }));
+     Renaming is in the box, on the same rules as the golfer list above it — see
+     wireNameBoxes — and `render()` WITHOUT redrawing this list, which would
+     replace the input being typed in. */
+  wireNameBoxes(box, () => state.courses, 80);
   box.querySelectorAll('[data-course]').forEach((b) => b.addEventListener('click', () => openCourseEdit(b.dataset.course)));
   /* Never disabled, whatever the round count. A first attempt greyed these out
      while rounds still pointed at the course, on the assumption that deleting it
@@ -4912,9 +5033,43 @@ const methodDraft = () => JSON.stringify(
   ['m_window', 'm_use', 'm_basis', 'm_mult', 'm_adj'].map((id) => document.getElementById(id).value)
     .concat([document.getElementById('m_caps').checked, document.getElementById('m_esr').checked]));
 
-let methoding = null;   // { written } while the window is up
+let methoding = null;   // { written, rule } while the window is up
 
-function openMethod() {
+/* The rule as STORED, in one string, so the window can tell whether an adoption
+   changed it. Kept beside `written` (the raw boxes) rather than derived from
+   it: the boxes can lawfully differ from the stored rule while a reader is
+   mid-way through one, and that difference is exactly what must NOT count as
+   an adoption. */
+const methodRuleKey = () => JSON.stringify([normalizeMethod(state.settings.method),
+  state.settings.applyCaps !== false, state.settings.applyEsr !== false]);
+
+/* Called wherever `state` is REPLACED under the page — a sync adoption, another
+   tab's write. The golfer and course name boxes survive that by re-finding
+   their record by id on every keystroke; this window cannot, because
+   `commitMethod` rebuilds the WHOLE rule from the boxes, so boxes filled from
+   the old state would put the old rule back on the next finished box and push
+   it to the device the new one came from (2026-09-07 audit). So a changed rule
+   refills the boxes and retakes the snapshot. An UNCHANGED rule — a sync that
+   moved a round, not the rule — leaves the boxes alone, including one the
+   reader is half-way through typing in. */
+function stateReplaced() {
+  if (!methoding || !methodDialog.open) return;
+  if (methodRuleKey() === methoding.rule) return;
+  const midway = methodDraft() !== methoding.written;
+  fillMethodBoxes();
+  document.getElementById('methodWarn').textContent = '';
+  updateMethodPreview();
+  methoding = { written: methodDraft(), rule: methodRuleKey() };
+  if (midway) toast('The league rule changed on another device — the boxes now show it, and what you were typing was not kept', 6000);
+}
+
+/* THE ONE SETTER: every box, from what is STORED. Opening the window fills
+   through here, and so does every commit (2026-09-07 audit) — `normalizeMethod`
+   clamps a window of 99 to 60 and a multiplier of 5 to 2, and a commit that
+   stored the clamped rule while the box kept what was typed left the window
+   describing a rule the leaderboard behind it was not using. A refill after the
+   write is what makes the boxes and the stored rule one thing. */
+function fillMethodBoxes() {
   const m = normalizeMethod(state.settings.method);
   document.getElementById('m_window').value = m.window;
   document.getElementById('m_use').value = m.use;
@@ -4923,6 +5078,10 @@ function openMethod() {
   document.getElementById('m_adj').value = m.adjustment;
   document.getElementById('m_caps').checked = state.settings.applyCaps !== false;
   document.getElementById('m_esr').checked = state.settings.applyEsr !== false;
+}
+
+function openMethod() {
+  fillMethodBoxes();
   document.getElementById('methodWarn').textContent = '';
   updateMethodPreview();
   /* What the window opened holding, so opening it to READ the rule and closing
@@ -4930,7 +5089,7 @@ function openMethod() {
      boxes, so a glance would otherwise re-rank the league and toast about it.
      Taken after the boxes are filled. Reset re-enters through here, which is
      what keeps this in step with the boxes it just changed. */
-  methoding = { written: methodDraft() };
+  methoding = { written: methodDraft(), rule: methodRuleKey() };
   openModal(methodDialog);
 }
 
@@ -4945,12 +5104,19 @@ function readMethodForm() {
 }
 
 function updateMethodPreview() {
-  const m = readMethodForm();
+  /* An empty box is not an answer, and the preview must not pretend it is one:
+     `readMethodForm` reads '' as the DEFAULT, so with the window box cleared
+     the sentence used to describe "the last 5 rounds" over a stored rule of 60.
+     While a box is empty this describes the rule that is actually in force,
+     and says so. */
+  const blank = methodBlank();
+  const m = blank ? normalizeMethod(state.settings.method) : readMethodForm();
   const basis = m.basis === 'overPar' ? 'shots over par' : 'score differentials';
   const best = m.use < m.window ? `the best ${m.use} of ` : 'all of ';
   const tail = (m.multiplier !== 1 ? `, multiplied by ${m.multiplier}` : '') + (m.adjustment !== 0 ? `, then ${m.adjustment > 0 ? 'plus' : 'minus'} ${Math.abs(m.adjustment)}` : '');
+  const rounds = m.window === 1 ? 'round\u2019s' : 'rounds\u2019';
   document.getElementById('methodPreview').textContent =
-    `In words: average ${best}the last ${m.window} rounds' ${basis}${tail}.`;
+    `In words${blank ? ' (the rule as saved, while a box is empty)' : ''}: average ${best}the last ${m.window} ${rounds} ${basis}${tail}.`;
   /* THE NOTE ANSWERS THE ONE QUESTION AN AUTO-SAVING WINDOW HAS TO ANSWER: is
      what I am typing being kept? Saying "Saved as you go" over a box the app is
      deliberately ignoring would be a lie. */
@@ -4978,15 +5144,21 @@ function commitMethod(ctx, speak) {
   const m = readMethodForm();
   const rawUse = Math.round(Number(document.getElementById('m_use').value));
   if (rawUse > m.window) {
-    document.getElementById('methodWarn').textContent = `You can't use the best ${rawUse} of only ${m.window} rounds — it has been set to ${m.use}.`;
-    document.getElementById('m_use').value = m.use;
+    document.getElementById('methodWarn').textContent = `You can't use the best ${rawUse} of only ${m.window} round${m.window === 1 ? '' : 's'} — it has been set to ${m.use}.`;
   } else {
     document.getElementById('methodWarn').textContent = '';
   }
   state.settings.method = m;
   state.settings.applyCaps = document.getElementById('m_caps').checked;
   state.settings.applyEsr = document.getElementById('m_esr').checked;
+  /* EVERY box is refilled from what was just stored, not only the one the rule
+     between the boxes corrects: a window typed as 99 is stored as 60, and a box
+     still reading 99 would be the window describing a rule the leaderboard is
+     not using. The snapshot is taken AFTER the refill, so the boxes and the
+     record of what was written are the same thing. */
+  fillMethodBoxes();
   ctx.written = methodDraft();
+  ctx.rule = methodRuleKey();
   save();                                  // save() re-renders, so the league re-ranks
   if (speak) toast('Method updated');
   return true;
@@ -5038,6 +5210,36 @@ document.getElementById('methodBtn').addEventListener('click', openMethod);
 
 
 
+/* The name boxes of BOTH lists in Golfers & Courses, on one set of rules.
+   `list` is a function, not the array: `state` is replaced whole by a sync
+   adoption or another tab's write, and the record is re-found by id through
+   the live state on every keystroke. `cap` is the same length the boundary
+   sanitiser applies — `maxlength` stops typing past it but not a paste.
+
+   AN EMPTIED BOX STORES NOTHING (2026-09-07 audit). It used to write
+   `el.value.slice(…)` blank included: the golfer picker grew a blank option,
+   the leaderboard's name button lost its text, and `normalizeState` renamed
+   the record "Golfer" / "Course" on the next load. The course EDITOR has
+   always refused a blank name; this is the list box's equivalent — clearing
+   the box to retype is not a rename, and leaving it empty puts the last name
+   back, so the box never shows a name the record does not have. */
+function wireNameBoxes(box, list, cap) {
+  box.querySelectorAll('[data-name]').forEach((el) => {
+    const live = () => list().find((x) => x.id === el.dataset.name) || null;
+    el.addEventListener('input', () => {
+      const rec = live();
+      if (!rec) return;   // gone since the list was drawn (sync, other tab)
+      if (!el.value.trim()) return;
+      rec.name = el.value.slice(0, cap);
+      save();
+    });
+    el.addEventListener('blur', () => {
+      const rec = live();
+      if (rec && !el.value.trim()) el.value = rec.name;
+    });
+  });
+}
+
 function renderGolferList() {
   const box = document.getElementById('golferList');
   box.innerHTML = `<div class="table-scroll"><table>
@@ -5057,24 +5259,12 @@ function renderGolferList() {
 
   /* Renaming happens IN THE BOX, as it does in Sprint Predictability's and Flow
      Metrics' equivalent window — it was a `prompt()` behind an underlined name.
-     Three things this has to get right, all of them the siblings' rules:
-
-     • Re-found by id on every keystroke rather than written to an object captured
-       when the list was drawn. A sync adoption or another tab's write can replace
-       `state` while the dialog is open, and a rename onto a detached copy is lost
-       without a sound.
-     • `maxlength` stops typing past 60 but not a PASTE, so the cap is applied here
-       as well — the same belt-and-braces the boundary sanitiser uses.
-     • `render()` but NOT `renderGolferList()`: redrawing this list would replace
-       the very input being typed in and throw away the caret. The rest of the page
-       — the picker, the leaderboard — is what needs the new name, and that is what
-       render() covers. */
-  box.querySelectorAll('[data-name]').forEach((el) => el.addEventListener('input', () => {
-    const live = state.golfers.find((x) => x.id === el.dataset.name);
-    if (!live) return;   // gone since the list was drawn (sync, other tab)
-    live.name = el.value.slice(0, 60);
-    save();
-  }));
+     The rules are in wireNameBoxes, shared with the course list below. One of
+     them is specific to this list: save() calls render() but NOT
+     renderGolferList(), because redrawing this list would replace the very
+     input being typed in and throw away the caret. The rest of the page — the
+     picker, the leaderboard — is what needs the new name, and render() covers it. */
+  wireNameBoxes(box, () => state.golfers, 60);
   box.querySelectorAll('[data-remove]').forEach((b) => b.addEventListener('click', () => {
     const id = b.dataset.remove;
     if (state.golfers.length === 1) { document.getElementById('golferWarn').textContent = 'There has to be at least one golfer.'; return; }
@@ -5961,8 +6151,13 @@ function buildDemoLeague() {
     score: n.score, pcc: 0, note: n.note, counts: true, holes: 9
   }));
 
+  /* A COPY of the courses, through JSON like the cloud copy is. `loadDemoLeague`
+     upserts what this returns straight into `state`, so returned by reference
+     (as it was until 2026-09-07) a course renamed in Golfers & Courses renamed
+     the CONSTANT, and loading the example again — the thing meant to put it
+     back — kept the rename and regenerated every score off the edited rating. */
   return { golfers: DEMO_GOLFERS.map(g => ({ id: g.id, name: g.name })),
-           courses: DEMO_COURSES, rounds };
+           courses: JSON.parse(JSON.stringify(DEMO_COURSES)), rounds };
 }
 
 function loadDemoLeague() {
@@ -6104,11 +6299,23 @@ const b64urlDecode = (str) => {
   return Uint8Array.from(b, (c) => c.charCodeAt(0));
 };
 
+/* The writer's write() and close() are AWAITED, alongside the read, and not
+   fired and forgotten (2026-09-07 audit). A token cut in half by a mail app
+   errors the stream, and a rejection from close() that nothing awaited was an
+   unhandled rejection in the console beside the correct error card — the same
+   failure reported twice, once through a path nothing owned. Promise.all, not
+   two sequential awaits: the writable side of a transform only drains as the
+   readable side is read, so awaiting close() before starting the read would
+   deadlock on any input larger than the stream's buffer. Whichever side
+   rejects first rejects the whole, and decodeShare's caller catches it once. */
 async function squeeze(bytes, Stream, format) {
   const s = new Stream(format);
   const w = s.writable.getWriter();
-  w.write(bytes); w.close();
-  return new Uint8Array(await new Response(s.readable).arrayBuffer());
+  const [buf] = await Promise.all([
+    new Response(s.readable).arrayBuffer(),
+    w.write(bytes).then(() => w.close()),
+  ]);
+  return new Uint8Array(buf);
 }
 
 /* Which rounds a window keeps. Pure, and separate from the payload builder so
@@ -6476,6 +6683,7 @@ window.ghAdopt = (incoming, updatedAt) => {
     console.warn('Could not write saved data', e);
   }
   render();
+  stateReplaced();
 };
 window.ghCount = () => state.rounds.length;
 
@@ -6502,6 +6710,7 @@ window.addEventListener('storage', (e) => {
     haltForNewerData(incoming.version);
   state = normalizeState(incoming);
   render();
+  stateReplaced();
 });
 
 /* tests.html reaches the pure functions directly — they are all plain function
@@ -6788,6 +6997,9 @@ async function init() {
   db = F.getFirestore(app);
   A.onAuthStateChanged(auth, (u) => {
     user = u;
+    /* A new report is a new account (or none) and a new verdict to wait for:
+       nothing pushes until startSync below releases the gate. */
+    pushGate.hold();
     /* What the next load reads to decide whether to fetch Google's code at all
        (see shouldBootSync above). Written on EVERY report, including the null
        one that follows signing out — so signing out stops the requests, not
@@ -7010,6 +7222,15 @@ async function startSync() {
   }
   try { localStorage.setItem('gh-sync-uid', user.uid); }
   catch (e) { /* storage blocked — the next sign-in just asks again */ }
+  /* The verdict is in and acted on: pushes may flow, starting with one that
+     was asked for while they were held (an edit made before getDoc returned).
+     It pushes the CURRENT state, which is whichever copy the verdict chose.
+     Released before listen(), so the listener never sees a push it must
+     ignore as its own. A startSync that threw above never reaches this line —
+     the gate stays held, the button shows the error, and the next auth report
+     or reload starts again; pushing blind without a verdict is the fault this
+     exists to stop. */
+  pushGate.release(() => window.cloudPush());
   listen();
 }
 
@@ -7078,20 +7299,30 @@ async function pushNow() {
   if (!unsub) listen();
 }
 
+/* Every push goes through this — see makePushGate in the classic script. Held
+   from the moment an auth report arrives until startSync has its verdict. */
+const pushGate = makePushGate();
+
 /* Called by save() on every local change; debounced so rapid edits batch up. */
 window.cloudPush = () => {
   if (!user) return;
-  clearTimeout(pushTimer);
-  pushTimer = setTimeout(() => { pushTimer = null; pushNow().catch(setSyncError); }, 1200);
+  pushGate.request(() => {
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(() => { pushTimer = null; pushNow().catch(setSyncError); }, 1200);
+  });
 };
 
 /* Skips the debounce. "Delete all data" calls this so the cleared state
-   reaches the cloud before the tab can be closed. */
+   reaches the cloud before the tab can be closed. Gated like cloudPush: a
+   clear-all before the verdict is still a local change the cloud copy might
+   be about to replace, and the release pushes whatever the verdict left. */
 window.cloudFlush = () => {
   if (!user) return;
-  clearTimeout(pushTimer);
-  pushTimer = null;
-  pushNow().catch(setSyncError);
+  pushGate.request(() => {
+    clearTimeout(pushTimer);
+    pushTimer = null;
+    pushNow().catch(setSyncError);
+  });
 };
 
 /* The same window, closed for ordinary edits too: "edit, then close the tab

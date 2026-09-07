@@ -171,9 +171,10 @@ that emphasis.
   — it is what you are playing today, not a fact about the golfers, so it never enters the
   saved data, never travels in a share link, and needed no SCHEMA bump. Both places it
   appears (the Course Handicap card and Strokes on the Day) read the one variable through
-  `setAllowance()`, so they cannot disagree. `playingHandicap()` rounds half AWAY from zero
-  for the same reason `round1` does: a plus handicap is negative, and `Math.round(-2.5)` is
-  `-2`, which would hand the better player a shot.
+  `setAllowance()`, so they cannot disagree. (`playingHandicap()` rounded half AWAY from
+  zero until 2026-09-07 on the reasoning that `Math.round(-2.5)` = `-2` "hands the better
+  player a shot"; the Rules say otherwise — see the 2026-09-07 audit section — and it is
+  `Math.round` now, the same as `courseHandicap()`.)
 - **The rounds filter never reaches the maths, and its markup is written once.** It filters
   what is SHOWN and the line beside it says so out loud. The controls live in the HTML rather
   than being redrawn by `render()` — a render that replaced them would replace the box being
@@ -1078,3 +1079,172 @@ this repo is round three. Each fix has its own commit and its own tests.
   branch had to stop returning early for the repair to reach it; it is one exit now.
   `<body>` is checked BY NAME and not through the rect test: body has a rect like anything
   else, so an assertion resting on rects alone would be deaf to the whole fault.
+
+## Fixes From the 2026-09-07 Audit
+
+Twelve findings, one commit each, every one with a test proven red against main first. The
+League Rules window had three of them and they share one part — `fillMethodBoxes()`, the ONE
+setter that fills every box from what is stored — so that fix went first and the others
+stand on it.
+
+- **The League Rules boxes always show the rule that is STORED.** `commitMethod` corrected
+  the box for one rule (use > window) and left the others reading what was typed:
+  `normalizeMethod` clamps a window of 99 to 60, a multiplier of 5 to 2, an adjustment of
+  50 to 20 and a window of 2.5 to 3, and each of those stored the clamped figure under a box
+  still showing the typed one — a window describing a rule the leaderboard behind it was
+  not using. `openMethod`'s fill is now `fillMethodBoxes()`, and every commit calls it after
+  the write, with the `written` snapshot taken AFTER the refill so the boxes and the record
+  of what was written are the same thing. The *In words* preview read the boxes through
+  `readMethodForm`, which reads an empty box as the DEFAULT, so with the window box cleared
+  it described "the last 5 rounds" over a stored 60; while a box is empty it now describes
+  `state.settings.method` and says so in the sentence. "1 rounds" is "1 round" in the
+  preview and in the use-of-only correction. The suite drives it in MEASURE, in a walk of
+  its own after the saves-as-you-go one.
+- **A sync adoption while League Rules is open refills the boxes.** `commitMethod` rebuilds
+  the WHOLE rule from the boxes, so after `window.ghAdopt` replaced `state` with a copy
+  holding window 12 / use 4 / caps off, boxes still reading 5 / 5 / caps on turned a change
+  to the multiplier alone into a stored 5 / 5 / 0.96 / caps on — the adoption reverted and
+  pushed straight back to the device it came from. The golfer and course name boxes survive
+  an adoption by re-finding their record by id per keystroke; this window cannot, so
+  `stateReplaced()` is called from the two places `state` is replaced under the page —
+  `ghAdopt` and the `storage` listener — and, while the window is up, compares
+  `methodRuleKey()` (the stored rule, caps and ESR in one string) against the one the boxes
+  were filled from. A CHANGED rule refills through `fillMethodBoxes()`, retakes the
+  `written` snapshot and toasts if the reader was mid-way through a box, because what they
+  typed is gone; an UNCHANGED rule — a sync that moved a round, not the rule — leaves the
+  boxes alone, half-typed figure included. `rule` sits beside `written` in `methoding`
+  rather than being derived from it, because the boxes lawfully differ from the stored rule
+  while a reader is mid-way through one, and that difference must not read as an adoption.
+  The suite drives it in MEASURE through the real `ghAdopt`, and puts `gh-state` /
+  `gh-updated` / `gh-tab` back afterwards for all three League Rules walks.
+- **Editing an orphaned round keeps it orphaned.** `fillCourseSelects` pre-selected the
+  FIRST course when the round's `courseId` no longer existed (and the first tee when its tee
+  was gone), the hint showed a live differential as though the round had been played there,
+  and `roundSave` stored it — correcting a note on an orphan re-homed it to whichever course
+  was listed first and it started counting against figures it was never played to. The
+  function takes an `orphanOk` flag now, true only when EDITING: a gone course puts a
+  `(deleted course)` option (value `''`) first and selects it, with `(deleted tee)` alone in
+  the tee box; a gone tee under a live course does the same in the tee box only. The hint is
+  an instruction while either is selected — *pick one for it to count again. It can be saved
+  as it is* — and `roundSave` keeps the round's own ids when the option is still selected,
+  skipping the pick-a-tee check for that case alone. The course select's `change` handler
+  re-orphans through the same flag when the reader moves back onto the option, so it cannot
+  snap to the first course by way of a second look. A NEW round never takes the option:
+  `lastUsed()` can point at a course deleted since, and the first course is the right
+  pre-fill for a round that has not been placed yet. The suite drives `openRound` on a
+  course-gone round and a tee-gone round in MEASURE and reads the stored ids back.
+- **A name box that is emptied stores nothing.** Both list boxes in Golfers & Courses wrote
+  `el.value.slice(…)` on every keystroke, blank included: the golfer picker grew a blank
+  option, the leaderboard's name button lost its text, and `normalizeState` renamed the
+  record "Golfer" / "Course" on the next load — so the name on screen and the name stored
+  disagreed until a reload silently picked one. The course EDITOR has always refused a blank
+  name; the list boxes now go through one helper, `wireNameBoxes(box, list, cap)`, whose
+  `input` handler returns before writing when the box trims to nothing and whose `blur`
+  handler puts the record's name back into an empty box. `list` is a FUNCTION so the record
+  is re-found through the live `state` on every keystroke (the rule the two handlers already
+  followed separately). The suite types into both boxes in MEASURE, empties them, blurs, and
+  reads the stored names and the picker's options back.
+- **`buildDemoLeague` hands out a COPY of `DEMO_COURSES`.** It returned the constant itself
+  and `loadDemoLeague`'s `upsert` stored those objects in `state`, so a course renamed in
+  Golfers & Courses renamed the constant, and loading the example again — the thing meant to
+  put it back — kept the rename and regenerated every score off the edited rating (the
+  scores are built from `tee.rating`, read off the same objects). A JSON round-trip on the
+  way out, the same way `forCloud` copies; `buildDemo` was never affected because it builds
+  its course as a fresh literal per call. The test builds twice, mutates one, and builds a
+  third time.
+- **One rounding rule for a course handicap and a playing handicap, and a plus is written
+  "+3".** `courseHandicap` used `Math.round` (−2.5 → −2) and `playingHandicap` rounded half
+  away from zero (−2.5 → −3) under a comment saying it did so "for the same reason round1
+  is" — so the two disagreed on the same half. The WHS Rules of Handicapping (Rules 6.1 and
+  6.2) round a Course Handicap and a Playing Handicap to the nearest whole number with .5
+  rounding UP, and up means toward the HIGHER number, not away from zero: a plus player's
+  raw −2.5 is a course handicap of +2, which is `Math.round`'s behaviour exactly. Both use it
+  now, the note over `courseHandicap` records the reasoning, and `round1` is left alone — it
+  rounds a differential or an index to the nearest tenth, where the Rules do go away from
+  zero. The DISPLAY was inconsistent too: `fmtIndex` wrote the index "+2.7" and the course
+  and playing handicaps beside it went through `String()`, so the same golfer read "+2.7" on
+  one line and "-3" on the next. `fmtShots(v)` is the whole-number sibling of `fmtIndex`
+  and the Course Handicap card, its sentence and both columns of Strokes on the Day go
+  through it. The old playingHandicap test pinning −3 was REWRITTEN to the Rule, not
+  deleted; `EXPECTED` counts it still.
+- **A nine waiting to be paired is not "counting towards handicap".** `renderStats`' tile
+  and the leaderboard's Rounds column both read `counted.length`, and `counted` is the list
+  BEFORE pairing — so Alex's single nine, which the note beside the tile says "counts as
+  soon as you log another nine", was counted in the very figure that note qualifies.
+  `computeAll` now also returns `counting`: `counted` minus `paired.pending`, the one
+  predicate both figures read. `counted` itself is deliberately unchanged — it is what the
+  exclusion notes reckon against (`excluded = all − counted` on the league page), and a
+  waiting nine is not an exclusion; it has a note of its own. The suite plants the demo and
+  reads both figures off the page for Alex (27 logged, 26 counting).
+- **The league warning names all three exclusion causes.** `counted` drops a round for one
+  of three reasons — course deleted, marked don't count, a nine off tees with no 9-hole
+  figures — and the golfer's own page (`renderFigures`' notes) names each; the line under
+  the leaderboard named two. It names three now, in the same order the notes use. A nine
+  waiting for its partner is deliberately NOT a fourth: it is not in `excluded` (see the
+  `counting` bullet above) and has a note of its own on the golfer's page. Pinned by
+  rendering: the demo plus one nine at a course with no 9-hole figures, read off
+  `#leagueWarn`.
+- **A round can't be in the future.** `roundSave` checked only the SHAPE of the date
+  (`/^\d{4}-\d{2}-\d{2}$/`), so a round dated next year saved silently and sat at the top of
+  the list as the newest round played. It refuses `date > todayISO()` with the dialog's own
+  warning line — *A round can't be in the future.* — compared as strings, since both are
+  `YYYY-MM-DD` and `todayISO()` is local like the box. `openRound` also sets the box's `max`
+  to today at open (not in the markup: a page left open across midnight would carry
+  yesterday's max), so the picker greys out tomorrow before anything is pressed. The suite
+  dates a round tomorrow and reads the refusal, then dates it today and reads the save; its
+  `todayLocal()` helper is local for the same reason the app's is.
+- **A truncated share link fails once, through the card.** `squeeze` called the writer's
+  `write()` and `close()` and awaited neither, so a token cut in half by a mail app produced
+  the correct *This Shared Link Couldn't Be Opened* card AND `Uncaught (in promise):
+  Compressed input was truncated` beside it — the same failure reported twice, once through
+  a path nothing owned. Both are awaited now, in a `Promise.all` WITH the read rather than
+  before it: the writable side of a transform stream only drains as the readable side is
+  read, so `await w.close()` before starting the read would deadlock on any input larger
+  than the stream's buffer. Whichever side rejects first rejects the whole, and
+  `openSharedView`'s catch reports it once. The suite calls `decodeShare` on a cut token
+  with an `unhandledrejection` listener on the frame the promise was made in (the event
+  fires at the promise's own global, not the suite's), waits a few tasks, and expects zero;
+  the headless runner's `pageerror` line said the same thing before the fix.
+- **A shared view says what a visitor can do.** Four lines of copy pointed a visitor at
+  buttons `viewOnly` hides: the leaderboard-of-one note ("add the people you play with with
+  the Golfers button in the header" — doubled word included), the Course Handicap card's and
+  Strokes on the Day's "Add a course first — … is in the header", and the rounds table's
+  sr-only caption "Select a date to edit that round" over dates that are plain text. Each
+  has a `viewOnly` branch now that describes the link instead (*This shared view has one
+  golfer…*, *No course was shared…*), and the caption drops its second sentence. The
+  Leaderboard tab stayed up for a one-golfer share because `renderEmptyState` returned on
+  `window.ghViewOnly` before reaching the one-golfer rule at its foot; the owner-only part
+  (welcome card, bare-app hiding) is a block now and the tab rule runs for everybody, so a
+  link that asked for the league view lands on the golfer. The old source test pinning the
+  early return was rewritten to pin the block. The suite opens TWO real links in frames of
+  their own — one golfer with a course and rounds, one golfer with nothing — and reads the
+  page with `innerText`, NOT `textContent`: the app's script is inside `<body>`, so
+  textContent reads every string in the source and fails on copy the visitor never sees.
+- **The example league is offered only to an EMPTY app.** The first-run block under Rounds
+  is drawn per golfer, so it offered *Or Load the Example League* to any golfer with no
+  rounds — including the eighth golfer of the example league itself, who has none by design.
+  Both example buttons (and their hint) now appear only when `state.rounds.length === 0`;
+  a golfer with none inside a populated app gets *No rounds yet for this golfer* and *+ Add
+  round*. The listeners are attached under the same condition, since the buttons do not
+  exist otherwise.
+- **No push before the verdict.** From reading, not from the browser: `startSync` awaits
+  `getDoc` before `syncDecision` can say which copy wins, and `window.cloudPush` was live the
+  whole time — so an edit made in that window, or a push already debounced when sign-in
+  completed, wrote this device's copy over the cloud one BEFORE the which-copy dialog had
+  asked. That is the exact overwrite the verdict exists to prevent, through a side door: the
+  first-sign-in rule and empty-never-beats-data both act on `getDoc`'s answer, and a push
+  that lands first changes the answer. `makePushGate()` in the classic script is the pure
+  part (held from the start; `request` runs or remembers; `release` opens and runs ONE push
+  if any was wanted; `hold` closes and forgets) and tests.html pins all four. The module
+  makes one, threads `cloudPush` AND `cloudFlush` through `request`, holds it on EVERY auth
+  report (a new account is a new verdict, and a push wanted under the old account must not
+  be sent under the new), and releases it in `startSync` after the verdict is acted on and
+  BEFORE `listen()` — the released push is `window.cloudPush()`, i.e. the CURRENT state,
+  which by then is whichever copy the verdict chose. A `startSync` that throws never reaches
+  the release: the gate stays held, the button shows the error, and the next auth report or
+  reload starts again — pushing blind without a verdict is the fault this stops.
+  `flushPending` (visibilitychange / pagehide) needed no change: it only sends a timer the
+  gate never let start. The module's wiring cannot be driven from the suite (Firebase never
+  loads there), so it is pinned at the source: the gate is made, both entry points call
+  `request`, `release` sits between `syncDecision(` and `listen();`, and `hold()` is in the
+  auth handler before `startSync()`.
