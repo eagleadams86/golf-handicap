@@ -169,8 +169,9 @@ answers are reachable: a nine that scores, and a nine the app says it cannot sco
 
 **It adds, and destroys nothing.** Your own golfer, courses and rounds are left exactly
 where they were — your golfer simply joins the leaderboard. The `demo-` ids are stable, so
-loading it twice refreshes the example league rather than stacking a second copy. *Clear
-everything*, in the Back up dialog, is the way back out.
+loading it twice refreshes the example league rather than stacking a second copy — a demo
+course you renamed or re-rated comes back as it was, scores included. *Clear everything*,
+in the Back up dialog, is the way back out.
 
 **The dates are counted from the day you load it**, so the league is never stale, and the
 scores come from a seeded generator — the same league on every device and in every run, so

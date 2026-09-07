@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 325;
+const EXPECTED = 326;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -931,6 +931,24 @@ async function onAppLoad() {
 
   const fullRoundsOf = (name) => roundsOf(name).filter((r) => r.holes !== 9);
 
+  it('hands out a COPY of the demo courses, so a rename cannot survive a reload of the example', () => {
+    /* `loadDemoLeague` upserts what this returns straight into state. Returned by
+       reference (as it was until 2026-09-07), renaming Ashfield in Golfers &
+       Courses renamed the constant, and loading the example again — the very
+       thing that is meant to put it back — kept the rename and regenerated every
+       score off the mutated rating. */
+    const a = W.buildDemoLeague(), b = W.buildDemoLeague();
+    ok(a.courses !== b.courses, 'two calls, two course lists');
+    ok(a.courses[0] !== b.courses[0], 'and two course objects');
+    ok(a.courses[0].tees[0] !== b.courses[0].tees[0], 'down to the tees');
+    const name = a.courses[0].name, rating = a.courses[0].tees[0].rating;
+    a.courses[0].name = 'Mutated';
+    a.courses[0].tees[0].rating = 1;
+    const c = W.buildDemoLeague();
+    eq(c.courses[0].name, name, 'the next build is untouched by the last one’s edits');
+    eq(c.courses[0].tees[0].rating, rating, 'rating included');
+    eq(c.rounds[0].score, LEAGUE.rounds[0].score, 'and its scores still come off the real rating');
+  });
   it('fills a whole league, which is the half of the app one golfer cannot show', () => {
     eq(LEAGUE.golfers.length, 8);
     eq(LEAGUE.courses.length, 6);

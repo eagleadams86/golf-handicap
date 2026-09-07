@@ -1143,3 +1143,11 @@ stand on it.
   is re-found through the live `state` on every keystroke (the rule the two handlers already
   followed separately). The suite types into both boxes in MEASURE, empties them, blurs, and
   reads the stored names and the picker's options back.
+- **`buildDemoLeague` hands out a COPY of `DEMO_COURSES`.** It returned the constant itself
+  and `loadDemoLeague`'s `upsert` stored those objects in `state`, so a course renamed in
+  Golfers & Courses renamed the constant, and loading the example again — the thing meant to
+  put it back — kept the rename and regenerated every score off the edited rating (the
+  scores are built from `tee.rating`, read off the same objects). A JSON round-trip on the
+  way out, the same way `forCloud` copies; `buildDemo` was never affected because it builds
+  its course as a fresh literal per call. The test builds twice, mutates one, and builds a
+  third time.

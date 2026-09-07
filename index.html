@@ -6058,8 +6058,13 @@ function buildDemoLeague() {
     score: n.score, pcc: 0, note: n.note, counts: true, holes: 9
   }));
 
+  /* A COPY of the courses, through JSON like the cloud copy is. `loadDemoLeague`
+     upserts what this returns straight into `state`, so returned by reference
+     (as it was until 2026-09-07) a course renamed in Golfers & Courses renamed
+     the CONSTANT, and loading the example again — the thing meant to put it
+     back — kept the rename and regenerated every score off the edited rating. */
   return { golfers: DEMO_GOLFERS.map(g => ({ id: g.id, name: g.name })),
-           courses: DEMO_COURSES, rounds };
+           courses: JSON.parse(JSON.stringify(DEMO_COURSES)), rounds };
 }
 
 function loadDemoLeague() {
