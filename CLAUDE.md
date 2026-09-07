@@ -171,9 +171,10 @@ that emphasis.
   — it is what you are playing today, not a fact about the golfers, so it never enters the
   saved data, never travels in a share link, and needed no SCHEMA bump. Both places it
   appears (the Course Handicap card and Strokes on the Day) read the one variable through
-  `setAllowance()`, so they cannot disagree. `playingHandicap()` rounds half AWAY from zero
-  for the same reason `round1` does: a plus handicap is negative, and `Math.round(-2.5)` is
-  `-2`, which would hand the better player a shot.
+  `setAllowance()`, so they cannot disagree. (`playingHandicap()` rounded half AWAY from
+  zero until 2026-09-07 on the reasoning that `Math.round(-2.5)` = `-2` "hands the better
+  player a shot"; the Rules say otherwise — see the 2026-09-07 audit section — and it is
+  `Math.round` now, the same as `courseHandicap()`.)
 - **The rounds filter never reaches the maths, and its markup is written once.** It filters
   what is SHOWN and the line beside it says so out loud. The controls live in the HTML rather
   than being redrawn by `render()` — a render that replaced them would replace the box being
@@ -1151,3 +1152,18 @@ stand on it.
   way out, the same way `forCloud` copies; `buildDemo` was never affected because it builds
   its course as a fresh literal per call. The test builds twice, mutates one, and builds a
   third time.
+- **One rounding rule for a course handicap and a playing handicap, and a plus is written
+  "+3".** `courseHandicap` used `Math.round` (−2.5 → −2) and `playingHandicap` rounded half
+  away from zero (−2.5 → −3) under a comment saying it did so "for the same reason round1
+  is" — so the two disagreed on the same half. The WHS Rules of Handicapping (Rules 6.1 and
+  6.2) round a Course Handicap and a Playing Handicap to the nearest whole number with .5
+  rounding UP, and up means toward the HIGHER number, not away from zero: a plus player's
+  raw −2.5 is a course handicap of +2, which is `Math.round`'s behaviour exactly. Both use it
+  now, the note over `courseHandicap` records the reasoning, and `round1` is left alone — it
+  rounds a differential or an index to the nearest tenth, where the Rules do go away from
+  zero. The DISPLAY was inconsistent too: `fmtIndex` wrote the index "+2.7" and the course
+  and playing handicaps beside it went through `String()`, so the same golfer read "+2.7" on
+  one line and "-3" on the next. `fmtShots(v)` is the whole-number sibling of `fmtIndex`
+  and the Course Handicap card, its sentence and both columns of Strokes on the Day go
+  through it. The old playingHandicap test pinning −3 was REWRITTEN to the Rule, not
+  deleted; `EXPECTED` counts it still.

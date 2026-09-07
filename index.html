@@ -2512,7 +2512,18 @@ function applyCaps(calculated, lowIndex) {
 
 /* Course Handicap = Index × (Slope ÷ 113) + (Course Rating − Par).
    The index is portable; this is what it turns into on one particular set of
-   tees on one particular course, i.e. the shots you actually get. */
+   tees on one particular course, i.e. the shots you actually get.
+
+   ROUNDED WITH Math.round, DELIBERATELY, and playingHandicap below uses the
+   same. The Rules of Handicapping round a Course Handicap and a Playing
+   Handicap to the nearest whole number with .5 going UP — and "up" is toward
+   the higher number, not away from zero — so a plus player's raw −2.5 is a
+   course handicap of +2 (−2 here), which is exactly what Math.round gives.
+   Until 2026-09-07 playingHandicap rounded half AWAY from zero instead, on the
+   reasoning that Math.round "hands the better player a shot", and the two
+   functions disagreed on the same half. round1 is different: it is a
+   score-differential / index rounding, where the Rules do round to the
+   nearest tenth with .5 away from zero. */
 function courseHandicap(index, slope, rating, par) {
   if (index == null || !(Number(slope) > 0)) return null;
   const raw = index * (Number(slope) / 113) + (Number(rating) - Number(par));
@@ -2544,13 +2555,11 @@ const DEFAULT_ALLOWANCE = 'full';
 function allowanceById(id) {
   return ALLOWANCES.find((a) => a.id === id) || ALLOWANCES[0];
 }
-/* Rounded half AWAY from zero, not with Math.round, for the same reason round1
-   is: a plus handicap is negative, and Math.round(-2.5) is -2, which would hand
-   the better player a shot they have not earned while rounding +2.5 up to 3. */
+/* Math.round, the same rule as courseHandicap — see the note there. */
 function playingHandicap(courseHcp, pct) {
   if (courseHcp == null) return null;
   const raw = courseHcp * ((Number(pct) || 0) / 100);
-  return raw < 0 ? -Math.round(-raw) : Math.round(raw);
+  return Math.round(raw);
 }
 
 /* ── Sync decision ───────────────────────────────────────────────────────────
@@ -2746,6 +2755,11 @@ function fmtDate(iso) {
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 function fmtIndex(v) { return v == null ? '—' : (v < 0 ? '+' + Math.abs(v).toFixed(1) : v.toFixed(1)); }
+/* The whole-number sibling, for a course or playing handicap: a plus player's
+   −3 is written "+3", as the "+2.7" index it came from is. Until 2026-09-07 those
+   figures went through String() and the same golfer read "+2.7" on one line
+   and "-3" on the next. */
+function fmtShots(v) { return v == null ? '—' : (v < 0 ? '+' + Math.abs(v) : String(v)); }
 /* A movement, read as one: down is an improving handicap. The arrow is never
    the only cue — the number carries the size and "level" is spelled out. */
 function trendLabel(v) { return v == null ? '—' : (v === 0 ? 'level' : (v < 0 ? '▼ ' : '▲ ') + Math.abs(v).toFixed(1)); }
@@ -3715,14 +3729,14 @@ function renderCourseHandicap(c) {
     return;
   }
   const ph = playingHandicap(ch, allow.pct);
-  el.textContent = String(ph); el.classList.remove('na');
+  el.textContent = fmtShots(ph); el.classList.remove('na');
   /* The full course handicap is always in the sentence, even when the allowance
      is 100% and the two numbers are the same. The big figure is what you play
      off; the line under it is where it came from, and a percentage that silently
      takes shots away is the one thing here that has to be visible. */
   const cut = allow.pct === 100 ? '' :
-    ` Then ${allow.pct}% for ${allow.label.replace(/\s*\(\d+%\)$/, '').toLowerCase()} = ${ph}.`;
-  sub.textContent = `${fmtIndex(index)} (${which}) × ${tee.slope} ÷ 113 + (${tee.rating} − ${tee.par}) = ${ch} shots off the tee at ${course.name}, ${tee.name}.${cut}`;
+    ` Then ${allow.pct}% for ${allow.label.replace(/\s*\(\d+%\)$/, '').toLowerCase()} = ${fmtShots(ph)}.`;
+  sub.textContent = `${fmtIndex(index)} (${which}) × ${tee.slope} ÷ 113 + (${tee.rating} − ${tee.par}) = ${fmtShots(ch)} shots off the tee at ${course.name}, ${tee.name}.${cut}`;
 }
 
 function renderRounds(c) {
@@ -4175,8 +4189,8 @@ function renderStrokes(rows) {
     return `<tr class="${x.id === state.activeGolfer ? 'is-you' : ''}">
       <th scope="row">${esc(x.name)}</th>
       <td class="num">${fmtIndex(x.index)}</td>
-      <td class="num">${x.ch == null ? '—' : x.ch}</td>
-      <td class="num">${x.ph == null ? '—' : x.ph}</td>
+      <td class="num">${fmtShots(x.ch)}</td>
+      <td class="num">${fmtShots(x.ph)}</td>
       <td class="num">${gives == null ? '—' : (gives === 0 ? 'scratch' : '+' + gives)}</td>
     </tr>`;
   }).join('');

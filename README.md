@@ -390,7 +390,9 @@ of tees — the shots those tees give you:
 index × (slope ÷ 113) + (course rating − par)
 ```
 
-rounded to a whole number. It follows whichever figure you have set as primary, so switching
+rounded to a whole number — a half rounds up toward the higher number, as the Rules of
+Handicapping say, so a plus player's −2.5 is +2, and a plus handicap is written *+2* here
+just as a plus index is. It follows whichever figure you have set as primary, so switching
 between the league handicap and the official one changes it.
 
 What a competition actually gives you is a **percentage of that**, and the percentage depends

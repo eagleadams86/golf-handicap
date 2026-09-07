@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 326;
+const EXPECTED = 331;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -398,14 +398,35 @@ async function onAppLoad() {
     eq(W.courseHandicap(18, 113, 72, 72), 18));
   it('has nothing to convert without an index', () =>
     eq(W.courseHandicap(null, 122, 69.4, 71), null));
+  it('rounds a half UP — toward the higher number — for a plus handicap too (WHS Rule 6.1)', () => {
+    /* The Rules of Handicapping round a Course Handicap to the nearest whole
+       number with .5 going UP, and "up" means toward the higher number, not
+       away from zero: a raw −2.5 is a course handicap of +2, not +3. That is
+       Math.round's behaviour exactly. */
+    eq(W.courseHandicap(-2.5, 113, 72, 72), -2);
+    eq(W.courseHandicap(2.5, 113, 72, 72), 3);
+  });
 
   /* ── playingHandicap ─────────────────────────────────────────────────── */
   describe('playingHandicap');
   it('leaves a full handicap alone', () => eq(W.playingHandicap(18, 100), 18));
   it('takes the four-ball allowance off', () => eq(W.playingHandicap(20, 90), 18));
-  it('rounds a half AWAY from zero, so a plus handicap is not handed a shot', () => {
+  it('rounds a half UP, the same rule as courseHandicap (WHS Rule 6.2)', () => {
+    /* Until 2026-09-07 this rounded half AWAY from zero (−2.5 → −3) on the
+       reasoning that Math.round would hand a plus player a shot. The Rules say
+       otherwise: .5 rounds up toward the higher number for a Playing Handicap
+       exactly as for a Course Handicap, so a plus player's −2.5 is +2, and the
+       two functions disagreeing on the same half was the real fault. */
     eq(W.playingHandicap(5, 50), 3);            // 2.5 → 3
-    eq(W.playingHandicap(-5, 50), -3);          // −2.5 → −3, not −2
+    eq(W.playingHandicap(-5, 50), -2);          // −2.5 → −2, the same rule as courseHandicap
+    eq(W.playingHandicap(-5, 50), W.courseHandicap(-2.5, 113, 72, 72),
+       'one rounding rule for the pair');
+  });
+  it('a plus handicap is written with a plus, as the index it came from is', () => {
+    eq(W.fmtShots(-3), '+3');
+    eq(W.fmtShots(3), '3');
+    eq(W.fmtShots(0), '0');
+    eq(W.fmtShots(null), '—');
   });
   it('has nothing to reduce without a course handicap', () =>
     eq(W.playingHandicap(null, 90), null));
@@ -3349,6 +3370,32 @@ describe('Hovering the trend chart');
     } catch (e) { BLANK.error = String(e && e.message || e); }
   }
 
+  /* ── A plus handicap shows as "+3", not "-3", wherever it is turned into shots ──
+     (2026-09-07 audit). The index was already written "+2.7" by fmtIndex; the
+     course handicap and playing handicap beside it came out of String(), so
+     the same golfer read "+2.7" on one line and "-3" on the next. Planted, not
+     saved: __plant never touches storage. */
+  const PLUS = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const rounds = [];
+      for (let i = 1; i <= 5; i++) rounds.push({ id: 'p' + i, golferId: 'g1', date: '2026-04-0' + i,
+        courseId: 'c1', teeId: 't1', score: 65, pcc: 0, note: '', counts: true, holes: 18 });
+      MHK.__plant({ version: MHK.SCHEMA,
+        golfers: [{ id: 'g1', name: 'Plus Player' }], activeGolfer: 'g1',
+        courses: [{ id: 'c1', name: 'Flat Links', tees: [{ id: 't1', name: 'White', rating: 72, slope: 113, par: 72 }] }],
+        rounds, settings: { method: MHK.DEFAULT_METHOD, applyCaps: true, primary: 'rolling' } });
+      MD.getElementById('tab-player').click();
+      await new Promise((r) => setTimeout(r, 40));
+      PLUS.index = MW.computeAll('g1').rolling.value;
+      PLUS.card = MD.getElementById('chValue').textContent;
+      PLUS.sub = MD.getElementById('chSub').textContent;
+      PLUS.row = [...MD.querySelectorAll('#strokesTable tbody td')].map((td) => td.textContent);
+      PLUS.ran = true;
+    } catch (e) { PLUS.error = String(e && e.message || e); }
+  }
+
   /* The walks above all wrote through save() — put the reader's own keys back
      before anything else runs. */
   FIND_KEYS.forEach((k, i) => {
@@ -3524,6 +3571,20 @@ describe('A name box that is emptied stores nothing (2026-09-07 audit)');
   it('the course box does the same', () => {
     eq(BLANK.courseEmptied, 'Renamed Course', 'an empty box is not a rename');
     eq(BLANK.courseBoxAfterBlur, 'Renamed Course', 'leaving the box puts the name back');
+  });
+
+describe('A plus handicap is written "+3", not "-3" (2026-09-07 audit)');
+  it('the frame actually drew it — everything below reads that record', () => {
+    ok(PLUS.ran, 'the walk did not finish', PLUS.error || 'no frame');
+    eq(PLUS.index, -7, 'five 65s at a par-72, rating-72, slope-113 tee is an index of +7.0');
+  });
+  it('the course handicap card writes the plus', () => {
+    eq(PLUS.card, '+7', 'the big figure');
+    ok(/\+7\.0 .*= \+7 shots/.test(PLUS.sub),
+       'and the sentence under it agrees with the index it starts from', PLUS.sub);
+  });
+  it('and so does the strokes table', () => {
+    eq(PLUS.row.slice(0, 3), ['+7.0', '+7', '+7'], 'index, course handicap, playing handicap');
   });
 
 describe('Where a press leaves the page (2026-09-05)');
