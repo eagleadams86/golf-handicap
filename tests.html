@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 340;
+const EXPECTED = 343;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -3491,6 +3491,52 @@ describe('Hovering the trend chart');
     } catch (e) { FUTURE.error = String(e && e.message || e); }
   }
 
+  /* ── A truncated share link fails ONCE, through the card (2026-09-07 audit) ──
+     `squeeze` neither awaited nor caught the writer's write() and close(), so a
+     token cut in half by a mail app produced the correct error card AND an
+     unhandled rejection in the console beside it — the same failure reported
+     twice, once through a path nothing owned. The codec is called directly with
+     a rejection listener on the frame it runs in, and a share frame is opened
+     at the same token for the card. */
+  const TRUNC = { ran: false };
+  try {
+    const whole = await S.encodeShare({
+      v: H.SHARE_PAYLOAD_V, sharedAt: 1754870400000, label: 'Cut', view: 'player',
+      golfers: [{ id: 'g1', name: 'Dad' }], activeGolfer: 'g1',
+      courses: [{ id: 'c1', name: 'Kilbryde Dunes',
+                  tees: [{ id: 't1', name: 'Medal', rating: 69.4, slope: 122, par: 71 }] }],
+      rounds: [], settings: { method: H.DEFAULT_METHOD, applyCaps: true, primary: 'rolling' },
+    });
+    /* Half the token, trimmed so atob does not refuse it for its length alone:
+       the failure has to be the deflate stream's, not base64's. */
+    let cut = whole.slice(0, Math.floor(whole.length / 2));
+    while ((cut.length - cut.indexOf('.') - 1) % 4 === 1) cut = cut.slice(0, -1);
+    TRUNC.compressed = whole.indexOf('0.') !== 0;
+    let unhandled = 0;
+    const onRej = (e) => { unhandled += 1; e.preventDefault(); };
+    W.addEventListener('unhandledrejection', onRej);
+    try { await S.decodeShare(cut); TRUNC.threw = false; }
+    catch (e) { TRUNC.threw = true; }
+    /* unhandledrejection is dispatched from a later task, so let a few run. */
+    await new Promise((r) => setTimeout(r, 150));
+    W.removeEventListener('unhandledrejection', onRej);
+    TRUNC.unhandled = unhandled;
+
+    const cf = document.createElement('iframe');
+    cf.setAttribute('aria-hidden', 'true');
+    cf.style.cssText = 'position:absolute;left:-9999px;width:1280px;height:800px;border:0';
+    await new Promise((resolve) => {
+      cf.onload = resolve;
+      cf.src = 'index.html?cut=' + Date.now() + '#share=' + cut;
+      document.body.appendChild(cf);
+    });
+    const CD = cf.contentWindow.document;
+    for (let i = 0; i < 60 && !/Couldn.t Be Opened/.test(CD.getElementById('playerPanel').textContent); i++)
+      await new Promise((r) => setTimeout(r, 50));
+    TRUNC.card = /Couldn.t Be Opened/.test(CD.getElementById('playerPanel').textContent);
+    TRUNC.ran = true;
+  } catch (e) { TRUNC.error = String(e && e.message || e); }
+
   /* The walks above all wrote through save() — put the reader's own keys back
      before anything else runs. */
   FIND_KEYS.forEach((k, i) => {
@@ -3725,6 +3771,21 @@ describe('A round can’t be in the future (2026-09-07 audit)');
   it('a round dated today saves', () => {
     ok(!FUTURE.today.open, 'the dialog closed');
     eq(FUTURE.today.added, 1, 'and one round was added');
+  });
+
+describe('A truncated share link fails once, through the card (2026-09-07 audit)');
+  it('the codec was actually driven — everything below reads that record', () => {
+    ok(TRUNC.ran, 'the walk did not finish', TRUNC.error || 'no frame');
+    ok(TRUNC.compressed, 'the token went through the deflate stream, which is the path in question');
+    ok(TRUNC.threw, 'and decodeShare refused the cut token');
+  });
+  it('the error card is shown', () => {
+    ok(TRUNC.card, 'the frame opened at the cut token drew “This Shared Link Couldn’t Be Opened”');
+  });
+  it('and nothing else is reported — no unhandled rejection beside the card', () => {
+    eq(TRUNC.unhandled, 0,
+       'squeeze must await, or catch, the writer’s write() and close(): a rejection from either '
+       + 'that nothing awaits is the same failure reported twice');
   });
 
 describe('Where a press leaves the page (2026-09-05)');

@@ -1193,3 +1193,15 @@ stand on it.
   yesterday's max), so the picker greys out tomorrow before anything is pressed. The suite
   dates a round tomorrow and reads the refusal, then dates it today and reads the save; its
   `todayLocal()` helper is local for the same reason the app's is.
+- **A truncated share link fails once, through the card.** `squeeze` called the writer's
+  `write()` and `close()` and awaited neither, so a token cut in half by a mail app produced
+  the correct *This Shared Link Couldn't Be Opened* card AND `Uncaught (in promise):
+  Compressed input was truncated` beside it — the same failure reported twice, once through
+  a path nothing owned. Both are awaited now, in a `Promise.all` WITH the read rather than
+  before it: the writable side of a transform stream only drains as the readable side is
+  read, so `await w.close()` before starting the read would deadlock on any input larger
+  than the stream's buffer. Whichever side rejects first rejects the whole, and
+  `openSharedView`'s catch reports it once. The suite calls `decodeShare` on a cut token
+  with an `unhandledrejection` listener on the frame the promise was made in (the event
+  fires at the promise's own global, not the suite's), waits a few tasks, and expects zero;
+  the headless runner's `pageerror` line said the same thing before the fix.

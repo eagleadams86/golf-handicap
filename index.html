@@ -6241,11 +6241,23 @@ const b64urlDecode = (str) => {
   return Uint8Array.from(b, (c) => c.charCodeAt(0));
 };
 
+/* The writer's write() and close() are AWAITED, alongside the read, and not
+   fired and forgotten (2026-09-07 audit). A token cut in half by a mail app
+   errors the stream, and a rejection from close() that nothing awaited was an
+   unhandled rejection in the console beside the correct error card — the same
+   failure reported twice, once through a path nothing owned. Promise.all, not
+   two sequential awaits: the writable side of a transform only drains as the
+   readable side is read, so awaiting close() before starting the read would
+   deadlock on any input larger than the stream's buffer. Whichever side
+   rejects first rejects the whole, and decodeShare's caller catches it once. */
 async function squeeze(bytes, Stream, format) {
   const s = new Stream(format);
   const w = s.writable.getWriter();
-  w.write(bytes); w.close();
-  return new Uint8Array(await new Response(s.readable).arrayBuffer());
+  const [buf] = await Promise.all([
+    new Response(s.readable).arrayBuffer(),
+    w.write(bytes).then(() => w.close()),
+  ]);
+  return new Uint8Array(buf);
 }
 
 /* Which rounds a window keeps. Pure, and separate from the payload builder so
