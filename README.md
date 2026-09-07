@@ -120,7 +120,9 @@ Metrics, Sprint Predictability, Money Map and the Lottery Portfolio.
 Multiple golfers are supported: use **Golfers & Courses** in the header, which is also where
 courses and their tees are added and edited. Each golfer keeps their own rounds and their own
 handicap. Courses and the league rule are shared between everyone, which is what makes the
-leaderboard a fair comparison.
+leaderboard a fair comparison. Renaming happens in the box beside the name, as you type; a
+box cleared to retype stores nothing until it holds a name again, and if you leave it empty
+the last name comes back — a golfer or a course is never nameless.
 
 Under **Rounds**, the *Used in* column shows which rounds each figure actually leaned on, so
 it is always visible why a number moved. Past eight rounds a filter appears above the table —

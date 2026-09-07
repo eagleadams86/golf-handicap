@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 322;
+const EXPECTED = 325;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -3284,6 +3284,53 @@ describe('Hovering the trend chart');
     } catch (e) { ORPHAN.error = String(e && e.message || e); }
   }
 
+  /* ── A name box that is emptied stores nothing (2026-09-07 audit) ─────────
+     Both list boxes in Golfers & Courses wrote `el.value.slice(…)` on every
+     keystroke, blank included: the golfer picker grew a blank option, the
+     leaderboard's name button lost its text, and `normalizeState` renamed the
+     record "Golfer" / "Course" on the next load. The course EDITOR already
+     refused a blank; the list boxes now do the equivalent — an emptied box is
+     not a rename, and leaving the box puts the last name back in it. */
+  const BLANK = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const demo = MW.buildDemoLeague();
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds: demo.rounds, activeGolfer: demo.golfers[0].id });
+      MW.openManage();
+      await new Promise((r) => setTimeout(r, 40));
+      const gid = demo.golfers[0].id, cid = demo.courses[0].id;
+      const gBox = MD.querySelector('#golferList [data-name="' + gid + '"]');
+      const cBox = MD.querySelector('#courseList [data-name="' + cid + '"]');
+      const type = (el, v) => { el.value = v; el.dispatchEvent(new MW.Event('input', { bubbles: true })); };
+      const leave = (el) => el.dispatchEvent(new MW.Event('blur'));
+      const golfer = () => MHK.__state().golfers.find((g) => g.id === gid).name;
+      const course = () => MHK.__state().courses.find((c) => c.id === cid).name;
+
+      type(gBox, 'Renamed Golfer');
+      BLANK.golferRenamed = golfer();
+      type(gBox, '');
+      BLANK.golferEmptied = golfer();
+      type(gBox, '   ');
+      BLANK.golferSpaces = golfer();
+      leave(gBox);
+      BLANK.golferBoxAfterBlur = gBox.value;
+      BLANK.pickerBlank = [...MD.getElementById('golferSel').options].some((o) => !o.textContent.trim());
+
+      type(cBox, 'Renamed Course');
+      BLANK.courseRenamed = course();
+      type(cBox, '');
+      BLANK.courseEmptied = course();
+      leave(cBox);
+      BLANK.courseBoxAfterBlur = cBox.value;
+
+      MD.getElementById('manageDialog').close();
+      await new Promise((r) => setTimeout(r, 40));
+      BLANK.ran = true;
+    } catch (e) { BLANK.error = String(e && e.message || e); }
+  }
+
   /* The walks above all wrote through save() — put the reader's own keys back
      before anything else runs. */
   FIND_KEYS.forEach((k, i) => {
@@ -3442,6 +3489,23 @@ describe('Editing an orphaned round keeps it orphaned (2026-09-07 audit)');
     ok(/deleted tee/.test(ORPHAN.tee.text), 'the option says so', ORPHAN.tee.text);
     ok(ORPHAN.teeAfter.closed, 'saving as it is goes through');
     eq(ORPHAN.teeAfter.teeId, 'gone-tee', 'and the tee id is untouched');
+  });
+
+describe('A name box that is emptied stores nothing (2026-09-07 audit)');
+  it('the walk actually drove it — everything below reads that record', () => {
+    ok(BLANK.ran, 'the walk did not finish', BLANK.error || 'no frame');
+    eq(BLANK.golferRenamed, 'Renamed Golfer', 'a real rename still lands as you type');
+    eq(BLANK.courseRenamed, 'Renamed Course', 'in both lists');
+  });
+  it('an emptied golfer box keeps the last name, and blur puts it back in the box', () => {
+    eq(BLANK.golferEmptied, 'Renamed Golfer', 'an empty box is not a rename');
+    eq(BLANK.golferSpaces, 'Renamed Golfer', 'nor is a box of spaces');
+    eq(BLANK.golferBoxAfterBlur, 'Renamed Golfer', 'leaving the box puts the name back');
+    ok(!BLANK.pickerBlank, 'and the golfer picker never grew a blank option');
+  });
+  it('the course box does the same', () => {
+    eq(BLANK.courseEmptied, 'Renamed Course', 'an empty box is not a rename');
+    eq(BLANK.courseBoxAfterBlur, 'Renamed Course', 'leaving the box puts the name back');
   });
 
 describe('Where a press leaves the page (2026-09-05)');

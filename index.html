@@ -4730,16 +4730,10 @@ function renderCourseList() {
      this window already lives. Neutral, not `.danger`: editing tees is not
      destructive and must not light up as though it were.
 
-     Renaming is in the box, on the same three rules as the golfer list above it:
-     re-found by id every keystroke, the cap applied in code as well as in
-     `maxlength` because a paste ignores the attribute, and `render()` WITHOUT
-     redrawing this list — which would replace the input being typed in. */
-  box.querySelectorAll('[data-name]').forEach((el) => el.addEventListener('input', () => {
-    const live = state.courses.find((x) => x.id === el.dataset.name);
-    if (!live) return;   // gone since the list was drawn (sync, other tab)
-    live.name = el.value.slice(0, 80);
-    save();
-  }));
+     Renaming is in the box, on the same rules as the golfer list above it — see
+     wireNameBoxes — and `render()` WITHOUT redrawing this list, which would
+     replace the input being typed in. */
+  wireNameBoxes(box, () => state.courses, 80);
   box.querySelectorAll('[data-course]').forEach((b) => b.addEventListener('click', () => openCourseEdit(b.dataset.course)));
   /* Never disabled, whatever the round count. A first attempt greyed these out
      while rounds still pointed at the course, on the assumption that deleting it
@@ -5123,6 +5117,36 @@ document.getElementById('methodBtn').addEventListener('click', openMethod);
 
 
 
+/* The name boxes of BOTH lists in Golfers & Courses, on one set of rules.
+   `list` is a function, not the array: `state` is replaced whole by a sync
+   adoption or another tab's write, and the record is re-found by id through
+   the live state on every keystroke. `cap` is the same length the boundary
+   sanitiser applies — `maxlength` stops typing past it but not a paste.
+
+   AN EMPTIED BOX STORES NOTHING (2026-09-07 audit). It used to write
+   `el.value.slice(…)` blank included: the golfer picker grew a blank option,
+   the leaderboard's name button lost its text, and `normalizeState` renamed
+   the record "Golfer" / "Course" on the next load. The course EDITOR has
+   always refused a blank name; this is the list box's equivalent — clearing
+   the box to retype is not a rename, and leaving it empty puts the last name
+   back, so the box never shows a name the record does not have. */
+function wireNameBoxes(box, list, cap) {
+  box.querySelectorAll('[data-name]').forEach((el) => {
+    const live = () => list().find((x) => x.id === el.dataset.name) || null;
+    el.addEventListener('input', () => {
+      const rec = live();
+      if (!rec) return;   // gone since the list was drawn (sync, other tab)
+      if (!el.value.trim()) return;
+      rec.name = el.value.slice(0, cap);
+      save();
+    });
+    el.addEventListener('blur', () => {
+      const rec = live();
+      if (rec && !el.value.trim()) el.value = rec.name;
+    });
+  });
+}
+
 function renderGolferList() {
   const box = document.getElementById('golferList');
   box.innerHTML = `<div class="table-scroll"><table>
@@ -5142,24 +5166,12 @@ function renderGolferList() {
 
   /* Renaming happens IN THE BOX, as it does in Sprint Predictability's and Flow
      Metrics' equivalent window — it was a `prompt()` behind an underlined name.
-     Three things this has to get right, all of them the siblings' rules:
-
-     • Re-found by id on every keystroke rather than written to an object captured
-       when the list was drawn. A sync adoption or another tab's write can replace
-       `state` while the dialog is open, and a rename onto a detached copy is lost
-       without a sound.
-     • `maxlength` stops typing past 60 but not a PASTE, so the cap is applied here
-       as well — the same belt-and-braces the boundary sanitiser uses.
-     • `render()` but NOT `renderGolferList()`: redrawing this list would replace
-       the very input being typed in and throw away the caret. The rest of the page
-       — the picker, the leaderboard — is what needs the new name, and that is what
-       render() covers. */
-  box.querySelectorAll('[data-name]').forEach((el) => el.addEventListener('input', () => {
-    const live = state.golfers.find((x) => x.id === el.dataset.name);
-    if (!live) return;   // gone since the list was drawn (sync, other tab)
-    live.name = el.value.slice(0, 60);
-    save();
-  }));
+     The rules are in wireNameBoxes, shared with the course list below. One of
+     them is specific to this list: save() calls render() but NOT
+     renderGolferList(), because redrawing this list would replace the very
+     input being typed in and throw away the caret. The rest of the page — the
+     picker, the leaderboard — is what needs the new name, and render() covers it. */
+  wireNameBoxes(box, () => state.golfers, 60);
   box.querySelectorAll('[data-remove]').forEach((b) => b.addEventListener('click', () => {
     const id = b.dataset.remove;
     if (state.golfers.length === 1) { document.getElementById('golferWarn').textContent = 'There has to be at least one golfer.'; return; }

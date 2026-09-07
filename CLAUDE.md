@@ -1132,3 +1132,14 @@ stand on it.
   `lastUsed()` can point at a course deleted since, and the first course is the right
   pre-fill for a round that has not been placed yet. The suite drives `openRound` on a
   course-gone round and a tee-gone round in MEASURE and reads the stored ids back.
+- **A name box that is emptied stores nothing.** Both list boxes in Golfers & Courses wrote
+  `el.value.slice(…)` on every keystroke, blank included: the golfer picker grew a blank
+  option, the leaderboard's name button lost its text, and `normalizeState` renamed the
+  record "Golfer" / "Course" on the next load — so the name on screen and the name stored
+  disagreed until a reload silently picked one. The course EDITOR has always refused a blank
+  name; the list boxes now go through one helper, `wireNameBoxes(box, list, cap)`, whose
+  `input` handler returns before writing when the box trims to nothing and whose `blur`
+  handler puts the record's name back into an empty box. `list` is a FUNCTION so the record
+  is re-found through the live `state` on every keystroke (the rule the two handlers already
+  followed separately). The suite types into both boxes in MEASURE, empties them, blurs, and
+  reads the stored names and the picker's options back.
