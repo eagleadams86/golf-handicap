@@ -679,6 +679,11 @@ offline either way.
 
 - The **first time a Google account syncs in a browser**, if both sides already hold rounds
   you are asked which copy to keep. It does not guess by timestamp.
+- **Nothing is pushed until that question has been answered.** Between sign-in and the
+  answer the app is reading the cloud copy; an edit made in that gap, or one still waiting
+  to be sent when sign-in completed, is held and goes up once the verdict is in — as part of
+  whichever copy the verdict chose — rather than overwriting the cloud copy before the
+  dialog could ask.
 - Underneath that, **an empty copy never beats a copy with data in it**, whatever the
   timestamps say. Without this rule, signing in on a fresh browser pushes an empty state
   stamped *now*, and the device that actually had the rounds — carrying an older timestamp —

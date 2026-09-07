@@ -1227,3 +1227,24 @@ stand on it.
   a golfer with none inside a populated app gets *No rounds yet for this golfer* and *+ Add
   round*. The listeners are attached under the same condition, since the buttons do not
   exist otherwise.
+- **No push before the verdict.** From reading, not from the browser: `startSync` awaits
+  `getDoc` before `syncDecision` can say which copy wins, and `window.cloudPush` was live the
+  whole time — so an edit made in that window, or a push already debounced when sign-in
+  completed, wrote this device's copy over the cloud one BEFORE the which-copy dialog had
+  asked. That is the exact overwrite the verdict exists to prevent, through a side door: the
+  first-sign-in rule and empty-never-beats-data both act on `getDoc`'s answer, and a push
+  that lands first changes the answer. `makePushGate()` in the classic script is the pure
+  part (held from the start; `request` runs or remembers; `release` opens and runs ONE push
+  if any was wanted; `hold` closes and forgets) and tests.html pins all four. The module
+  makes one, threads `cloudPush` AND `cloudFlush` through `request`, holds it on EVERY auth
+  report (a new account is a new verdict, and a push wanted under the old account must not
+  be sent under the new), and releases it in `startSync` after the verdict is acted on and
+  BEFORE `listen()` — the released push is `window.cloudPush()`, i.e. the CURRENT state,
+  which by then is whichever copy the verdict chose. A `startSync` that throws never reaches
+  the release: the gate stays held, the button shows the error, and the next auth report or
+  reload starts again — pushing blind without a verdict is the fault this stops.
+  `flushPending` (visibilitychange / pagehide) needed no change: it only sends a timer the
+  gate never let start. The module's wiring cannot be driven from the suite (Firebase never
+  loads there), so it is pinned at the source: the gate is made, both entry points call
+  `request`, `release` sits between `syncDecision(` and `listen();`, and `hold()` is in the
+  auth handler before `startSync()`.

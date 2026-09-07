@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 350;
+const EXPECTED = 355;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -678,6 +678,56 @@ async function onAppLoad() {
   });
   it('pushes when both sides are empty — nothing to adopt', () =>
     eq(W.syncDecision(0, 0, false, true), 'push'));
+
+  /* ── makePushGate — no push before the verdict (2026-09-07 audit) ──────────
+     startSync awaits getDoc before syncDecision can say which copy wins, and
+     window.cloudPush was live the whole time — so an edit made in that
+     window, or a push already debounced when sign-in completed, could overwrite
+     the cloud copy before the which-copy dialog had asked. The gate is the pure
+     part: held until released, remembering that a push was wanted meanwhile. */
+  describe('makePushGate — no push before the verdict');
+  it('starts held, and a push asked for while held is remembered, not run', () => {
+    const g = W.makePushGate();
+    let n = 0;
+    const push = () => { n += 1; };
+    ok(g.held(), 'held from the start');
+    eq(g.request(push), false, 'request says it did not run');
+    eq(n, 0, 'and it did not');
+  });
+  it('release runs ONE push if any was wanted, however many were asked for', () => {
+    const g = W.makePushGate();
+    let n = 0;
+    const push = () => { n += 1; };
+    g.request(push); g.request(push); g.request(push);
+    g.release(push);
+    eq(n, 1, 'three requests while held are one push after the verdict');
+    ok(!g.held(), 'and the gate is open');
+    g.release(push);
+    eq(n, 1, 'a second release does not push again');
+  });
+  it('release with nothing wanted runs nothing, and a request afterwards runs at once', () => {
+    const g = W.makePushGate();
+    let n = 0;
+    const push = () => { n += 1; };
+    g.release(push);
+    eq(n, 0, 'nothing was asked for');
+    eq(g.request(push), true, 'open: the request runs');
+    eq(n, 1);
+  });
+  it('hold closes it again for the next sign-in, forgetting anything wanted before', () => {
+    const g = W.makePushGate();
+    let n = 0;
+    const push = () => { n += 1; };
+    g.release(push);
+    g.request(push);
+    g.hold();
+    ok(g.held(), 'held again');
+    g.request(push);
+    eq(n, 1, 'the request after hold did not run');
+    g.hold();
+    g.release(push);
+    eq(n, 1, 'and hold() forgot it — a push wanted under the OLD account is not sent under the new');
+  });
 
   /* ── data coming in from outside ─────────────────────────────────────── */
   describe('sanitizeIds');
@@ -1708,6 +1758,33 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
     const afterHalt = APP_SRC.indexOf('addEventListener', APP_SRC.indexOf('btn.addEventListener') + 20);
     ok(guardAt < afterHalt || afterHalt === -1, 'the check must run before any handler is attached');
     ok(firstListener > -1, 'sanity: the app does attach listeners');
+  });
+  it('the sync module holds every push behind the gate until startSync has its verdict', () => {
+    /* The module's functions are not reachable from here (it is a module, and
+       Firebase never loads in the suite), so its wiring is pinned at the source:
+       the gate is made, both push entry points go through request(), startSync
+       releases it AFTER the verdict and BEFORE the listener opens, and every
+       auth report holds it again — a new account is a new verdict. */
+    const mod = APP_SRC.slice(APP_SRC.indexOf('<script type="module">'));
+    ok(mod.indexOf('const pushGate = makePushGate();') > -1, 'the module makes the gate');
+    const cp = mod.indexOf('window.cloudPush = () => {');
+    const cf = mod.indexOf('window.cloudFlush = () => {');
+    ok(cp > -1 && mod.slice(cp, mod.indexOf('};', cp)).indexOf('pushGate.request(') > -1,
+       'cloudPush asks the gate');
+    ok(cf > -1 && mod.slice(cf, mod.indexOf('};', cf)).indexOf('pushGate.request(') > -1,
+       'and so does cloudFlush');
+    const ss = mod.indexOf('async function startSync() {');
+    const body = mod.slice(ss, mod.indexOf('\n}\n', ss));
+    const verdict = body.indexOf('syncDecision(');
+    const release = body.indexOf('pushGate.release(');
+    const listenAt = body.lastIndexOf('listen();');
+    ok(verdict > -1 && release > verdict && listenAt > release,
+       'startSync releases the gate after the verdict and before listen()',
+       JSON.stringify({ verdict, release, listenAt }));
+    const auth = mod.indexOf('A.onAuthStateChanged(auth, (u) => {');
+    const authBody = mod.slice(auth, mod.indexOf('startSync()', auth));
+    ok(auth > -1 && authBody.indexOf('pushGate.hold();') > -1,
+       'every auth report holds the gate again before startSync can run');
   });
   it('ghAdopt stores the newer copy verbatim, then halts instead of adopting', () => {
     const at = APP_SRC.indexOf('window.ghAdopt =');

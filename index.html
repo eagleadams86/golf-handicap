@@ -2576,6 +2576,39 @@ function syncDecision(localCount, remoteCount, remoteIsNewer, firstSyncForAccoun
   return remoteCount && remoteIsNewer ? 'adopt' : 'push';
 }
 
+/* ── The push gate ───────────────────────────────────────────────────────────
+   No push reaches the cloud before syncDecision has said which copy wins
+   (2026-09-07 audit). startSync awaits getDoc before it can ask, and until then
+   `window.cloudPush` was live: an edit made in that window, or a push already
+   debounced when sign-in completed, wrote this device's copy over the cloud
+   one BEFORE the which-copy dialog had asked — the exact overwrite the verdict
+   exists to prevent, through a side door. Pure, so tests.html pins it; the
+   sync module makes one and threads every push through it.
+
+   `request(push)` runs the push at once when the gate is open; while it is
+   held it remembers that one was wanted and runs nothing. `release(push)`
+   opens the gate and runs ONE push if any was wanted meanwhile — the current
+   state, which by then is whichever copy the verdict chose. `hold()` closes
+   it again and forgets: every auth report is a new account and a new verdict,
+   and a push wanted under the old account must not be sent under the new.
+─────────────────────────────────────────────────────────────────────────── */
+function makePushGate() {
+  let held = true, wanted = false;
+  return {
+    held: () => held,
+    request(push) {
+      if (held) { wanted = true; return false; }
+      push();
+      return true;
+    },
+    release(push) {
+      held = false;
+      if (wanted) { wanted = false; push(); }
+    },
+    hold() { held = true; wanted = false; },
+  };
+}
+
 const DAY = 86400000;
 function isoOf(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -6964,6 +6997,9 @@ async function init() {
   db = F.getFirestore(app);
   A.onAuthStateChanged(auth, (u) => {
     user = u;
+    /* A new report is a new account (or none) and a new verdict to wait for:
+       nothing pushes until startSync below releases the gate. */
+    pushGate.hold();
     /* What the next load reads to decide whether to fetch Google's code at all
        (see shouldBootSync above). Written on EVERY report, including the null
        one that follows signing out — so signing out stops the requests, not
@@ -7186,6 +7222,15 @@ async function startSync() {
   }
   try { localStorage.setItem('gh-sync-uid', user.uid); }
   catch (e) { /* storage blocked — the next sign-in just asks again */ }
+  /* The verdict is in and acted on: pushes may flow, starting with one that
+     was asked for while they were held (an edit made before getDoc returned).
+     It pushes the CURRENT state, which is whichever copy the verdict chose.
+     Released before listen(), so the listener never sees a push it must
+     ignore as its own. A startSync that threw above never reaches this line —
+     the gate stays held, the button shows the error, and the next auth report
+     or reload starts again; pushing blind without a verdict is the fault this
+     exists to stop. */
+  pushGate.release(() => window.cloudPush());
   listen();
 }
 
@@ -7254,20 +7299,30 @@ async function pushNow() {
   if (!unsub) listen();
 }
 
+/* Every push goes through this — see makePushGate in the classic script. Held
+   from the moment an auth report arrives until startSync has its verdict. */
+const pushGate = makePushGate();
+
 /* Called by save() on every local change; debounced so rapid edits batch up. */
 window.cloudPush = () => {
   if (!user) return;
-  clearTimeout(pushTimer);
-  pushTimer = setTimeout(() => { pushTimer = null; pushNow().catch(setSyncError); }, 1200);
+  pushGate.request(() => {
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(() => { pushTimer = null; pushNow().catch(setSyncError); }, 1200);
+  });
 };
 
 /* Skips the debounce. "Delete all data" calls this so the cleared state
-   reaches the cloud before the tab can be closed. */
+   reaches the cloud before the tab can be closed. Gated like cloudPush: a
+   clear-all before the verdict is still a local change the cloud copy might
+   be about to replace, and the release pushes whatever the verdict left. */
 window.cloudFlush = () => {
   if (!user) return;
-  clearTimeout(pushTimer);
-  pushTimer = null;
-  pushNow().catch(setSyncError);
+  pushGate.request(() => {
+    clearTimeout(pushTimer);
+    pushTimer = null;
+    pushNow().catch(setSyncError);
+  });
 };
 
 /* The same window, closed for ordinary edits too: "edit, then close the tab
