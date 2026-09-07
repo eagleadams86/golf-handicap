@@ -2990,6 +2990,14 @@ function computeAll(golferId) {
      same things. */
   const paired = pairNines(counted);
   const games = paired.games;
+  /* What is actually COUNTING: `counted` minus a nine still waiting for its
+     partner. `counted` is the list before pairing and stays so — it is what
+     the exclusion notes reckon against, and a waiting nine is not an exclusion,
+     it has a note of its own. Until 2026-09-07 the "Counting towards handicap"
+     tile and the leaderboard's Rounds column read `counted.length`, so the
+     nine the note beside them said "counts towards nothing yet" was counted in
+     the very figure the note qualified. */
+  const counting = paired.pending ? counted.filter((e) => e !== paired.pending) : counted;
 
   const forHistory = games.map((g) => ({
     date: g.date,
@@ -3015,7 +3023,7 @@ function computeAll(golferId) {
   const usedRoll = pickUsed(newestFirst, values, rollPick);
 
   return {
-    all, counted, games, pendingNine: paired.pending, method, useCaps, useEsr, history, latest,
+    all, counted, counting, games, pendingNine: paired.pending, method, useCaps, useEsr, history, latest,
     whs: {
       value: latest ? latest.whs : null,
       uncapped: latest ? latest.whsUncapped : null,
@@ -3230,7 +3238,7 @@ function renderStats(c) {
      last unless something longer arrives. */
   const tiles = [
     ['Rounds logged', String(c.all.length)],
-    ['Counting towards handicap', String(c.counted.length)],
+    ['Counting towards handicap', String(c.counting.length)],
     ['Best differential', best == null ? '—' : best.toFixed(1)],
     [`Change over ${TREND_ROUNDS} rounds`, trendLabel(trend)],
     ['Last round', last ? `${last.round.score} on ${fmtDate(last.date)}` : '—'],
@@ -4089,7 +4097,7 @@ function leagueRows() {
       rolling: c.rolling.value,
       whs: c.whs.value,
       rounds: c.all.length,
-      counted: c.counted.length,
+      counted: c.counting.length,
       excluded: c.all.length - c.counted.length,
       best: diffs.length ? Math.min.apply(null, diffs) : null,
       change: changeOverRounds(c.history, state.settings.primary, TREND_ROUNDS),

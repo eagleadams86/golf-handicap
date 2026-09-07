@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 331;
+const EXPECTED = 334;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -3396,6 +3396,36 @@ describe('Hovering the trend chart');
     } catch (e) { PLUS.error = String(e && e.message || e); }
   }
 
+  /* ── A nine waiting to be paired is not "counting towards handicap" (2026-09-07 audit) ──
+     `renderStats`' tile and the leaderboard's Rounds column both read
+     `counted.length`, which is the list BEFORE pairing — so Alex's single nine,
+     which the note beside the tile says "counts as soon as you log another
+     nine", was counted in the very figure that note qualifies. Planted, never
+     saved. */
+  const WAITING = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const demo = MW.buildDemoLeague();
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds: demo.rounds, activeGolfer: 'demo-g-1' });
+      const c = MW.computeAll('demo-g-1');
+      WAITING.logged = c.all.length;
+      WAITING.pending = !!c.pendingNine;
+      MD.getElementById('tab-player').click();
+      await new Promise((r) => setTimeout(r, 40));
+      const tile = [...MD.querySelectorAll('#stats .stat')]
+        .find((el) => /Counting towards handicap/.test(el.textContent));
+      WAITING.tile = tile ? tile.querySelector('.v').textContent : null;
+      MD.getElementById('tab-league').click();
+      await new Promise((r) => setTimeout(r, 40));
+      const row = MD.querySelector('#leagueTable tr[data-golfer="demo-g-1"]');
+      WAITING.leagueRounds = row ? row.children[4].textContent : null;
+      MD.getElementById('tab-player').click();
+      WAITING.ran = true;
+    } catch (e) { WAITING.error = String(e && e.message || e); }
+  }
+
   /* The walks above all wrote through save() — put the reader's own keys back
      before anything else runs. */
   FIND_KEYS.forEach((k, i) => {
@@ -3585,6 +3615,20 @@ describe('A plus handicap is written "+3", not "-3" (2026-09-07 audit)');
   });
   it('and so does the strokes table', () => {
     eq(PLUS.row.slice(0, 3), ['+7.0', '+7', '+7'], 'index, course handicap, playing handicap');
+  });
+
+describe('A nine waiting to be paired is not "counting towards handicap" (2026-09-07 audit)');
+  it('the frame actually drew it — everything below reads that record', () => {
+    ok(WAITING.ran, 'the walk did not finish', WAITING.error || 'no frame');
+    eq(WAITING.logged, 27, 'Alex has 27 rounds logged');
+    ok(WAITING.pending, 'and one of them is a nine waiting for its partner');
+  });
+  it('the tile counts 26, not 27', () => {
+    eq(WAITING.tile, '26',
+       'the note beside it says the nine counts towards nothing yet, and the figure has to agree');
+  });
+  it('and so does the leaderboard’s Rounds column', () => {
+    eq(WAITING.leagueRounds, '26', 'the same figure, from the same predicate');
   });
 
 describe('Where a press leaves the page (2026-09-05)');

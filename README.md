@@ -211,7 +211,7 @@ The **Leaderboard** tab puts every golfer in one table, lowest handicap first:
 | **Golfer** | Select a name to open that golfer's own page. |
 | *The league rule's name* | Their league handicap — the figure the app leads with. |
 | **Official** | Their World Handicap System index. |
-| **Rounds** | How many of their rounds count towards the figures. |
+| **Rounds** | How many of their rounds count towards the figures. A nine still waiting for its partner is not among them — nor in the *Counting towards handicap* tile on the golfer's own page — until the second nine is logged. |
 | **Best diff** | Their lowest score differential ever logged. |
 | **Change over 5** | A sparkline of their last few games, and how far their handicap has moved over their last 5 counting rounds. ▼ is improving — and the figure, not the line, is what a screen reader reads and what the CSV carries. |
 | **Last round** | When they last played. |

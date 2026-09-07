@@ -1167,3 +1167,12 @@ stand on it.
   and the Course Handicap card, its sentence and both columns of Strokes on the Day go
   through it. The old playingHandicap test pinning −3 was REWRITTEN to the Rule, not
   deleted; `EXPECTED` counts it still.
+- **A nine waiting to be paired is not "counting towards handicap".** `renderStats`' tile
+  and the leaderboard's Rounds column both read `counted.length`, and `counted` is the list
+  BEFORE pairing — so Alex's single nine, which the note beside the tile says "counts as
+  soon as you log another nine", was counted in the very figure that note qualifies.
+  `computeAll` now also returns `counting`: `counted` minus `paired.pending`, the one
+  predicate both figures read. `counted` itself is deliberately unchanged — it is what the
+  exclusion notes reckon against (`excluded = all − counted` on the league page), and a
+  waiting nine is not an exclusion; it has a note of its own. The suite plants the demo and
+  reads both figures off the page for Alex (27 logged, 26 counting).
