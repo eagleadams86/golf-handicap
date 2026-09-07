@@ -1205,3 +1205,25 @@ stand on it.
   with an `unhandledrejection` listener on the frame the promise was made in (the event
   fires at the promise's own global, not the suite's), waits a few tasks, and expects zero;
   the headless runner's `pageerror` line said the same thing before the fix.
+- **A shared view says what a visitor can do.** Four lines of copy pointed a visitor at
+  buttons `viewOnly` hides: the leaderboard-of-one note ("add the people you play with with
+  the Golfers button in the header" — doubled word included), the Course Handicap card's and
+  Strokes on the Day's "Add a course first — … is in the header", and the rounds table's
+  sr-only caption "Select a date to edit that round" over dates that are plain text. Each
+  has a `viewOnly` branch now that describes the link instead (*This shared view has one
+  golfer…*, *No course was shared…*), and the caption drops its second sentence. The
+  Leaderboard tab stayed up for a one-golfer share because `renderEmptyState` returned on
+  `window.ghViewOnly` before reaching the one-golfer rule at its foot; the owner-only part
+  (welcome card, bare-app hiding) is a block now and the tab rule runs for everybody, so a
+  link that asked for the league view lands on the golfer. The old source test pinning the
+  early return was rewritten to pin the block. The suite opens TWO real links in frames of
+  their own — one golfer with a course and rounds, one golfer with nothing — and reads the
+  page with `innerText`, NOT `textContent`: the app's script is inside `<body>`, so
+  textContent reads every string in the source and fails on copy the visitor never sees.
+- **The example league is offered only to an EMPTY app.** The first-run block under Rounds
+  is drawn per golfer, so it offered *Or Load the Example League* to any golfer with no
+  rounds — including the eighth golfer of the example league itself, who has none by design.
+  Both example buttons (and their hint) now appear only when `state.rounds.length === 0`;
+  a golfer with none inside a populated app gets *No rounds yet for this golfer* and *+ Add
+  round*. The listeners are attached under the same condition, since the buttons do not
+  exist otherwise.

@@ -3107,38 +3107,44 @@ function render() {
 }
 
 function renderEmptyState() {
-  if (window.ghViewOnly) return;
-  /* ── The welcome card ──────────────────────────────────────────────────────
-     Up only while the app is completely bare. NOT just "no rounds": add a
-     course and the Rounds card's own first-run state is the right next
-     instruction — it knows you have somewhere to play and offers the round
-     rather than the course again — so this steps aside at exactly that point.
+  /* A shared view keeps its cards whatever the link carried — renderRounds
+     says "No rounds were shared" in the table's place — so the welcome card
+     and the bare-app hiding are the owner's alone. The one-golfer rule at the
+     foot is EVERYBODY'S: until 2026-09-07 this returned before reaching it,
+     so a one-golfer share kept a Leaderboard tab a one-golfer app never has. */
+  if (!window.ghViewOnly) {
+    /* ── The welcome card ────────────────────────────────────────────────────
+       Up only while the app is completely bare. NOT just "no rounds": add a
+       course and the Rounds card's own first-run state is the right next
+       instruction — it knows you have somewhere to play and offers the round
+       rather than the course again — so this steps aside at exactly that point.
 
-     What it hides is hidden in CSS off `data-welcome`; setTab() writes the
-     panels' `hidden` property and would put them back a tick later. */
-  const virgin = state.rounds.length === 0 && state.courses.length === 0;
-  document.getElementById('welcomeCard').hidden = !virgin;
-  document.documentElement.toggleAttribute('data-welcome', virgin);
+       What it hides is hidden in CSS off `data-welcome`; setTab() writes the
+       panels' `hidden` property and would put them back a tick later. */
+    const virgin = state.rounds.length === 0 && state.courses.length === 0;
+    document.getElementById('welcomeCard').hidden = !virgin;
+    document.documentElement.toggleAttribute('data-welcome', virgin);
 
-  const bare = state.rounds.length === 0;
-  /* `strokesCard` joins them for the same reason: with no rounds there are no
-     handicaps to turn into shots, so it is a course picker above a column of
-     dashes. `leagueCard` stays — it is the tab's whole content, and its own note
-     explains an empty table. `courseStatsCard` is deliberately NOT here: it
-     decides its own visibility on how many courses have been played, and this
-     loop would then un-hide it a moment later on every render with rounds in. */
-  ['handicapCard', 'statsCard', 'trendCard', 'playingCard', 'strokesCard'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.hidden = bare;
-  });
-  /* The Rounds card STAYS — it is what holds the empty state — but its heading
-     row goes with the rest. "Rounds" over a card that says there are none, beside
-     an "+ Add round" the empty state offers again in the right order, is two
-     controls competing with the one thing a first-time visitor is being asked to
-     do. The card keeps its own heading for a screen reader either way: the empty
-     state's lede is the first thing in it. */
-  const head = document.getElementById('roundsHead');
-  if (head) head.hidden = bare;
+    const bare = state.rounds.length === 0;
+    /* `strokesCard` joins them for the same reason: with no rounds there are no
+       handicaps to turn into shots, so it is a course picker above a column of
+       dashes. `leagueCard` stays — it is the tab's whole content, and its own note
+       explains an empty table. `courseStatsCard` is deliberately NOT here: it
+       decides its own visibility on how many courses have been played, and this
+       loop would then un-hide it a moment later on every render with rounds in. */
+    ['handicapCard', 'statsCard', 'trendCard', 'playingCard', 'strokesCard'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.hidden = bare;
+    });
+    /* The Rounds card STAYS — it is what holds the empty state — but its heading
+       row goes with the rest. "Rounds" over a card that says there are none, beside
+       an "+ Add round" the empty state offers again in the right order, is two
+       controls competing with the one thing a first-time visitor is being asked to
+       do. The card keeps its own heading for a screen reader either way: the empty
+       state's lede is the first thing in it. */
+    const head = document.getElementById('roundsHead');
+    if (head) head.hidden = bare;
+  }
   const solo = state.golfers.length < 2;
   const tab = document.getElementById('tab-league');
   if (tab) tab.hidden = solo;
@@ -3727,7 +3733,11 @@ function renderCourseHandicap(c) {
   const sub = document.getElementById('chSub');
   if (!tee) {
     el.textContent = '—'; el.classList.add('na');
-    sub.textContent = state.courses.length ? 'Pick a course and tee.' : 'Add a course first — the Courses button is in the header.';
+    /* A visitor has no Golfers & Courses button to be sent to (2026-09-07
+       audit): say what the link carried instead. */
+    sub.textContent = state.courses.length ? 'Pick a course and tee.'
+      : viewOnly ? 'No course was shared, so there is nothing to convert the index at.'
+      : 'Add a course first — Golfers & Courses is in the header.';
     return;
   }
   const ch = courseHandicap(index, tee.slope, tee.rating, tee.par);
@@ -3770,23 +3780,32 @@ function renderRounds(c) {
        course" is an instruction the visitor has followed, and the round they
        cannot otherwise reach is the thing to offer. */
     const haveCourse = state.courses.length > 0;
+    /* The examples are for an EMPTY APP, not an empty golfer (2026-09-07 audit):
+       this block is drawn per golfer, and it offered "Load the Example League"
+       to the eighth golfer of the example league itself, who has no rounds by
+       design. With rounds anywhere in the app the one thing to offer is theirs. */
+    const anyRounds = state.rounds.length > 0;
     box.innerHTML = `<div class="empty first-run">
-      <p class="lede">${haveCourse
+      <p class="lede">${anyRounds
+        ? 'No rounds yet for this golfer. Log one and both handicaps appear straight away.'
+        : haveCourse
         ? 'No rounds yet. Log one and both handicaps appear straight away.'
         : 'No rounds yet. Add a course first, then log a round — both handicaps appear as soon as there is something to work from.'}</p>
       <div class="first-run-actions">
         <button type="button" class="primary" id="firstCourseBtn">${haveCourse ? '+ Add round' : 'Add your first course'}</button>
-        <button type="button" class="link" id="demoLeagueBtn">Or Load the Example League</button>
+        ${anyRounds ? '' : '<button type="button" class="link" id="demoLeagueBtn">Or Load the Example League</button>'}
       </div>
-      <p class="hint">Eight golfers, six courses and a season
+      ${anyRounds ? '' : `<p class="hint">Eight golfers, six courses and a season
         of rounds, so every figure and the whole leaderboard have something behind them.
         Just want one populated page?
-        <button type="button" class="link" id="demoBtn">Load a Single Golfer's Season</button></p>
+        <button type="button" class="link" id="demoBtn">Load a Single Golfer's Season</button></p>`}
     </div>`;
     document.getElementById('firstCourseBtn').addEventListener('click',
       () => (haveCourse ? openRound(null) : openCourseEdit(null)));
-    document.getElementById('demoLeagueBtn').addEventListener('click', loadDemoLeague);
-    document.getElementById('demoBtn').addEventListener('click', loadDemo);
+    if (!anyRounds) {
+      document.getElementById('demoLeagueBtn').addEventListener('click', loadDemoLeague);
+      document.getElementById('demoBtn').addEventListener('click', loadDemo);
+    }
     return;
   }
   /* Newest first: the last round played is the one you came to look at. */
@@ -3831,7 +3850,7 @@ function renderRounds(c) {
   }
 
   box.innerHTML = `<table>
-    <caption class="sr-only">Every round logged, newest first. Select a date to edit that round.</caption>
+    <caption class="sr-only">Every round logged, newest first.${viewOnly ? '' : ' Select a date to edit that round.'}</caption>
     <thead><tr>
       <th scope="col">Date</th><th scope="col">Course</th><th scope="col">Tee</th>
       <th scope="col" class="num">Score</th>
@@ -4168,6 +4187,7 @@ function renderStrokes(rows) {
   if (!tee) {
     box.innerHTML = '<div class="empty"><p>' + (state.courses.length
       ? 'Pick a course and a set of tees.'
+      : viewOnly ? 'No course was shared, so there are no shots to work out.'
       : 'Add a course first — Golfers &amp; Courses is in the header.') + '</p></div>';
     return;
   }
@@ -4313,7 +4333,12 @@ function renderLeague() {
       + `${primary === 'whs' ? ` (it is not issued below ${WHS_MIN_ROUNDS} counting rounds)` : ''}, so they sit at the foot of the table.`);
   }
   if (rows.length === 1) {
-    notes.push('A leaderboard of one so far — add the people you play with with the Golfers button in the header. Courses and the league rule are shared by everyone, so their rounds slot straight in.');
+    /* A visitor cannot add anybody, and the tab is hidden for them anyway (see
+       renderEmptyState) — but the note is drawn regardless, and copy that sends a
+       reader to a button they do not have is wrong wherever it ends up. */
+    notes.push(viewOnly
+      ? 'This shared view has one golfer, so there is nobody to rank them against.'
+      : 'A leaderboard of one so far — add the people you play with under Golfers & Courses in the header. Courses and the league rule are shared by everyone, so their rounds slot straight in.');
   }
   document.getElementById('leagueNote').textContent = notes.join(' ');
 

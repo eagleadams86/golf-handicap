@@ -65,7 +65,9 @@ A browser with nothing in it opens on one card — no tabs, no panels:
 **Start Fresh** opens the course editor, because a score means nothing until the app knows the
 rating and slope it was shot against. **Load Sample Data** loads
 [the example league](#trying-it-out--the-example-league). **Restore a Backup** opens the same
-[*Back Up & Restore*](#backups) window the ⇩ button does.
+[*Back Up & Restore*](#backups) window the ⇩ button does. The Rounds card offers the two
+examples again while the app has no rounds at all; a golfer with no rounds in an app that
+has some — a new member, say — is offered a round and nothing else.
 
 The card is up only while the app is completely bare. Save a course and it steps aside for the
 Rounds card's own first-run state, which knows you have somewhere to play and offers the round
@@ -472,7 +474,10 @@ editor that would refuse to save.
 **Share** in the header builds a link that shows someone the handicaps you pick, with no
 sign-in and no way for them to change anything. Tick the golfers to include — **Select all**
 takes the lot, and the count above the list says where you are — and pick more than one and
-the link opens on the leaderboard.
+the link opens on the leaderboard. A link for one golfer has no Leaderboard tab, as an app
+with one golfer has none, and every line of copy the visitor sees describes the link rather
+than the buttons they do not have — *No course was shared* where the owner would be told to
+add one, and no "select a date to edit" over dates that are plain text.
 
 **How many rounds** decides how much history rides along: every round, each golfer's last 20
 or 10, the last 12 or 6 months, or everything from a date you choose. "Last N" counts *per

@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 343;
+const EXPECTED = 350;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -2162,10 +2162,18 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
        'the virgin test no longer asks about courses'));
   /* A visitor must never be offered three buttons that write to their own
      browser: renderEmptyState leaves before any of this in a shared view. */
-  it('never appears over a shared link', () =>
-    ok(APP_SRC.indexOf('if (window.ghViewOnly) return;')
-       < APP_SRC.indexOf('const virgin = state.rounds.length'),
-       'the shared-view guard must come first in renderEmptyState'));
+  it('never appears over a shared link', () => {
+    /* The guard is a block now, not an early return (2026-09-07): the
+       one-golfer rule at the foot of renderEmptyState is everybody's, and the
+       return was what kept a one-golfer share's Leaderboard tab up. The welcome
+       card still has to sit INSIDE the owner-only block. */
+    const guard = APP_SRC.indexOf('if (!window.ghViewOnly) {');
+    const virgin = APP_SRC.indexOf('const virgin = state.rounds.length');
+    ok(guard > -1 && guard < virgin,
+       'the shared-view guard must open before the welcome card in renderEmptyState');
+    ok(VISITOR.ran && VISITOR.bare.viewOnly
+       && !VISITOR.bare.welcome, 'and a shared frame with nothing in it draws no welcome card');
+  });
 
   /* ── the info dot and the help window ─────────────────────────────────────
      Both are family-wide blocks as of 2026-08-23, and both were this app's
@@ -3537,6 +3545,98 @@ describe('Hovering the trend chart');
     TRUNC.ran = true;
   } catch (e) { TRUNC.error = String(e && e.message || e); }
 
+  /* ── A shared view says what a visitor can do (2026-09-07 audit) ──────────
+     Four lines of copy pointed a visitor at buttons `viewOnly` hides — "the
+     Golfers button in the header", "the Courses button is in the header",
+     "Golfers & Courses is in the header", "Select a date to edit that round"
+     — one of them with a doubled word, and the Leaderboard tab stayed up for a
+     one-golfer share because renderEmptyState() returned before the line that
+     hides it. Two real links, each opened in a frame of its own, since
+     `viewOnly` is decided at boot. */
+  const VISITOR = { ran: false };
+  const openShare = async (payload) => {
+    const token = await S.encodeShare(payload);
+    const f = document.createElement('iframe');
+    f.setAttribute('aria-hidden', 'true');
+    f.style.cssText = 'position:absolute;left:-9999px;width:1280px;height:800px;border:0';
+    await new Promise((resolve) => {
+      f.onload = resolve;
+      f.src = 'index.html?visitor=' + Date.now() + Math.random() + '#share=' + token;
+      document.body.appendChild(f);
+    });
+    const FW = f.contentWindow;
+    for (let i = 0; i < 60 && !(FW.__ghTestHooks.__state().golfers || []).length; i++)
+      await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 60));
+    return FW;
+  };
+  try {
+    const base = { v: H.SHARE_PAYLOAD_V, sharedAt: 1754870400000, label: 'Dad', activeGolfer: 'g1',
+                   golfers: [{ id: 'g1', name: 'Dad' }],
+                   settings: { method: H.DEFAULT_METHOD, applyCaps: true, primary: 'rolling' } };
+    /* One golfer, a course, rounds — and the link asked for the league view. */
+    const A = await openShare(Object.assign({}, base, {
+      view: 'league',
+      courses: [{ id: 'c1', name: 'Kilbryde Dunes',
+                  tees: [{ id: 't1', name: 'Medal', rating: 69.4, slope: 122, par: 71 }] }],
+      rounds: [1, 2, 3].map((i) => ({ id: 'r' + i, golferId: 'g1', date: '2026-05-0' + i, courseId: 'c1',
+                                       teeId: 't1', score: 85 + i, pcc: 0, note: '', counts: true, holes: 18 })),
+    }));
+    const AD = A.document;
+    VISITOR.one = {
+      viewOnly: A.ghViewOnly === true,
+      leagueTabHidden: AD.getElementById('tab-league').hidden,
+      tab: AD.documentElement.getAttribute('data-tab'),
+      leagueNote: AD.getElementById('leagueNote').textContent,
+      caption: (AD.querySelector('#roundsTable caption') || {}).textContent || '',
+      /* innerText, not textContent: the app's script is INSIDE body, so
+         textContent would read every string in the source, hidden dialogs
+         included, and fail on the owner's copy the visitor never sees. */
+      doubled: /with with/.test(AD.body.innerText),
+      pointsAtHeader: /in the header/.test(AD.body.innerText),
+    };
+    /* One golfer and nothing else. */
+    const B = await openShare(Object.assign({}, base, { view: 'player', courses: [], rounds: [] }));
+    const BD = B.document;
+    VISITOR.bare = {
+      viewOnly: B.ghViewOnly === true,
+      welcome: !BD.getElementById('welcomeCard').hidden,
+      chSub: BD.getElementById('chSub').textContent,
+      strokes: BD.getElementById('strokesTable').textContent,
+      rounds: BD.getElementById('roundsTable').textContent,
+      pointsAtHeader: /in the header/.test(BD.body.innerText),
+    };
+    VISITOR.ran = true;
+  } catch (e) { VISITOR.error = String(e && e.message || e); }
+
+  /* ── The example league is offered only to an EMPTY app (2026-09-07 audit) ──
+     The first-run block under Rounds offered "Or Load the Example League" to
+     any golfer with no rounds — including the eighth golfer of the example
+     league itself, who has none by design. Planted, never saved. */
+  const OFFER = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const demo = MW.buildDemoLeague();
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds: demo.rounds, activeGolfer: 'demo-g-8' });
+      MD.getElementById('tab-player').click();
+      await new Promise((r) => setTimeout(r, 40));
+      OFFER.member = {
+        rounds: MHK.__state().rounds.filter((r) => r.golferId === 'demo-g-8').length,
+        league: !!MD.getElementById('demoLeagueBtn'),
+        single: !!MD.getElementById('demoBtn'),
+        first: (MD.getElementById('firstCourseBtn') || {}).textContent,
+        text: MD.getElementById('roundsTable').textContent,
+      };
+      MHK.__plant({ version: MHK.SCHEMA, golfers: [{ id: 'g1', name: 'Only Me' }], activeGolfer: 'g1',
+                    courses: [demo.courses[0]], rounds: [] });
+      await new Promise((r) => setTimeout(r, 40));
+      OFFER.empty = { league: !!MD.getElementById('demoLeagueBtn'), single: !!MD.getElementById('demoBtn') };
+      OFFER.ran = true;
+    } catch (e) { OFFER.error = String(e && e.message || e); }
+  }
+
   /* The walks above all wrote through save() — put the reader's own keys back
      before anything else runs. */
   FIND_KEYS.forEach((k, i) => {
@@ -3786,6 +3886,47 @@ describe('A truncated share link fails once, through the card (2026-09-07 audit)
     eq(TRUNC.unhandled, 0,
        'squeeze must await, or catch, the writer’s write() and close(): a rejection from either '
        + 'that nothing awaits is the same failure reported twice');
+  });
+
+describe('A shared view says what a visitor can do (2026-09-07 audit)');
+  it('both links actually opened as shared views — everything below reads that record', () => {
+    ok(VISITOR.ran, 'the walk did not finish', VISITOR.error || 'no frame');
+    ok(VISITOR.one.viewOnly && VISITOR.bare.viewOnly, 'both frames booted read-only');
+  });
+  it('a one-golfer share has no Leaderboard tab, as a one-golfer app has none', () => {
+    ok(VISITOR.one.leagueTabHidden, 'the tab is hidden');
+    eq(VISITOR.one.tab, 'player', 'and the link that asked for the league view lands on the golfer');
+  });
+  it('nothing points a visitor at a button they do not have', () => {
+    ok(!VISITOR.one.doubled, 'the doubled "with with" is gone');
+    ok(!/Golfers button|Golfers & Courses/.test(VISITOR.one.leagueNote),
+       'the leaderboard-of-one note does not send a visitor to a hidden button', VISITOR.one.leagueNote);
+    ok(/shared/i.test(VISITOR.one.leagueNote), 'it says what this is instead', VISITOR.one.leagueNote);
+    ok(!VISITOR.one.pointsAtHeader && !VISITOR.bare.pointsAtHeader,
+       'nothing on either page says "in the header"');
+    ok(!/Add a course/.test(VISITOR.bare.chSub), 'the course handicap card does not ask for a course', VISITOR.bare.chSub);
+    ok(!/Add a course/.test(VISITOR.bare.strokes), 'nor does Strokes on the Day', VISITOR.bare.strokes);
+    ok(/shared/i.test(VISITOR.bare.chSub) && /shared/i.test(VISITOR.bare.strokes),
+       'both say what was (not) shared', VISITOR.bare.chSub + ' | ' + VISITOR.bare.strokes);
+  });
+  it('the rounds table does not tell a screen reader to select a date that is plain text', () => {
+    ok(VISITOR.one.caption.length > 0, 'the caption is still there', VISITOR.one.caption);
+    ok(!/Select a date/.test(VISITOR.one.caption), 'without the edit instruction', VISITOR.one.caption);
+  });
+
+describe('The example league is offered only to an empty app (2026-09-07 audit)');
+  it('the frame actually drew it — everything below reads that record', () => {
+    ok(OFFER.ran, 'the walk did not finish', OFFER.error || 'no frame');
+    eq(OFFER.member.rounds, 0, 'the eighth golfer of the example has no rounds, by design');
+  });
+  it('a golfer with no rounds inside a populated app is offered a round, not the example', () => {
+    ok(!OFFER.member.league, 'no "Load the Example League" — it is already loaded');
+    ok(!OFFER.member.single, 'and no single-golfer example either');
+    eq(OFFER.member.first, '+ Add round', 'the one thing to do is offered');
+    ok(/for this golfer/.test(OFFER.member.text), 'and the line says whose rounds are missing', OFFER.member.text);
+  });
+  it('an app with no rounds at all still gets both examples', () => {
+    ok(OFFER.empty.league && OFFER.empty.single, 'both offers are up');
   });
 
 describe('Where a press leaves the page (2026-09-05)');
