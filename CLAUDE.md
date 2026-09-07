@@ -1176,3 +1176,11 @@ stand on it.
   exclusion notes reckon against (`excluded = all − counted` on the league page), and a
   waiting nine is not an exclusion; it has a note of its own. The suite plants the demo and
   reads both figures off the page for Alex (27 logged, 26 counting).
+- **The league warning names all three exclusion causes.** `counted` drops a round for one
+  of three reasons — course deleted, marked don't count, a nine off tees with no 9-hole
+  figures — and the golfer's own page (`renderFigures`' notes) names each; the line under
+  the leaderboard named two. It names three now, in the same order the notes use. A nine
+  waiting for its partner is deliberately NOT a fourth: it is not in `excluded` (see the
+  `counting` bullet above) and has a note of its own on the golfer's page. Pinned by
+  rendering: the demo plus one nine at a course with no 9-hole figures, read off
+  `#leagueWarn`.

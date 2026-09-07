@@ -4294,12 +4294,16 @@ function renderLeague() {
   });
 
   /* Exclusions are never silent here either: a round left out of a figure is
-     named on the league page as well as on the golfer's own. */
+     named on the league page as well as on the golfer's own. THREE causes,
+     because `counted` drops three kinds of round — this line named two until
+     2026-09-07, and the golfer's own page named all three. A nine waiting for
+     its partner is deliberately not among them: it is not in `excluded`, and
+     the golfer's page gives it a note of its own. */
   const excluded = rows.reduce((n, r) => n + r.excluded, 0);
   const affected = rows.filter((r) => r.excluded).length;
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
   document.getElementById('leagueWarn').textContent = excluded
-    ? `${plural(excluded, 'round')} across ${plural(affected, 'golfer')} ${excluded === 1 ? 'is' : 'are'} left out of these figures — the course was deleted, or the round is marked “don't count”.`
+    ? `${plural(excluded, 'round')} across ${plural(affected, 'golfer')} ${excluded === 1 ? 'is' : 'are'} left out of these figures — the course was deleted, the round is marked “don't count”, or it is a nine off tees with no 9-hole rating yet.`
     : '';
 
   const notes = [`Ranked by ${rankedName}${primary === 'whs' ? '' : ` (${method.name})`}, lowest first.`];

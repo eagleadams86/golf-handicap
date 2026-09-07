@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 334;
+const EXPECTED = 336;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -3426,6 +3426,29 @@ describe('Hovering the trend chart');
     } catch (e) { WAITING.error = String(e && e.message || e); }
   }
 
+  /* ── The league warning names all three exclusion causes (2026-09-07 audit) ──
+     `counted` drops three kinds of round — the course deleted, marked don't
+     count, and a nine off tees with no 9-hole figures — and the golfer's own
+     page names each. The league page's line named two. Planted, never saved. */
+  const CAUSES = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const demo = MW.buildDemoLeague();
+      const bare = demo.courses.find((c) => c.tees.every((t) => t.rating9 == null));
+      const rounds = demo.rounds.concat([{ id: 'nine-no9', golferId: 'demo-g-2', date: '2026-06-01',
+        courseId: bare.id, teeId: bare.tees[0].id, score: 44, pcc: 0, note: '', counts: true, holes: 9 }]);
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds, activeGolfer: 'demo-g-2' });
+      CAUSES.no9 = MW.computeAll('demo-g-2').all.some((e) => e.no9);
+      MD.getElementById('tab-league').click();
+      await new Promise((r) => setTimeout(r, 40));
+      CAUSES.warn = MD.getElementById('leagueWarn').textContent;
+      MD.getElementById('tab-player').click();
+      CAUSES.ran = true;
+    } catch (e) { CAUSES.error = String(e && e.message || e); }
+  }
+
   /* The walks above all wrote through save() — put the reader's own keys back
      before anything else runs. */
   FIND_KEYS.forEach((k, i) => {
@@ -3629,6 +3652,20 @@ describe('A nine waiting to be paired is not "counting towards handicap" (2026-0
   });
   it('and so does the leaderboard’s Rounds column', () => {
     eq(WAITING.leagueRounds, '26', 'the same figure, from the same predicate');
+  });
+
+describe('The league warning names all three exclusion causes (2026-09-07 audit)');
+  it('the frame actually drew it — everything below reads that record', () => {
+    ok(CAUSES.ran, 'the walk did not finish', CAUSES.error || 'no frame');
+    ok(CAUSES.no9, 'and the planted nine really is one the app cannot score');
+  });
+  it('the line under the leaderboard names the nine with no 9-hole figures too', () => {
+    ok(/left out/.test(CAUSES.warn), 'the warning is up', CAUSES.warn);
+    ok(/deleted/.test(CAUSES.warn) && /don.t count/.test(CAUSES.warn),
+       'the two causes it always named', CAUSES.warn);
+    ok(/9-hole/.test(CAUSES.warn),
+       'and the third, which counted drops just the same and the golfer’s own page names',
+       CAUSES.warn);
   });
 
 describe('Where a press leaves the page (2026-09-05)');

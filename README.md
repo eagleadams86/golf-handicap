@@ -224,7 +224,9 @@ Every row goes through exactly the same calculation as that golfer's own page, s
 can never disagree. A golfer with no figure yet — fewer than 3 counting rounds gets no
 official index, and someone who has never played gets neither — sits at the foot with no
 position, rather than being ranked first for having no number. Rounds left out of the
-figures are counted up underneath the table, as they are on the front page.
+figures are counted up underneath the table, as they are on the front page, with all three
+reasons a round can be left out — the course was deleted, it is marked *don't count*, or it
+is a nine off tees with no 9-hole rating yet.
 
 Underneath it, **Strokes on the Day** turns those handicaps into shots at one course, off one
 set of tees, in one format: each golfer's course handicap, what they play off after the
