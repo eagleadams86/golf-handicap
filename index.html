@@ -4564,6 +4564,10 @@ function openRound(id) {
   const r = editingRound;
   document.getElementById('roundTitle').textContent = r ? 'Edit Round' : 'Add Round';
   document.getElementById('f_date').value = r ? r.date : todayISO();
+  /* The picker greys out tomorrow onward; roundSave still checks, since a date
+     can be typed. Set at open rather than in the markup, because the page can
+     be left open across midnight. */
+  document.getElementById('f_date').max = todayISO();
   document.getElementById('f_holes').value = String(r ? r.holes : (lastUsed('holes') || 18));
   renderScoreRows();
   /* Guarded rather than assumed: the box carrying this id is the row for the
@@ -4661,6 +4665,11 @@ document.getElementById('roundSave').addEventListener('click', () => {
   const holes = document.getElementById('f_holes').value === '9' ? 9 : 18;
   const warn = document.getElementById('roundWarn');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { warn.textContent = 'Pick a date.'; return; }
+  /* A round is something that was played. Until 2026-09-07 only the SHAPE was
+     checked, so a round dated next year saved silently and sat at the top of the
+     list as the newest round played. Compared as strings: both are YYYY-MM-DD,
+     and todayISO() is local, as the date box is. */
+  if (date > todayISO()) { warn.textContent = 'A round can\u2019t be in the future.'; return; }
   /* An orphan being edited with its "(deleted course)" / "(deleted tee)" option
      still selected keeps the ids it had: the note or the score is what is being
      corrected, and the round stays out of the figures until a real course is

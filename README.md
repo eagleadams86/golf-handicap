@@ -80,7 +80,8 @@ words and the same order.
 2. **Log a round.** *+ Add round.* Date, holes, course, tees, then a score for everyone who
    played — the whole fourball goes in through one window, with nobody ticked but you until
    you say otherwise. The next round pre-fills with whatever the last one used, so a regular
-   game at the same club is a few taps.
+   game at the same club is a few taps. A round is something that was played: a date after
+   today is refused, and the picker greys tomorrow out.
 3. **Read the two numbers.** Both figures update as you type, and *How these are worked out*
    shows the actual arithmetic — which rounds were used, what they averaged to, and every
    step in between.

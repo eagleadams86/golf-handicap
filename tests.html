@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 336;
+const EXPECTED = 340;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -129,6 +129,12 @@ const EXPECTED = 336;
    can be fooled about what is commented out is a test that can miss a live
    off-origin script, so it is worth doing properly. Same helper, same wording,
    in every sibling repo’s suite. */
+/* Today as the app writes it — local, not UTC: toISOString() is a day out
+   either side of midnight in any zone but Greenwich. */
+const todayLocal = () => {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+};
 const stripHtmlComments = (s) => {
   let out = String(s), prev;
   do { prev = out; out = out.replace(/<!--[\s\S]*?-->/g, ''); } while (out !== prev);
@@ -3449,6 +3455,42 @@ describe('Hovering the trend chart');
     } catch (e) { CAUSES.error = String(e && e.message || e); }
   }
 
+  /* ── A round can't be in the future (2026-09-07 audit) ────────────────────
+     roundSave checked only the SHAPE of the date, so a round dated next year
+     saved silently and sat at the top of the list as the newest round played.
+     Driven in MEASURE through the real dialog; it writes on the second save,
+     so it sits with the walks whose keys are put back below. */
+  const FUTURE = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const demo = MW.buildDemoLeague();
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds: demo.rounds, activeGolfer: 'demo-g-3' });
+      const dlg = MD.getElementById('roundDialog');
+      const count = () => MHK.__state().rounds.length;
+      const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+      MW.openRound(null);
+      await new Promise((r) => setTimeout(r, 40));
+      FUTURE.max = MD.getElementById('f_date').max;
+      MD.getElementById('f_date').value = MW.isoOf(tomorrow);
+      MD.getElementById('f_score').value = '85';
+      const before = count();
+      MD.getElementById('roundSave').click();
+      await new Promise((r) => setTimeout(r, 40));
+      FUTURE.refused = { open: dlg.open, warn: MD.getElementById('roundWarn').textContent,
+                         added: count() - before };
+      /* Today is fine. */
+      MD.getElementById('f_date').value = MW.todayISO();
+      MD.getElementById('roundSave').click();
+      await new Promise((r) => setTimeout(r, 40));
+      FUTURE.today = { open: dlg.open, added: count() - before };
+      if (dlg.open) dlg.close();
+      await new Promise((r) => setTimeout(r, 40));
+      FUTURE.ran = true;
+    } catch (e) { FUTURE.error = String(e && e.message || e); }
+  }
+
   /* The walks above all wrote through save() — put the reader's own keys back
      before anything else runs. */
   FIND_KEYS.forEach((k, i) => {
@@ -3666,6 +3708,23 @@ describe('The league warning names all three exclusion causes (2026-09-07 audit)
     ok(/9-hole/.test(CAUSES.warn),
        'and the third, which counted drops just the same and the golfer’s own page names',
        CAUSES.warn);
+  });
+
+describe('A round can’t be in the future (2026-09-07 audit)');
+  it('the walk actually drove it — everything below reads that record', () => {
+    ok(FUTURE.ran, 'the walk did not finish', FUTURE.error || 'no frame');
+  });
+  it('a round dated tomorrow is refused, in the dialog’s own words', () => {
+    ok(FUTURE.refused.open, 'the dialog stays up');
+    eq(FUTURE.refused.added, 0, 'and nothing was saved');
+    ok(/future/.test(FUTURE.refused.warn), 'the warning line says why', FUTURE.refused.warn);
+  });
+  it('the date box says so before you press anything', () => {
+    eq(FUTURE.max, todayLocal(), 'its max is today');
+  });
+  it('a round dated today saves', () => {
+    ok(!FUTURE.today.open, 'the dialog closed');
+    eq(FUTURE.today.added, 1, 'and one round was added');
   });
 
 describe('Where a press leaves the page (2026-09-05)');

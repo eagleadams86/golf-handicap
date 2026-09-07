@@ -1184,3 +1184,12 @@ stand on it.
   `counting` bullet above) and has a note of its own on the golfer's page. Pinned by
   rendering: the demo plus one nine at a course with no 9-hole figures, read off
   `#leagueWarn`.
+- **A round can't be in the future.** `roundSave` checked only the SHAPE of the date
+  (`/^\d{4}-\d{2}-\d{2}$/`), so a round dated next year saved silently and sat at the top of
+  the list as the newest round played. It refuses `date > todayISO()` with the dialog's own
+  warning line — *A round can't be in the future.* — compared as strings, since both are
+  `YYYY-MM-DD` and `todayISO()` is local like the box. `openRound` also sets the box's `max`
+  to today at open (not in the markup: a page left open across midnight would carry
+  yesterday's max), so the picker greys out tomorrow before anything is pressed. The suite
+  dates a round tomorrow and reads the refusal, then dates it today and reads the save; its
+  `todayLocal()` helper is local for the same reason the app's is.
