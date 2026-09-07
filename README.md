@@ -666,6 +666,11 @@ offline either way.
 - A device clearing everything **asks** the others rather than silently wiping them.
 - Two tabs of the **same browser** share one copy: an edit saved in one appears in the
   other immediately, signed in or not.
+- **A change to the league rule arriving while League Rules is open** refills the boxes
+  with the rule that arrived, and says so if you were half-way through typing in one. The
+  window writes the whole rule from its boxes, so boxes left showing the old rule would
+  have put it back on your next change and sent it to the device the new one came from.
+  A sync that changed a round and not the rule leaves the boxes alone.
 - **Sync failures are shown, not logged.** The button reads "⚠️ Not syncing" with the cause
   in plain English. There is deliberately no retry button: transient failures are retried by
   the SDK, permanent ones are not fixed by pressing anything, and the next save recovers the

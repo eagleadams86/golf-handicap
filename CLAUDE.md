@@ -1099,3 +1099,20 @@ stand on it.
   `state.settings.method` and says so in the sentence. "1 rounds" is "1 round" in the
   preview and in the use-of-only correction. The suite drives it in MEASURE, in a walk of
   its own after the saves-as-you-go one.
+- **A sync adoption while League Rules is open refills the boxes.** `commitMethod` rebuilds
+  the WHOLE rule from the boxes, so after `window.ghAdopt` replaced `state` with a copy
+  holding window 12 / use 4 / caps off, boxes still reading 5 / 5 / caps on turned a change
+  to the multiplier alone into a stored 5 / 5 / 0.96 / caps on — the adoption reverted and
+  pushed straight back to the device it came from. The golfer and course name boxes survive
+  an adoption by re-finding their record by id per keystroke; this window cannot, so
+  `stateReplaced()` is called from the two places `state` is replaced under the page —
+  `ghAdopt` and the `storage` listener — and, while the window is up, compares
+  `methodRuleKey()` (the stored rule, caps and ESR in one string) against the one the boxes
+  were filled from. A CHANGED rule refills through `fillMethodBoxes()`, retakes the
+  `written` snapshot and toasts if the reader was mid-way through a box, because what they
+  typed is gone; an UNCHANGED rule — a sync that moved a round, not the rule — leaves the
+  boxes alone, half-typed figure included. `rule` sits beside `written` in `methoding`
+  rather than being derived from it, because the boxes lawfully differ from the stored rule
+  while a reader is mid-way through one, and that difference must not read as an adoption.
+  The suite drives it in MEASURE through the real `ghAdopt`, and puts `gh-state` /
+  `gh-updated` / `gh-tab` back afterwards for all three League Rules walks.

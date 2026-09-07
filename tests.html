@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 312;
+const EXPECTED = 317;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -3149,6 +3149,84 @@ describe('Hovering the trend chart');
     } catch (e) { REFILL.error = String(e && e.message || e); }
   }
 
+  /* ── A sync adoption while League Rules is open refills the boxes (2026-09-07 audit) ──
+     `commitMethod` rebuilds the WHOLE rule from the boxes. After `ghAdopt`
+     replaced `state` with a copy holding window 12 / use 4 / caps off, the boxes
+     still read 5 / 5 / caps on, and finishing with the multiplier alone stored
+     5 / 5 / 0.96 / caps on — the adopted rule reverted and pushed straight
+     back. The golfer and course name boxes re-find their record by id on every
+     keystroke; this window's equivalent is to refill from the new
+     `state.settings` wherever an adoption lands. Driven in MEASURE, through the
+     real `window.ghAdopt`. */
+  const ADOPT = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const dlg = MD.getElementById('methodDialog');
+      const rule = () => MHK.__state().settings.method;
+      const box = (id) => MD.getElementById(id).value;
+      const fire = (id, v) => {
+        const el = MD.getElementById(id);
+        el.value = v;
+        el.dispatchEvent(new MW.Event('input', { bubbles: true }));
+        el.dispatchEvent(new MW.Event('change', { bubbles: true }));
+      };
+      /* Typing that has not finished: `input` only, no `change`. */
+      const typing = (id, v) => {
+        const el = MD.getElementById(id);
+        el.value = v;
+        el.dispatchEvent(new MW.Event('input', { bubbles: true }));
+      };
+      const adoptWith = (method, caps) => {
+        const next = JSON.parse(JSON.stringify(MHK.__state()));
+        next.settings.method = method;
+        next.settings.applyCaps = caps;
+        MW.ghAdopt(next, Date.now());
+      };
+      const demo = MW.buildDemoLeague();
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds: demo.rounds, activeGolfer: demo.golfers[0].id });
+      if (dlg.open) dlg.close();
+      await new Promise((r) => setTimeout(r, 40));
+      MD.getElementById('methodBtn').click();
+      await new Promise((r) => setTimeout(r, 40));
+      ADOPT.before = { window: box('m_window'), use: box('m_use'), caps: MD.getElementById('m_caps').checked };
+
+      /* Another device changed the rule while this window was up. */
+      adoptWith({ window: 12, use: 4, basis: 'differential', multiplier: 1, adjustment: 0 }, false);
+      ADOPT.boxesAfter = { window: box('m_window'), use: box('m_use'), caps: MD.getElementById('m_caps').checked };
+      fire('m_mult', '0.96');
+      ADOPT.stored = { window: rule().window, use: rule().use, multiplier: rule().multiplier,
+                       caps: MHK.__state().settings.applyCaps };
+
+      /* Mid-way through a box when a DIFFERENT rule arrives: the box is
+         refilled and the reader is told, because what they typed is gone. */
+      MD.getElementById('toast').textContent = '';
+      typing('m_adj', '3');
+      adoptWith({ window: 10, use: 4, basis: 'differential', multiplier: 0.96, adjustment: 0 }, false);
+      ADOPT.midway = { adj: box('m_adj'), window: box('m_window'), toast: MD.getElementById('toast').textContent };
+
+      /* Mid-way through a box when the SAME rule arrives (a sync that changed
+         a round, not the rule): the typing is left alone and nothing is said. */
+      MD.getElementById('toast').textContent = '';
+      typing('m_adj', '3');
+      adoptWith({ window: 10, use: 4, basis: 'differential', multiplier: 0.96, adjustment: 0 }, false);
+      ADOPT.sameRule = { adj: box('m_adj'), toast: MD.getElementById('toast').textContent };
+
+      dlg.close();
+      await new Promise((r) => setTimeout(r, 40));
+      ADOPT.ran = true;
+    } catch (e) { ADOPT.error = String(e && e.message || e); }
+  }
+  /* The three walks above all wrote through save() — put the reader's own keys
+     back before anything else runs. */
+  FIND_KEYS.forEach((k, i) => {
+    try {
+      if (findSaved[i] === null) localStorage.removeItem(k);
+      else localStorage.setItem(k, findSaved[i]);
+    } catch (e) { /* a browser refusing the write left it alone anyway */ }
+  });
+
 
 describe('The League Handicap window saves as you go (2026-09-07)');
   it('the walk actually drove it — everything below reads that record', () => {
@@ -3239,6 +3317,31 @@ describe('The League Rules boxes always show the rule that is stored (2026-09-07
        'the preview is singular', REFILL.previewAtOne);
     ok(/of only 1 round\b(?!s)/.test(REFILL.warnAtOne),
        'and so is the correction', REFILL.warnAtOne);
+  });
+
+describe('A sync adoption while League Rules is open refills the boxes (2026-09-07 audit)');
+  it('the walk actually drove it — everything below reads that record', () => {
+    ok(ADOPT.ran, 'the walk did not finish', ADOPT.error || 'no frame');
+    eq(ADOPT.before, { window: '5', use: '5', caps: true }, 'and it opened on the default rule');
+  });
+  it('the boxes follow the adopted rule', () => {
+    eq(ADOPT.boxesAfter, { window: '12', use: '4', caps: false },
+       'after ghAdopt the window shows the rule that is now stored');
+  });
+  it('finishing with one box then stores the ADOPTED rule plus that box, not the stale boxes', () => {
+    eq(ADOPT.stored, { window: 12, use: 4, multiplier: 0.96, caps: false },
+       'commitMethod rebuilds the whole rule from the boxes, so stale boxes would revert the '
+       + 'adoption and push it straight back to the device it came from');
+  });
+  it('mid-way through a box when a different rule arrives: refilled, and told', () => {
+    eq(ADOPT.midway.window, '10', 'the boxes show the new rule');
+    eq(ADOPT.midway.adj, '0', 'including the one the reader was typing in');
+    ok(/changed/.test(ADOPT.midway.toast),
+       'and a toast says the rule changed under them', ADOPT.midway.toast);
+  });
+  it('mid-way through a box when the SAME rule arrives: the typing is left alone', () => {
+    eq(ADOPT.sameRule.adj, '3', 'a sync that changed a round, not the rule, must not wipe a box');
+    eq(ADOPT.sameRule.toast, '', 'and there is nothing to say');
   });
 
 describe('Where a press leaves the page (2026-09-05)');

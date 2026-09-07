@@ -4912,7 +4912,35 @@ const methodDraft = () => JSON.stringify(
   ['m_window', 'm_use', 'm_basis', 'm_mult', 'm_adj'].map((id) => document.getElementById(id).value)
     .concat([document.getElementById('m_caps').checked, document.getElementById('m_esr').checked]));
 
-let methoding = null;   // { written } while the window is up
+let methoding = null;   // { written, rule } while the window is up
+
+/* The rule as STORED, in one string, so the window can tell whether an adoption
+   changed it. Kept beside `written` (the raw boxes) rather than derived from
+   it: the boxes can lawfully differ from the stored rule while a reader is
+   mid-way through one, and that difference is exactly what must NOT count as
+   an adoption. */
+const methodRuleKey = () => JSON.stringify([normalizeMethod(state.settings.method),
+  state.settings.applyCaps !== false, state.settings.applyEsr !== false]);
+
+/* Called wherever `state` is REPLACED under the page — a sync adoption, another
+   tab's write. The golfer and course name boxes survive that by re-finding
+   their record by id on every keystroke; this window cannot, because
+   `commitMethod` rebuilds the WHOLE rule from the boxes, so boxes filled from
+   the old state would put the old rule back on the next finished box and push
+   it to the device the new one came from (2026-09-07 audit). So a changed rule
+   refills the boxes and retakes the snapshot. An UNCHANGED rule — a sync that
+   moved a round, not the rule — leaves the boxes alone, including one the
+   reader is half-way through typing in. */
+function stateReplaced() {
+  if (!methoding || !methodDialog.open) return;
+  if (methodRuleKey() === methoding.rule) return;
+  const midway = methodDraft() !== methoding.written;
+  fillMethodBoxes();
+  document.getElementById('methodWarn').textContent = '';
+  updateMethodPreview();
+  methoding = { written: methodDraft(), rule: methodRuleKey() };
+  if (midway) toast('The league rule changed on another device — the boxes now show it, and what you were typing was not kept', 6000);
+}
 
 /* THE ONE SETTER: every box, from what is STORED. Opening the window fills
    through here, and so does every commit (2026-09-07 audit) — `normalizeMethod`
@@ -4940,7 +4968,7 @@ function openMethod() {
      boxes, so a glance would otherwise re-rank the league and toast about it.
      Taken after the boxes are filled. Reset re-enters through here, which is
      what keeps this in step with the boxes it just changed. */
-  methoding = { written: methodDraft() };
+  methoding = { written: methodDraft(), rule: methodRuleKey() };
   openModal(methodDialog);
 }
 
@@ -5009,6 +5037,7 @@ function commitMethod(ctx, speak) {
      record of what was written are the same thing. */
   fillMethodBoxes();
   ctx.written = methodDraft();
+  ctx.rule = methodRuleKey();
   save();                                  // save() re-renders, so the league re-ranks
   if (speak) toast('Method updated');
   return true;
@@ -6498,6 +6527,7 @@ window.ghAdopt = (incoming, updatedAt) => {
     console.warn('Could not write saved data', e);
   }
   render();
+  stateReplaced();
 };
 window.ghCount = () => state.rounds.length;
 
@@ -6524,6 +6554,7 @@ window.addEventListener('storage', (e) => {
     haltForNewerData(incoming.version);
   state = normalizeState(incoming);
   render();
+  stateReplaced();
 });
 
 /* tests.html reaches the pure functions directly — they are all plain function
