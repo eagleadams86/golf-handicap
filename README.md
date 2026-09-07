@@ -252,6 +252,11 @@ could press one the change is made. Two things it will tell you about rather tha
 - **You can't use the best 30 of only 20 rounds.** It corrects the box to what the rule can
   mean, says so, and then stores the corrected rule — the correction ends up on the
   leaderboard rather than stranded on screen.
+- **Every box shows what was stored.** The window runs from 1 to 60 rounds, the multiplier
+  from 0.1 to 2 and the offset from −20 to +20, and a figure typed outside those is stored
+  at the nearer end — after each change every box is refilled from the stored rule, so a
+  box never reads 99 over a leaderboard ranked on 60. While a box is empty the *In words*
+  line describes the rule as saved, and says so.
 
 *Reset to Last 5* writes immediately, as it always has.
 

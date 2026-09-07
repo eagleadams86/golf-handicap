@@ -4914,7 +4914,13 @@ const methodDraft = () => JSON.stringify(
 
 let methoding = null;   // { written } while the window is up
 
-function openMethod() {
+/* THE ONE SETTER: every box, from what is STORED. Opening the window fills
+   through here, and so does every commit (2026-09-07 audit) — `normalizeMethod`
+   clamps a window of 99 to 60 and a multiplier of 5 to 2, and a commit that
+   stored the clamped rule while the box kept what was typed left the window
+   describing a rule the leaderboard behind it was not using. A refill after the
+   write is what makes the boxes and the stored rule one thing. */
+function fillMethodBoxes() {
   const m = normalizeMethod(state.settings.method);
   document.getElementById('m_window').value = m.window;
   document.getElementById('m_use').value = m.use;
@@ -4923,6 +4929,10 @@ function openMethod() {
   document.getElementById('m_adj').value = m.adjustment;
   document.getElementById('m_caps').checked = state.settings.applyCaps !== false;
   document.getElementById('m_esr').checked = state.settings.applyEsr !== false;
+}
+
+function openMethod() {
+  fillMethodBoxes();
   document.getElementById('methodWarn').textContent = '';
   updateMethodPreview();
   /* What the window opened holding, so opening it to READ the rule and closing
@@ -4945,12 +4955,19 @@ function readMethodForm() {
 }
 
 function updateMethodPreview() {
-  const m = readMethodForm();
+  /* An empty box is not an answer, and the preview must not pretend it is one:
+     `readMethodForm` reads '' as the DEFAULT, so with the window box cleared
+     the sentence used to describe "the last 5 rounds" over a stored rule of 60.
+     While a box is empty this describes the rule that is actually in force,
+     and says so. */
+  const blank = methodBlank();
+  const m = blank ? normalizeMethod(state.settings.method) : readMethodForm();
   const basis = m.basis === 'overPar' ? 'shots over par' : 'score differentials';
   const best = m.use < m.window ? `the best ${m.use} of ` : 'all of ';
   const tail = (m.multiplier !== 1 ? `, multiplied by ${m.multiplier}` : '') + (m.adjustment !== 0 ? `, then ${m.adjustment > 0 ? 'plus' : 'minus'} ${Math.abs(m.adjustment)}` : '');
+  const rounds = m.window === 1 ? 'round\u2019s' : 'rounds\u2019';
   document.getElementById('methodPreview').textContent =
-    `In words: average ${best}the last ${m.window} rounds' ${basis}${tail}.`;
+    `In words${blank ? ' (the rule as saved, while a box is empty)' : ''}: average ${best}the last ${m.window} ${rounds} ${basis}${tail}.`;
   /* THE NOTE ANSWERS THE ONE QUESTION AN AUTO-SAVING WINDOW HAS TO ANSWER: is
      what I am typing being kept? Saying "Saved as you go" over a box the app is
      deliberately ignoring would be a lie. */
@@ -4978,14 +4995,19 @@ function commitMethod(ctx, speak) {
   const m = readMethodForm();
   const rawUse = Math.round(Number(document.getElementById('m_use').value));
   if (rawUse > m.window) {
-    document.getElementById('methodWarn').textContent = `You can't use the best ${rawUse} of only ${m.window} rounds — it has been set to ${m.use}.`;
-    document.getElementById('m_use').value = m.use;
+    document.getElementById('methodWarn').textContent = `You can't use the best ${rawUse} of only ${m.window} round${m.window === 1 ? '' : 's'} — it has been set to ${m.use}.`;
   } else {
     document.getElementById('methodWarn').textContent = '';
   }
   state.settings.method = m;
   state.settings.applyCaps = document.getElementById('m_caps').checked;
   state.settings.applyEsr = document.getElementById('m_esr').checked;
+  /* EVERY box is refilled from what was just stored, not only the one the rule
+     between the boxes corrects: a window typed as 99 is stored as 60, and a box
+     still reading 99 would be the window describing a rule the leaderboard is
+     not using. The snapshot is taken AFTER the refill, so the boxes and the
+     record of what was written are the same thing. */
+  fillMethodBoxes();
   ctx.written = methodDraft();
   save();                                  // save() re-renders, so the league re-ranks
   if (speak) toast('Method updated');

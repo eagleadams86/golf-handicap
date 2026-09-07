@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 307;
+const EXPECTED = 312;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -3091,6 +3091,64 @@ describe('Hovering the trend chart');
       METHOD.ran = true;
     } catch (e) { METHOD.error = String(e && e.message || e); }
   }
+  /* ── The League Rules boxes always show the rule that is STORED (2026-09-07 audit) ──
+     `normalizeMethod` clamps: a window of 99 is stored as 60, a multiplier of 5
+     as 2, an adjustment of 50 as 20, a window of 2.5 as 3. The window used to
+     correct the box for ONE of its rules (use > window) and leave the others
+     showing what was typed over a rule that said something else — so after a
+     commit every box is refilled from what was actually stored. The preview
+     under the boxes describes the STORED rule while a box is empty rather than
+     the default `clampInt` reads an empty box as, and "1 rounds" is "1 round".
+     Driven in MEASURE like the walk above; the keys it writes are put back
+     below, together with that walk's. */
+  const REFILL = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const dlg = MD.getElementById('methodDialog');
+      const rule = () => MHK.__state().settings.method;
+      const box = (id) => MD.getElementById(id).value;
+      const fire = (id, v) => {
+        const el = MD.getElementById(id);
+        el.value = v;
+        el.dispatchEvent(new MW.Event('input', { bubbles: true }));
+        el.dispatchEvent(new MW.Event('change', { bubbles: true }));
+      };
+      if (dlg.open) dlg.close();
+      await new Promise((r) => setTimeout(r, 40));
+      MD.getElementById('methodBtn').click();
+      await new Promise((r) => setTimeout(r, 40));
+
+      fire('m_window', '99');
+      REFILL.win99 = { box: box('m_window'), stored: rule().window };
+      fire('m_window', '0');
+      REFILL.win0 = { box: box('m_window'), stored: rule().window };
+      fire('m_window', '2.5');
+      REFILL.win25 = { box: box('m_window'), stored: rule().window };
+      fire('m_mult', '5');
+      REFILL.mult5 = { box: box('m_mult'), stored: rule().multiplier };
+      fire('m_adj', '50');
+      REFILL.adj50 = { box: box('m_adj'), stored: rule().adjustment };
+
+      /* An emptied box: the preview must describe what is STORED (60, from the
+         first step), not the 5 that clampInt reads an empty string as. */
+      fire('m_window', '60');
+      fire('m_use', '5');
+      fire('m_window', '');
+      REFILL.previewWhileBlank = MD.getElementById('methodPreview').textContent;
+      REFILL.storedWhileBlank = rule().window;
+
+      /* Singular. use is 5 by now, so "the best 5 of only 1" is corrected too. */
+      fire('m_window', '1');
+      REFILL.previewAtOne = MD.getElementById('methodPreview').textContent;
+      REFILL.warnAtOne = MD.getElementById('methodWarn').textContent;
+
+      dlg.close();
+      await new Promise((r) => setTimeout(r, 40));
+      REFILL.ran = true;
+    } catch (e) { REFILL.error = String(e && e.message || e); }
+  }
+
 
 describe('The League Handicap window saves as you go (2026-09-07)');
   it('the walk actually drove it — everything below reads that record', () => {
@@ -3151,6 +3209,36 @@ describe('The League Handicap window saves as you go (2026-09-07)');
     eq(METHOD.afterReset, METHOD.defaults, 'the reset stores the defaults');
     eq(METHOD.resetCloseWrites, 0,
        'and re-entering openMethod() retook the snapshot, so closing finds nothing moved');
+  });
+
+describe('The League Rules boxes always show the rule that is stored (2026-09-07 audit)');
+  it('the walk actually drove it — everything below reads that record', () => {
+    ok(REFILL.ran, 'the walk did not finish', REFILL.error || 'no frame');
+  });
+  it('a window of 99 is stored as 60, and the box says 60', () => {
+    eq(REFILL.win99.stored, 60, 'normalizeMethod clamps to 60');
+    eq(REFILL.win99.box, '60',
+       'and the box is refilled from what was stored — a box reading 99 over a rule of 60 '
+       + 'is a window lying about the leaderboard behind it');
+  });
+  it('every clamp is shown, not just the one between the boxes', () => {
+    eq(REFILL.win0, { box: '1', stored: 1 }, 'window 0 → 1');
+    eq(REFILL.win25, { box: '3', stored: 3 }, 'window 2.5 → 3 (whole rounds)');
+    eq(REFILL.mult5, { box: '2', stored: 2 }, 'multiplier 5 → 2');
+    eq(REFILL.adj50, { box: '20', stored: 20 }, 'adjustment 50 → 20');
+  });
+  it('with a box empty the preview describes the STORED rule, not the default', () => {
+    eq(REFILL.storedWhileBlank, 60, 'nothing was written for the empty box');
+    ok(/the last 60 rounds/.test(REFILL.previewWhileBlank),
+       'the preview names the window that is actually in force', REFILL.previewWhileBlank);
+    ok(/as saved/.test(REFILL.previewWhileBlank),
+       'and says that is what it is describing', REFILL.previewWhileBlank);
+  });
+  it('one round is "1 round", in the preview and in the correction', () => {
+    ok(/the last 1 round’s|the last 1 round's/.test(REFILL.previewAtOne),
+       'the preview is singular', REFILL.previewAtOne);
+    ok(/of only 1 round\b(?!s)/.test(REFILL.warnAtOne),
+       'and so is the correction', REFILL.warnAtOne);
   });
 
 describe('Where a press leaves the page (2026-09-05)');

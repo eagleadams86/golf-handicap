@@ -1078,3 +1078,24 @@ this repo is round three. Each fix has its own commit and its own tests.
   branch had to stop returning early for the repair to reach it; it is one exit now.
   `<body>` is checked BY NAME and not through the rect test: body has a rect like anything
   else, so an assertion resting on rects alone would be deaf to the whole fault.
+
+## Fixes From the 2026-09-07 Audit
+
+Twelve findings, one commit each, every one with a test proven red against main first. The
+League Rules window had three of them and they share one part — `fillMethodBoxes()`, the ONE
+setter that fills every box from what is stored — so that fix went first and the others
+stand on it.
+
+- **The League Rules boxes always show the rule that is STORED.** `commitMethod` corrected
+  the box for one rule (use > window) and left the others reading what was typed:
+  `normalizeMethod` clamps a window of 99 to 60, a multiplier of 5 to 2, an adjustment of
+  50 to 20 and a window of 2.5 to 3, and each of those stored the clamped figure under a box
+  still showing the typed one — a window describing a rule the leaderboard behind it was
+  not using. `openMethod`'s fill is now `fillMethodBoxes()`, and every commit calls it after
+  the write, with the `written` snapshot taken AFTER the refill so the boxes and the record
+  of what was written are the same thing. The *In words* preview read the boxes through
+  `readMethodForm`, which reads an empty box as the DEFAULT, so with the window box cleared
+  it described "the last 5 rounds" over a stored 60; while a box is empty it now describes
+  `state.settings.method` and says so in the sentence. "1 rounds" is "1 round" in the
+  preview and in the use-of-only correction. The suite drives it in MEASURE, in a walk of
+  its own after the saves-as-you-go one.
