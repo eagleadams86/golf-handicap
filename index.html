@@ -162,32 +162,12 @@
    follows every theme, Auto included, for free.
 ─────────────────────────────────────────────────────────────────────────── */
 :root { --c-roll: var(--series-1); --c-whs: var(--series-2); }
-/* `color-scheme`, one declaration per theme, the same shape PAPTrack and Money
-   Map use. It rode along with four hand-picked chart colours until 2026-08-23;
-   those are the pack's `--series-*` now (see above) and only this is left. It is not a colour of ours and it overrides
-   nothing in the pack — it is how a page TELLS the browser which way round it is,
-   so the parts of a control the browser draws itself follow the theme. Without
-   it they are always drawn light: the calendar button inside `<input type=date>`
-   was a near-black glyph on a near-black field on the two dark themes, and it is
-   the one control in the round form that cannot be restyled from CSS. It fixes
-   the number spinners, the checkbox and the scrollbars too, which had the same
-   problem more quietly.
-   Note the pairing follows the PALETTE, not the theme's name: sepia is a warm
-   LIGHT theme and takes `light`. */
-:root                 { color-scheme: dark; }
-[data-theme="dark"]   { color-scheme: dark; }
-[data-theme="light"]  { color-scheme: light; }
-[data-theme="sepia"]  { color-scheme: light; }
-/* Auto has no palette of its own — theme.css resolves it to Light or, under
-   prefers-color-scheme: dark, to Midnight. The two line colours and the color-scheme
-   has to resolve the same way the palette does, or an Auto page in light mode would
-   draw its native controls dark. Same structure as the pack's own auto block: the
-   light value, then the dark one in the media query. The chart lines no longer need
-   a mention here — they follow `--series-*`, which theme.css already resolves. */
-[data-theme="auto"]   { color-scheme: light; }
-@media (prefers-color-scheme: dark) {
-  [data-theme="auto"] { color-scheme: dark; }
-}
+/* `color-scheme` moved INTO the pack on 2026-09-12 (rule 18). theme.css emits
+   it on every palette block — :root, each [data-theme], BOTH halves of auto,
+   and the print block — derived from each theme's `isLight` in tokens.json, so
+   it follows the PALETTE and not the theme's name. This page declared its own
+   until then; don't re-add one, a local block is drift now and it is what left
+   the same declaration missing from ten other pages in the family. */
 
 * { box-sizing: border-box; }
 /* THE `hidden` ATTRIBUTE HAS TO BEAT A CLASS THAT SETS `display`, AND ON ITS OWN
