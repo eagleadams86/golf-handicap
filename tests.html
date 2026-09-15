@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 359;
+const EXPECTED = 363;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -264,6 +264,46 @@ async function onAppLoad() {
     N.tabScrolledBy = tabs.scrollLeft;
     await tick();
     N.tabPrevOnAfter = !tabPrev.disabled;
+    /* BESIDE THE NAME (Charles, 2026-09-14: "keep buttons beside the name").
+       This app's name is long, so at 705px the row is left about 236px — and
+       it must stay on the name's line and scroll there, not wrap below it. */
+    const brandR = D.querySelector('.brand').getBoundingClientRect(), ctlR = ctl.getBoundingClientRect();
+    N.beside = { dMid: +((ctlR.top + ctlR.height / 2) - (brandR.top + brandR.height / 2)).toFixed(1),
+      gap: +(ctlR.left - brandR.right).toFixed(1), room: ctl.scrollWidth - ctl.clientWidth };
+    /* A CONTROL HALF PAST THE EDGE, FOCUSED FROM THE KEYBOARD, comes whole into
+       the row with its ring's 4px (the browser only scrolls a focus target that
+       is ENTIRELY hidden). The straddle is MADE rather than hoped for: at rest a
+       12px gap can land exactly on the edge, so the first item reaching past it
+       is scrolled until its middle sits on the edge, then focused. */
+    const reveal = (row, items) => {
+      row.scrollLeft = 0;
+      let box = row.getBoundingClientRect();
+      const half = items.find((el) => el.getBoundingClientRect().right > box.right - 1);
+      if (!half) return { found: false };
+      const r0 = half.getBoundingClientRect();
+      row.scrollLeft += Math.max(0, r0.left + r0.width / 2 - box.right);
+      box = row.getBoundingClientRect();
+      const r1 = half.getBoundingClientRect();
+      const out = { found: true, id: half.id, straddles: r1.left < box.right && r1.right > box.right,
+        setup: r1.left.toFixed(1) + '–' + r1.right.toFixed(1) + ' vs edge ' + box.right.toFixed(1) };
+      half.focus({ focusVisible: true });
+      out.focused = D.activeElement === half;
+      const r = half.getBoundingClientRect(), b2 = row.getBoundingClientRect();
+      out.leftRoom = r.left - b2.left; out.rightRoom = b2.right - r.right;
+      half.blur();
+      return out;
+    };
+    N.revealHead = reveal(ctl, IDS.map((id) => D.getElementById(id)).filter((c) => c.getClientRects().length));
+    /* 260px holds one tab (127px) with room but not two, so the second one
+       straddles. The Leaderboard tab hides for a single golfer, which a fresh
+       harness browser may well have — shown here, since the bar's layout is
+       the question, and put back after. */
+    const league = D.getElementById('tab-league'), leagueHidden = league.hidden;
+    league.hidden = false;
+    D.querySelector('.tabrow').style.width = '260px';
+    await tick();
+    N.revealTabs = reveal(tabs, [...tabs.querySelectorAll('[role="tab"]')].filter((t) => t.getClientRects().length));
+    league.hidden = leagueHidden;
     f.remove();
 
     f = await rowFrame(1600, 'rows1600');
@@ -278,6 +318,40 @@ async function onAppLoad() {
         - D.querySelector('.brand').getBoundingClientRect().top) < 16,
       tabLines: lines([...D.querySelector('.tabs').children]),
     };
+    f.remove();
+
+    /* AN UPRIGHT PHONE KEEPS THE HEADER PINNED (Charles, 2026-09-14: "make golf
+       sticky again"). Below 560px it used to be `position: static`, from when
+       the controls wrapped to four lines. A 3000px spacer gives the page
+       something to scroll whatever the harness browser holds. */
+    f = await rowFrame(390, 'rowsPhone');
+    D = f.contentDocument;
+    D.documentElement.removeAttribute('data-welcome');
+    const spacer = D.createElement('div');
+    spacer.style.height = '3000px';
+    D.querySelector('.wrap').appendChild(spacer);
+    f.contentWindow.scrollTo(0, 800);
+    await tick();
+    const pHead = D.querySelector('header'), pBrand = D.querySelector('.brand').getBoundingClientRect();
+    const pCtl = D.querySelector('.headctl').getBoundingClientRect();
+    ROWS.phone = {
+      scrollY: Math.round(f.contentWindow.scrollY),
+      headerTop: +pHead.getBoundingClientRect().top.toFixed(1),
+      position: f.contentWindow.getComputedStyle(pHead).position,
+      rowUnderName: pCtl.top + 4 >= pBrand.bottom - 1, rowGap: +(pCtl.top + 4 - pBrand.bottom).toFixed(1),
+      ctlLines: lines(IDS.map((id) => D.getElementById(id))),
+    };
+    /* And what the pinned bar costs: something scrolled to the top of the
+       window — as Shift+Tab back up the page does — must land BELOW it, not
+       behind it. A button 2000px down the spacer, scrolled to the start. */
+    const mark = D.createElement('button');
+    mark.textContent = 'mark';
+    mark.style.marginTop = '2000px';
+    spacer.appendChild(mark);
+    mark.scrollIntoView({ block: 'start' });
+    await tick();
+    ROWS.phone.markRoom = +(mark.getBoundingClientRect().top - pHead.getBoundingClientRect().bottom).toFixed(1);
+    ROWS.phone.markScrolled = Math.round(f.contentWindow.scrollY) > 1500;
     f.remove();
     ROWS.ran = true;
   } catch (e) { ROWS.error = String(e && e.message || e); }
@@ -2148,6 +2222,50 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
        bordered 30px control, and a taller one would grow the header. */
     eq(N.navBorder, '0px', 'the arrows are glyphs, not bordered header buttons');
     ok(N.navH <= N.ctlH, 'and no taller than the controls beside them', N.navH + ' vs ' + N.ctlH);
+  });
+  it('705px: the controls stay BESIDE the name and scroll there', () => {
+    ok(ROWS.ran, 'the row frames did not measure', ROWS.error);
+    const B = ROWS.narrow.beside;
+    ok(Math.abs(B.dMid) < 8, 'the row is centred on the name’s own line rather than wrapped onto one of its own '
+       + '(Charles, 2026-09-14: "keep buttons beside the name")', B.dMid);
+    ok(B.gap >= 0, 'and it starts to the right of the name, not over it', B.gap);
+    ok(B.room > 1, 'with something to scroll — the row shrank to what the name leaves', B.room);
+    ok(/\.headrow \{ display: flex; align-items: center; justify-content: flex-end; gap: 4px;\s*flex: 1 1 0%; min-width: min\(15rem, 100%\); \}/.test(APP_SRC),
+       'the row takes what the name leaves, packed right, and wraps under it only below 15rem');
+  });
+  it('a control half past a row’s edge, reached from the keyboard, lands whole inside the row', () => {
+    ok(ROWS.ran, 'the row frames did not measure', ROWS.error);
+    /* The browser scrolls a focus target into view only when it is WHOLLY
+       hidden. The straddle is made, not hoped for — see ROWS. */
+    for (const [name, R] of [['header', ROWS.narrow.revealHead], ['tab bar', ROWS.narrow.revealTabs]]) {
+      ok(R && R.found, name + ': there is a control reaching past the edge to test with');
+      ok(R.straddles, name + ': set up — ' + R.id + ' straddles the edge', R.setup);
+      ok(R.focused, name + ': and ' + R.id + ' took the focus');
+      ok(R.leftRoom >= 3 && R.rightRoom >= 3,
+         name + ': focused, ' + R.id + ' is scrolled wholly inside the row with its ring’s room',
+         R.leftRoom.toFixed(1) + ' / ' + R.rightRoom.toFixed(1));
+    }
+    ok(/if \(t === row \|\| !t\.matches\(':focus-visible'\)\) return;/.test(APP_SRC),
+       'only a keyboard focus scrolls the row — a mouse press needs no help');
+  });
+  it('an upright phone: the header stays pinned at the top as the page scrolls', () => {
+    ok(ROWS.ran, 'the row frames did not measure', ROWS.error);
+    const P = ROWS.phone;
+    ok(P.scrollY >= 700, 'the page scrolled — otherwise nothing is being measured', P.scrollY);
+    ok(Math.abs(P.headerTop) <= 1, 'and the header is still at the top of the screen '
+       + '(Charles, 2026-09-14: "make golf sticky again")', P.headerTop);
+    eq(P.position, 'sticky', 'because it is sticky here, as at every other width');
+    ok(P.rowUnderName, 'the name leaves the row under 15rem here, so the row sits under it', P.rowGap);
+    eq(P.ctlLines, 1, 'on one line');
+  });
+  it('an upright phone: something scrolled to the top of the window lands below the pinned header, not behind it', () => {
+    ok(ROWS.ran, 'the row frames did not measure', ROWS.error);
+    const P = ROWS.phone;
+    ok(P.markScrolled, 'the page scrolled to it — otherwise nothing is being measured');
+    ok(P.markRoom >= 2, 'it sits below the header with room for its focus ring '
+       + '(on the first sticky phone bar, 27 of 91 Shift+Tab stops landed wholly behind it)', P.markRoom);
+    ok(/html \{ scroll-padding-top: calc\(var\(--head-h, 0px\) \+ 8px\); \}/.test(APP_SRC),
+       'the room is the header’s measured height, not a number');
   });
   it('the tab bar is one row that scrolls the same way, the moment its tabs do not fit', () => {
     ok(ROWS.ran, 'the row frames did not measure', ROWS.error);
