@@ -92,6 +92,13 @@ The app has two tabs. **My handicap** is one golfer's page — the two figures, 
 chart, the course handicap and the full list of rounds. **Leaderboard** is everybody at
 once (see [The leaderboard](#the-leaderboard)).
 
+**The header's controls and the tabs are each one line that scrolls sideways**, at every
+window size (2026-09-14). While every control fits beside the app's name it sits there as
+it always has; when it doesn't — a narrow window, or a phone upright or on its side — the
+row takes a line of its own under the name and you flick or scroll it to reach the rest.
+With a mouse or trackpad, **‹ ›** arrows appear at the end of a row whenever something is
+off an edge. The controls used to wrap onto as many as four lines, pushing the page down.
+
 **A tab press starts the new page at the top**, rather than at whatever offset the other
 one had you scrolled to — before September 2026 it kept that offset, so where the
 Leaderboard opened depended on how far down a long round list you had read. Pressing the
