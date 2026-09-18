@@ -604,6 +604,15 @@ that emphasis.
   (localStorage is shared, so the tabs would otherwise last-write-wins each other). Adopt
   and render only — never `save()` from that listener: the writing tab already pushed to
   the cloud, and the event only fires in *other* tabs, so it cannot loop.
+  **Checked against Sprint Predictability's two-copies guard on 2026-09-18, and nothing was
+  ported:** that app had NO listener, so a stale window overwrote the other's work; this one
+  adopts the moment the write lands, dialog open or not, so a stale copy does not arise, and
+  Delete All Data saves a blank board rather than removing the key, so `!e.newValue` never
+  skips a real change. The sibling's second half — `save()` refusing to write over bytes it did
+  not last read — was deliberately NOT added here: sync rewrites this key from three places
+  (`ghAdopt` twice, the push path), each of which would have to keep a marker true, for a
+  window the listener already closes. Revisit only if a frozen background tab is ever shown to
+  miss a `storage` event and then save.
 - **`privacy.html` is the privacy policy** (static, linked from the footer via
   `.privacy-links` — deliberately a separate element from `#privacyNote`, whose textContent
   the sync code rewrites). It follows the saved theme: the same pre-paint boot script as
