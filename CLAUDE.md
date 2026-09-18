@@ -609,8 +609,8 @@ that emphasis.
   adopts the moment the write lands, dialog open or not, so a stale copy does not arise, and
   Delete All Data saves a blank board rather than removing the key, so `!e.newValue` never
   skips a real change. The sibling's second half — `save()` refusing to write over bytes it did
-  not last read — was deliberately NOT added here: sync rewrites this key from three places
-  (`ghAdopt` twice, the push path), each of which would have to keep a marker true, for a
+  not last read — was deliberately NOT added here: sync's `ghAdopt` rewrites this key in two
+  places beside `save()`, each of which would have to keep a marker true, for a
   window the listener already closes. Revisit only if a frozen background tab is ever shown to
   miss a `storage` event and then save.
 - **`privacy.html` is the privacy policy** (static, linked from the footer via
