@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 364;
+const EXPECTED = 365;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -2341,6 +2341,17 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
     eq(H.raisesKeyboard({ tagName: 'SELECT' }), false);
     eq(H.raisesKeyboard({ tagName: 'DIALOG' }), false, 'the dialog itself, once focus lands there');
     eq(H.raisesKeyboard(null), false, 'nothing focused is not a keyboard');
+  });
+  it('a dropdown or picker opens on focus, so a window never opens on one', () => {
+    /* iOS 26 opens a focused <select>'s menu at once: Wine Cellar's Share and
+       Settings windows opened with their first dropdown already down (Charles,
+       iPhone, 2026-10-23). openModal() asks opensOnFocus(), not raisesKeyboard(). */
+    ok(H.opensOnFocus({ tagName: 'SELECT' }), 'a select');
+    ok(H.opensOnFocus({ tagName: 'INPUT', type: 'time' }), 'a time picker');
+    ok(H.opensOnFocus({ tagName: 'INPUT', type: 'text' }), 'and everything that raises the keyboard');
+    ok(!H.opensOnFocus({ tagName: 'INPUT', type: 'checkbox' }), 'a checkbox opens nothing');
+    ok(!H.opensOnFocus({ tagName: 'BUTTON' }), 'nor a button');
+    ok(!H.opensOnFocus(null), 'nor nothing focused');
   });
 
   /* ── Select-on-focus versus a number field’s spin arrows ──────────────────────

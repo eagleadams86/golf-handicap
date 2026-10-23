@@ -229,6 +229,11 @@ header {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   padding: 10px 0; margin-bottom: 20px;
+  /* Installed on an iPhone, the page runs UNDER the status bar
+     (black-translucent), so the bar clears the notch itself and its own
+     background fills the space — PAPTrack's line. Pinned at every width, so
+     it also keeps scrolled content out from under the clock. */
+  padding-top: calc(10px + env(safe-area-inset-top));
 }
 /* A FOCUS NEVER LANDS UNDER THE PINNED BAR. Scrolling the page to bring
    something into view — Shift+Tab back up the page, most of all — lines it up
@@ -976,6 +981,13 @@ dialog {
      scrolling is untouched, only the hand-off is. */
   overscroll-behavior: contain;
 }
+/* A tall window on an installed iPhone reached up under the status bar, its
+   heading behind the clock (Wine Cellar, 2026-10-23). A dialog is centred, so
+   the room comes off BOTH ends by the larger inset — that is what keeps its top
+   edge clear of the notch. Zero wherever there is no notch. Still vh, for the
+   reason above. */
+dialog { max-height: calc(100vh - var(--sp-8)
+           - 2 * max(env(safe-area-inset-top), env(safe-area-inset-bottom))); }
 /* The share dialog carries more than any other — two choices, a link to copy
    and two paragraphs about what a link is and isn't — and at 560px it opened
    already scrolling. Given room, its two choices sit side by side, which is
@@ -1452,7 +1464,7 @@ html[data-welcome] [role="tabpanel"] { display: none !important; }
    document, not something to click on the way in. */
 footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
 .footnotes { flex: 1 1 320px; min-width: 0; }
-.privacy { font-size: var(--fs-xs); color: var(--text-muted); margin: 28px 0 0; padding-left: 19px; }
+.privacy { font-size: var(--fs-xs); color: var(--text-muted); margin: 28px 0 0; padding: 0 19px; }
 .privacy-links { margin-top: 6px; }
 .privacy-links a { color: var(--text-muted); }
 </style>
@@ -4518,19 +4530,33 @@ const KEYBOARD_TYPES = new Set(['text', 'number', 'search', 'tel', 'url', 'email
 /* Which elements a phone answers with a keyboard — pure over {tagName, type},
    so the list is pinned by tests rather than rediscovered the next time a
    dialog opens on a field nobody thought about. A checkbox, a button and a
-   select all raise nothing, which is why the dialogs that open on one are left
-   exactly as they were. */
+   select raise no keyboard — though a select OPENS on focus, which is what
+   opensOnFocus() below adds. */
 function raisesKeyboard(el) {
   if (!el) return false;
   return el.tagName === 'TEXTAREA'
     || (el.tagName === 'INPUT' && KEYBOARD_TYPES.has(el.type));
+}
+
+/* Which controls OPEN something the moment they are focused, on a touch
+   screen: the keyboard's, plus a <select> and the date and time pickers.
+   iOS 26 opens a focused select's menu at once — Wine Cellar's Share and
+   Settings windows opened with their first dropdown already down (Charles,
+   iPhone, 2026-10-23) — so openModal() asks this, not raisesKeyboard(). */
+function opensOnFocus(el) {
+  if (!el) return false;
+  if (raisesKeyboard(el)) return true;
+  const tag = (el.tagName || '').toUpperCase();
+  if (tag === 'SELECT') return true;
+  return tag === 'INPUT' && ['date', 'time', 'datetime-local', 'month', 'week']
+    .indexOf((el.type || '').toLowerCase()) !== -1;
 }
 function openModal(dlg) {
   dlg.showModal();
   if (!window.matchMedia('(pointer: coarse)').matches) return;
   const el = document.activeElement;
   if (!el || !dlg.contains(el)) return;
-  if (!raisesKeyboard(el)) return;
+  if (!opensOnFocus(el)) return;
   dlg.tabIndex = -1;
   dlg.focus();
 }
@@ -6898,7 +6924,7 @@ window.addEventListener('storage', (e) => {
    without going through loadDemoLeague(), which saves — the difference between
    showing the render layer some data and writing example rounds into somebody's
    real handicap record. The starter carries the same pair, worded the same way. */
-window.__ghTestHooks = { raisesKeyboard,
+window.__ghTestHooks = { raisesKeyboard, opensOnFocus,
   __plant: function (next) { state = normalizeState(next); render(); },
   __state: function () { return state; },
   TABS, TAB_KEY,
