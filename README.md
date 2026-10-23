@@ -750,6 +750,8 @@ Dark, Light, Sepia — plus **Auto, which is the default**: with nothing saved t
 your own system, Light or Midnight, and changes with it while the page is open. Midnight is the
 base palette, and what Auto means by "dark". All five are listed alphabetically in the picker. Never retune a colour
 here: change the pack's `tokens.json`, run its contrast gate, rebuild, re-transcribe.
+A switched-off button — Copy Link while the share window is working — is dimmed with the "not
+allowed" cursor by `theme.css` (pack rule 20, 2026-10-23); it used to look exactly like one that works.
 
 ---
 
