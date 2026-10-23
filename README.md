@@ -152,6 +152,8 @@ for it and it counts again. (Until September 2026 the editor pre-selected the fi
 in the list, worked out a differential as though the round had been played there, and a
 corrected note quietly re-homed it.)
 
+**Scrolling never changes a number box.** A browser steps a number box you have just typed in every time the mouse wheel or trackpad scrolls over it, so scrolling a window down past it used to change the figure without a word. The box now lets go of the cursor the moment you scroll over it, and the page scrolls instead; click it again to carry on typing.
+
 ### Trying It Out — The Example League
 
 **Load Sample Data** on the welcome card loads the example league: eight golfers, six courses
