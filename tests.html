@@ -113,7 +113,7 @@ function ok(v, msg, detail) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 365;
+const EXPECTED = 366;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -3876,6 +3876,32 @@ describe('Hovering the trend chart');
     } catch (e) { CAUSES.error = String(e && e.message || e); }
   }
 
+  /* ── A golfer's name wraps (2026-10-24) ───────────────────────────────────
+     The name is a .rowbtn, and the base button rule says nowrap: one long name
+     held the whole Golfer column on one line and pushed the leaderboard far
+     past its box (Wine Cellar had it first). Read as COMPUTED style in the
+     1280px frame, from a planted league. */
+  const NAMEWRAP = { ran: false };
+  if (MEASURE) {
+    try {
+      const MW = MEASURE, MD = MW.document, MHK = MW.__ghTestHooks;
+      const demo = MW.buildDemoLeague();
+      MHK.__plant({ version: MHK.SCHEMA, golfers: demo.golfers, courses: demo.courses,
+                    rounds: demo.rounds, activeGolfer: 'demo-g-1' });
+      MD.getElementById('tab-league').click();
+      await new Promise((r) => setTimeout(r, 40));
+      const name = MD.querySelector('#leagueTable tr.rowlink .rowbtn');
+      NAMEWRAP.ws = name ? MW.getComputedStyle(name).whiteSpace : null;
+      NAMEWRAP.deco = name ? MW.getComputedStyle(name).textDecorationLine : null;
+      MD.getElementById('tab-player').click();
+      await new Promise((r) => setTimeout(r, 40));
+      const date = MD.querySelector('#roundsTable .rowbtn');
+      NAMEWRAP.dateDeco = date ? MW.getComputedStyle(date).textDecorationLine : null;
+      NAMEWRAP.dateRowlink = date ? !!date.closest('tr.rowlink') : null;
+      NAMEWRAP.ran = true;
+    } catch (e) { NAMEWRAP.error = String(e && e.message || e); }
+  }
+
   /* ── A round can't be in the future (2026-09-07 audit) ────────────────────
      roundSave checked only the SHAPE of the date, so a round dated next year
      saved silently and sat at the top of the list as the newest round played.
@@ -4267,6 +4293,15 @@ describe('The league warning names all three exclusion causes (2026-09-07 audit)
     ok(/9-hole/.test(CAUSES.warn),
        'and the third, which counted drops just the same and the golfer’s own page names',
        CAUSES.warn);
+  });
+
+describe('A golfer’s name wraps like every other column (2026-10-24)');
+  it('wraps, and drops its underline only where the whole row is the target', () => {
+    ok(NAMEWRAP.ran, 'the walk did not finish', NAMEWRAP.error || 'no frame');
+    eq(NAMEWRAP.ws, 'normal', 'the base button rule says nowrap — the Golfer column alone squeezed the rest');
+    eq(NAMEWRAP.deco, 'none', 'a leaderboard row hovers and opens as one, so the name needs no mark of its own');
+    eq(NAMEWRAP.dateRowlink, false, 'a round’s date is the ONLY target in its row');
+    eq(NAMEWRAP.dateDeco, 'underline', 'so it keeps the underline that says it can be pressed');
   });
 
 describe('A round can’t be in the future (2026-09-07 audit)');

@@ -567,6 +567,12 @@ that emphasis.
   `<th scope="row">` holding a `.rowbtn`: a `<tr>` can't take focus, and giving it a button
   role would break the grid semantics that make the numeric columns readable. `tbody th`
   re-styles the row-header cells back to body text.
+- **A golfer's name wraps; only a whole-row target drops the underline** (2026-10-24, family-wide
+  after Wine Cellar). `.rowbtn` sets `white-space: normal; text-align: left` — the base `button`
+  rule says `nowrap`, so one long name held the Golfer column on one line and pushed the
+  leaderboard to 1225px in an 815px box. `tr.rowlink .rowbtn` drops the underline (the leaderboard
+  row hovers and opens as one; focus keeps the ring). A round's DATE keeps its underline: that row
+  is not a rowlink, so the date is the only target in it. A test pins all of it.
 - **`pushNow()` sends the state through JSON (`forCloud()`), exactly as `save()` writes the
   local copy** — so the two are the same bytes by construction rather than nearly so. Don't
   "simplify" it back to handing `state` straight to `setDoc()`: Firestore walks the live
