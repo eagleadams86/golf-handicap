@@ -29,13 +29,13 @@
      lottery pages. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://accounts.google.com; manifest-src 'self'; worker-src 'self'; frame-src https://accounts.google.com; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Golf Handicap — rolling handicap tracker</title>
+<title>Golf Handicap</title>
 <meta name="description" content="Track your golf rounds and see your handicap two ways: a configurable league handicap over your last N rounds, and the official World Handicap System calculation. Compare every golfer on one leaderboard. Works offline, no account required.">
 <!-- The standard name is mobile-web-app-capable; Chrome warns that the apple-
      prefixed one is deprecated. Both stay: older iOS reads only the apple- one. -->
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Handicap">
+<meta name="apple-mobile-web-app-title" content="Golf Handicap">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <!-- The app's own mark: a flagstick on the green with a ball beside it, on the tile
      the whole family wears — midnight page, soft disc in the corner, the accent
@@ -1489,13 +1489,12 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
          favicon for a long time, and without it the header would keep showing
          whatever icon it cached the first time. Bump it on every reference (here,
          the <link> in <head>, and privacy.html's) when make_favicon.py is re-run. -->
-    <!-- Name then strapline behind a middle dot, the family's brand line — Sprint
-         Predictability wears "· Charlie's Epic Sprint Planner" and Money Map "·
-         Charlie's Epic Money Map". It is FIXED text, not a setting: it used to be
-         typed into the League Rules window's "What to call it" box, which labelled
-         the calculation rather than the app and put the name somewhere nobody
-         would look for it. -->
-    <h1 class="brand"><img class="mark" src="favicon.ico?v=1" width="22" height="22" alt="">Golf&nbsp;Handicap <span>&middot; Charlie&rsquo;s Epic League Tracker</span></h1>
+    <!-- The name alone: the family dropped its "· Charlie's Epic …" straplines on
+         2026-10-24. It is FIXED text, not a setting: it used to be typed into the
+         League Rules window's "What to call it" box, which labelled the
+         calculation rather than the app and put the name somewhere nobody would
+         look for it. -->
+    <h1 class="brand"><img class="mark" src="favicon.ico?v=1" width="22" height="22" alt="">Golf&nbsp;Handicap</h1>
     <!-- ── The family's header order ───────────────────────────────────────────
          Every app in the family lays this row out the same way, so a control is
          in the same place whichever one you have open. Right to left, because
@@ -5839,7 +5838,7 @@ document.getElementById('csvBtn').addEventListener('click', () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `golf-rounds-${todayISO()}.csv`;
+  a.download = `golf-handicap-rounds-${todayISO()}.csv`;
   document.body.appendChild(a);
   a.click();
   a.remove();

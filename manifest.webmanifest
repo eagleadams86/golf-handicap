@@ -1,7 +1,7 @@
 {
   "id": "/golf-handicap/",
   "name": "Golf Handicap",
-  "short_name": "Handicap",
+  "short_name": "Golf Handicap",
   "description": "A golf handicap tracker: rounds, course handicaps and a rolling index alongside the WHS calculation, private to your own browser.",
   "start_url": "./",
   "scope": "./",
