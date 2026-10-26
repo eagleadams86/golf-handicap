@@ -685,7 +685,7 @@ Two consequences worth knowing:
 
 ### How Syncing Behaves
 
-One Firestore document per user at `golfhandicap/{uid}`, holding `{ state, updatedAt }`.
+One Firestore document per user at `golfhandicap/{uid}`, holding `{ state, updatedAt, rev }`.
 localStorage stays the source of truth; the cloud copy is a mirror, and the app works
 offline either way.
 
@@ -701,6 +701,14 @@ offline either way.
   stamped *now*, and the device that actually had the rounds — carrying an older timestamp —
   takes the empty copy as "newer" and empties itself. This is not hypothetical; it cost real
   data in a sibling app, which is where the rule comes from.
+- **An edit made offline never overwrites a newer copy from another device** (2026-10-26).
+  Every save carries a version number (`rev`) that goes up by one each time, and each device
+  remembers the version it last saw. A save is sent only if the cloud is still that version;
+  if another device saved in between, you are asked which copy to keep instead of one quietly
+  replacing the other. An offline edit is held on this device — never queued inside Firebase
+  to land later — and sent through the same check when the connection comes back (on
+  reconnect, when the page comes back into view, or a minute later). Device clocks no
+  longer decide anything, so a phone whose clock runs fast cannot win every time.
 - A device clearing everything **asks** the others rather than silently wiping them.
 - Two tabs of the **same browser** share one copy: an edit saved in one appears in the
   other immediately, signed in or not.

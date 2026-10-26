@@ -2728,6 +2728,139 @@ function makePushGate() {
   };
 }
 
+/* ── Which copy is newer: a version number, not a clock (2026-10-26) ─────────
+   Until this, every push was a blind setDoc of the whole document stamped with
+   this device's clock, and a device took the cloud copy only if its stamp was
+   bigger than its own. So an edit made OFFLINE with the page open was queued by
+   Firestore and replayed on reconnect over whatever another device had saved
+   meanwhile; that device then ignored the replay as older, kept its own copy,
+   and the two quietly disagreed — the other device's work gone from the cloud
+   with nothing on screen. A device with a fast clock won every comparison, and
+   an offline edit followed by a reload was thrown away at the next sign-in.
+   League Night never had the fault, and this is its answer, trimmed to one
+   person's devices:
+
+   - The document carries `rev`, which every write raises by exactly one, and
+     each device remembers the copy it last took or wrote — its BASE, `{rev, at}`
+     per account. A copy whose tag is not the base has been written elsewhere.
+   - Every push is a TRANSACTION that writes only if the cloud is still the
+     base. If it has moved on, nothing is written and the which-copy question
+     is asked instead — both sides changed, and only the reader knows which
+     one matters.
+   - A transaction refuses to run offline, so nothing is ever queued to land
+     later. An unsent edit is DIRTY — the copy's stamp is not the one last sent
+     — and it is sent, through the same check, on reconnect.
+   - `at` rides in the tag beside `rev` so a write from a page still running
+     the old code (no rev) still reads as a change.
+
+   syncPlan() is the verdict, pure and pinned; makeCloudSync() is the engine,
+   written against an `io` the sync module supplies (Firestore's calls, this
+   page's storage, the dialogs), so tests.html drives it with a fake cloud. */
+function cloudTag(d) { return { rev: Number((d && d.rev) || 0), at: Number((d && d.updatedAt) || 0) }; }
+function sameTag(a, b) { return !!a && !!b && a.rev === b.rev && a.at === b.at; }
+/* `base` is null when this device has never synced this account under the
+   new rule — then the old clock rules decide, once, and set it. */
+function syncPlan(p) {
+  if (!p.base) return syncDecision(p.localCount, p.remoteCount, p.remoteIsNewer, p.firstSync);
+  if (!p.remote) return 'push';
+  if (sameTag(p.base, p.remote)) return p.dirty ? 'push' : 'none';
+  /* The cloud moved and nothing here is unsent: take it — except an emptied
+     cloud over a device with data, which asks (empty never beats data). */
+  if (!p.dirty) return !p.remoteCount && p.localCount ? 'ask' : 'adopt';
+  /* Both sides changed. With nothing in either, there is nothing to lose. */
+  return !p.localCount && !p.remoteCount ? 'push' : 'ask';
+}
+function makeCloudSync(io) {
+  let pushing = false, again = false, held = null, asking = null;
+  const base = () => {
+    try {
+      const b = JSON.parse(io.getItem(io.keys.base) || 'null');
+      return b && b.uid === io.uid() ? { rev: Number(b.rev) || 0, at: Number(b.at) || 0 } : null;
+    } catch (e) { return null; }
+  };
+  const setBase = (t) => io.setItem(io.keys.base, JSON.stringify({ uid: io.uid(), rev: t.rev, at: t.at }));
+  const dirty = () => io.stamp() !== Number(io.getItem(io.keys.pushed) || 0);
+  const markSent = (at) => io.setItem(io.keys.pushed, String(at));
+  function adopt(data, how) {
+    io.adopt(data);
+    setBase(cloudTag(data));
+    markSent(io.stamp());
+    io.toast(how === 'live' ? 'synced' : 'loaded');
+  }
+  /* Keeping this device: the copy in the cloud becomes the base being replaced,
+     and this one is stamped newest so the choice wins everywhere. */
+  function keep(data) {
+    setBase(cloudTag(data));
+    io.touch();
+    io.toast('kept');
+    return push();
+  }
+  function ask(data, how, emptied) {
+    if (asking) return asking;
+    asking = Promise.resolve(emptied ? io.askEmptied() : io.ask(io.localCount(), io.remoteCount(data), data && data.updatedAt))
+      .then((takeCloud) => { asking = null; return takeCloud ? adopt(data, how) : keep(data); })
+      .finally(() => { asking = null; drain(); });
+    return asking;
+  }
+  function resolve(data, how, firstSync) {
+    const plan = syncPlan({ base: base(), remote: data ? cloudTag(data) : null, dirty: dirty(),
+      localCount: io.localCount(), remoteCount: io.remoteCount(data),
+      remoteIsNewer: !!(data && Number(data.updatedAt) > io.stamp()), firstSync: !!firstSync });
+    if (plan === 'adopt') return adopt(data, how);
+    if (plan === 'ask') return ask(data, how, !dirty() && !io.remoteCount(data) && how === 'live');
+    if (plan === 'push') { if (data) setBase(cloudTag(data)); return push(); }
+    return null;
+  }
+  /* A copy that arrived while a push or the question was in flight waits for
+     it, then is looked at against the base that left behind. */
+  function drain() {
+    if (pushing || asking || !held) return;
+    const d = held;
+    held = null;
+    snapshot(d);
+  }
+  async function push() {
+    if (!io.uid()) return;
+    if (pushing) { again = true; return; }
+    pushing = true;
+    let moved = null;
+    try {
+      do {
+        again = false;
+        if (!io.stamp()) io.touch();
+        const at = io.stamp(), b = base(), doc = io.localDoc();
+        const out = await io.transact((cur) => {
+          if (cur && !sameTag(b, cloudTag(cur))) return { moved: cur };
+          const rev = cloudTag(cur).rev + 1;
+          return { write: Object.assign({}, doc, { updatedAt: at, rev: rev }), tag: { rev: rev, at: at } };
+        });
+        if (out.moved) { moved = out.moved; break; }
+        setBase(out.tag);
+        markSent(at);
+      } while (again);
+    } finally { pushing = false; }
+    if (moved) return resolve(moved, 'live');
+    drain();
+  }
+  function snapshot(data) {
+    if (pushing || asking) { held = data; return null; }
+    if (sameTag(base(), cloudTag(data))) return null;
+    return resolve(data, 'live');
+  }
+  return {
+    /* Sign-in: read the cloud, then the same verdict as everything else. A copy
+       that is not a cellar of ours (no state) is written over, never adopted. */
+    start: async () => {
+      const data = await io.read();
+      if (data && !io.valid(data)) { setBase(cloudTag(data)); return push(); }
+      return resolve(data, 'start', io.firstSync());
+    },
+    push: push,
+    snapshot: snapshot,
+    dirty: dirty,
+  };
+}
+
 const DAY = 86400000;
 function isoOf(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -7404,33 +7537,49 @@ function chooseSyncSource(localCount, remoteCount, remoteUpdatedAt) {
 
 const roundCount = (data) => (data && data.state && Array.isArray(data.state.rounds)) ? data.state.rounds.length : 0;
 
-async function startSync() {
-  const snap = await F.getDoc(docRef());
-  const remote = snap.exists() ? snap.data() : null;
-  const remoteN = roundCount(remote);
-  const localN = window.ghCount();
-  const isFirstSyncForAccount = localStorage.getItem('gh-sync-uid') !== user.uid;
+/* The engine — makeCloudSync in the classic script, where tests.html drives it
+   with a fake cloud. This is everything it needs from Firebase and the page. */
+const cloud = makeCloudSync({
+  uid: () => (user ? user.uid : null),
+  keys: { base: 'gh-cloud-base', pushed: 'gh-cloud-sent' },
+  getItem: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  setItem: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* blocked */ } },
+  stamp: localTs,
+  touch: () => touchLocal(),
+  read: async () => { const snap = await F.getDoc(docRef()); return snap.exists() ? snap.data() : null; },
+  transact: (decide) => F.runTransaction(db, async (tx) => {
+    const snap = await tx.get(docRef());
+    const out = decide(snap.exists() ? snap.data() : null);
+    if (out.write) tx.set(docRef(), out.write);
+    return out;
+  }),
+  localDoc: () => ({ state: forCloud(window.ghGet()) }),
+  localCount: () => window.ghCount(),
+  remoteCount: roundCount,
+  valid: (d) => !!(d && d.state && Array.isArray(d.state.rounds)),
+  firstSync: () => localStorage.getItem('gh-sync-uid') !== user.uid,
+  adopt: (d) => window.ghAdopt(d.state, d.updatedAt),
+  ask: (localN, remoteN, at) => chooseSyncSource(localN, remoteN, at),
+  /* Clearing everything really is something people do, so an emptied cloud
+     over a device with rounds asks rather than refusing — but it asks. */
+  askEmptied: () => confirm('Another device has cleared all its rounds.\n\n'
+    + 'Clear this device too? Cancel keeps what’s on this device and restores it to your other devices.'),
+  toast: (k) => window.toast({ loaded: 'Loaded your rounds from the cloud ☁️', synced: 'Synced from another device ☁️',
+    kept: 'Kept this device’s rounds' }[k]),
+});
 
-  /* The which-copy-wins rules live in syncDecision() in the classic script —
-     pure, so tests.html pins them (empty never beats data; a first sign-in
-     with rounds on both sides asks). This block only acts on the verdict. */
-  const verdict = syncDecision(localN, remoteN, !!(remote && remote.updatedAt > localTs()), isFirstSyncForAccount);
-  if (verdict === 'ask') {
-    const keepGoogle = await chooseSyncSource(localN, remoteN, remote.updatedAt);
-    if (keepGoogle) {
-      window.ghAdopt(remote.state, remote.updatedAt);
-      window.toast('Loaded your rounds from the cloud ☁️');
-    } else {
-      touchLocal();
-      await pushNow();
-      window.toast('Kept this device’s rounds');
-    }
-  } else if (verdict === 'adopt') {
-    window.ghAdopt(remote.state, remote.updatedAt);
-    window.toast('Loaded your rounds from the cloud ☁️');
-  } else {
-    await pushNow();
-  }
+let starting = null;
+function startSync() {
+  if (!starting) starting = runStartSync().finally(() => { starting = null; });
+  return starting;
+}
+async function runStartSync() {
+  /* The which-copy rules live in syncPlan() and syncDecision() in the classic
+     script — pure, so tests.html pins them (empty never beats data; a first
+     sign-in with rounds on both sides asks; a copy moved on since this device
+     last saw it is never written over blind). */
+  await cloud.start();
+  clearSyncError();
   try { localStorage.setItem('gh-sync-uid', user.uid); }
   catch (e) { /* storage blocked — the next sign-in just asks again */ }
   /* The verdict is in and acted on: pushes may flow, starting with one that
@@ -7438,9 +7587,9 @@ async function startSync() {
      It pushes the CURRENT state, which is whichever copy the verdict chose.
      Released before listen(), so the listener never sees a push it must
      ignore as its own. A startSync that threw above never reaches this line —
-     the gate stays held, the button shows the error, and the next auth report
-     or reload starts again; pushing blind without a verdict is the fault this
-     exists to stop. */
+     the gate stays held, the button shows the error, and the next auth report,
+     reconnect or reload starts again; pushing blind without a verdict is the
+     fault this exists to stop. */
   pushGate.release(() => window.cloudPush());
   listen();
 }
@@ -7465,21 +7614,10 @@ function listen() {
     const r = s.data();
     // A document with no state object is half-written or foreign, never an
     // intentional "delete everything" — adopting it would clear this device.
-    if (!r || !r.state || !Array.isArray(r.state.rounds) || !(r.updatedAt > localTs())) return;
-    // Same empty-never-beats-data rule, live. Clearing everything really is
-    // something people do, so this asks rather than refusing — but it asks.
-    if (!r.state.rounds.length && window.ghCount()) {
-      const keep = !confirm('Another device has cleared all its rounds.\n\n'
-        + 'Clear this device too? Cancel keeps what’s on this device and restores it to your other devices.');
-      if (keep) {
-        touchLocal();
-        pushNow().catch(setSyncError);
-        window.toast('Kept this device’s rounds');
-        return;
-      }
-    }
-    window.ghAdopt(r.state, r.updatedAt);
-    window.toast('Synced from another device ☁️');
+    if (!r || !r.state || !Array.isArray(r.state.rounds)) return;
+    // The engine compares it with the copy this device last took or wrote, and
+    // takes it, ignores it, or asks — never by comparing two clocks.
+    Promise.resolve(cloud.snapshot(r)).catch(setSyncError);
   }, (e) => {
     setSyncError(e);
     unsub = null;
@@ -7503,11 +7641,22 @@ const forCloud = (s) => JSON.parse(JSON.stringify(s));
 
 async function pushNow() {
   if (!user) return;
-  await F.setDoc(docRef(), { state: forCloud(window.ghGet()), updatedAt: localTs() || Date.now() });
+  await cloud.push();
   clearSyncError();
   /* A push that got through proves the connection, so a listener that was
      dropped is re-opened here rather than left for the timer. */
   if (!unsub) listen();
+}
+
+/* A push that failed — offline, most often, since a transaction will not run
+   without the server — is shown on the button and tried again in a minute while
+   the edit is still unsent, for the connection that comes back without an
+   `online` event. */
+let retryTimer = null;
+function pushFailed(e) {
+  setSyncError(e);
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(() => { retryTimer = null; catchUp(); }, RELISTEN_MS);
 }
 
 /* Every push goes through this — see makePushGate in the classic script. Held
@@ -7519,7 +7668,7 @@ window.cloudPush = () => {
   if (!user) return;
   pushGate.request(() => {
     clearTimeout(pushTimer);
-    pushTimer = setTimeout(() => { pushTimer = null; pushNow().catch(setSyncError); }, 1200);
+    pushTimer = setTimeout(() => { pushTimer = null; pushNow().catch(pushFailed); }, 1200);
   });
 };
 
@@ -7532,7 +7681,7 @@ window.cloudFlush = () => {
   pushGate.request(() => {
     clearTimeout(pushTimer);
     pushTimer = null;
-    pushNow().catch(setSyncError);
+    pushNow().catch(pushFailed);
   });
 };
 
@@ -7555,6 +7704,21 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushPending();
 });
 addEventListener('pagehide', flushPending);
+
+/* Back online, or back in front of the reader: an edit that could not be sent
+   is sent now, through the same check — a transaction never runs offline, so
+   nothing else would. A sign-in whose verdict never came (getDoc failed
+   offline) is started again rather than pushed past. */
+const catchUp = () => {
+  if (!user || !F) return;
+  if (pushGate.held()) { startSync().catch(setSyncError); return; }
+  if (cloud.dirty()) window.cloudFlush();
+  if (!unsub) listen();
+};
+addEventListener('online', catchUp);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') catchUp();
+});
 </script>
 <!-- ── Offline ────────────────────────────────────────────────────────────────
      Registering sw.js is the whole of the offline feature on this side; the

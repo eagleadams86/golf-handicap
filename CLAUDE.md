@@ -600,7 +600,26 @@ that emphasis.
   the next sign-in while the next push said everything was fine. Same fix as Money Map's and
   PAPTrack's, pinned as source in the suite.
   The which-copy-wins rules live in the pure `syncDecision()` in the classic script so
-  tests.html can pin them; the module only acts on the verdict. "Clear everything" calls
+  tests.html can pin them; the module only acts on the verdict.
+  **Since 2026-10-26 a version number decides, not a clock** — the offline-overwrite fix,
+  League Night's answer trimmed to one person's devices, and the template the other synced
+  apps take. The doc carries `rev` (+1 per write); each device keeps its BASE, the
+  `{uid, rev, at}` of the copy it last took or wrote, in `gh-cloud-base`, and the stamp it
+  last sent in `gh-cloud-sent` — DIRTY is `gh-updated` ≠ that. `syncPlan()` is the verdict
+  (no base yet → `syncDecision`, once; base unchanged → push if dirty; moved and clean →
+  adopt, an emptied cloud asks; moved and dirty → ask). `makeCloudSync(io)` is the engine —
+  in the CLASSIC script, written against an `io` of Firestore calls and page hooks, so the
+  suite plays two devices against a fake cloud (`runSyncSim`, in `onAppLoad`, one
+  `step` per scenario). **Every push is `runTransaction`: it writes only if the cloud is
+  still the base**, else nothing is written and the which-copy question is asked. A
+  transaction never runs offline, so nothing is queued in the SDK to replay blind; an
+  unsent edit stays dirty and `catchUp()` sends it on `online`, on becoming visible, and a
+  minute after a failed push (`pushFailed`), and re-runs a sign-in whose verdict never came.
+  A snapshot that arrives mid-push or mid-question is held and looked at afterwards (so a
+  device's own write never asks it). `at` is in the tag beside `rev` so a write from a page
+  still on the old code reads as a change. **No setDoc is left in the module — a test pins
+  it.** The rules were NOT changed to require `rev`: an old cached page would just get
+  `permission-denied`, and the client check is the fix. "Clear everything" calls
   `window.cloudFlush()` to skip the push debounce — a clear must not sit in a window the
   tab might not survive. Ordinary edits get the same protection from `flushPending()`, which
   sends a *pending* debounced push on visibilitychange-hidden/pagehide (pending-only, so
