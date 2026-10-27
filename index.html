@@ -2797,7 +2797,7 @@ function makeCloudSync(io) {
   }
   function ask(data, how, emptied) {
     if (asking) return asking;
-    asking = Promise.resolve(emptied ? io.askEmptied() : io.ask(io.localCount(), io.remoteCount(data), data && data.updatedAt))
+    asking = Promise.resolve(emptied ? io.askEmptied() : io.ask(io.localCount(), io.remoteCount(data), data && data.updatedAt, data))
       .then((takeCloud) => { asking = null; return takeCloud ? adopt(data, how) : keep(data); })
       .finally(() => { asking = null; drain(); });
     return asking;
