@@ -821,7 +821,7 @@ tr.dropped td, tr.dropped th { color: var(--text-muted); }
    and here it gave each checkbox the whole row and pushed the name and the
    score box off the edge of the dialog. The number box escapes it on its own
    because it sets a width; a checkbox has none to set. */
-.scorerow input[type="checkbox"] { flex: none; width: auto; }
+.scorerow input[type="checkbox"] { flex: none; }   /* its size: the tick-box rule at the end */
 .scorerow input:disabled { opacity: 0.5; }
 
 /* The rounds filter. A row of controls above a table, sized like the table
@@ -1478,6 +1478,12 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
 .privacy { font-size: var(--fs-xs); color: var(--text-muted); margin: 28px 0 0; padding: 0 19px; }
 .privacy-links { margin-top: 6px; }
 .privacy-links a { color: var(--text-muted); }
+/* Every tick box (and radio) is one fixed size that a flex row can never
+   squeeze — the family rule since 2026-10-27, when iPhone Safari drew a Wine
+   Cellar setting's box about 5pt across beside its long label. The native
+   12–13px is a small target on a phone anyway. Last in the sheet so it wins at
+   equal weight; size only, never a colour. */
+input:is([type="checkbox"], [type="radio"]) { flex: none; width: 1.25rem; height: 1.25rem; min-width: 0; min-height: 0; }
 </style>
 </head>
 <body>
