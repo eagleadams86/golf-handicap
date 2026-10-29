@@ -625,6 +625,39 @@ that emphasis.
   sends a *pending* debounced push on visibilitychange-hidden/pagehide (pending-only, so
   app-switching doesn't fire pointless pushes) — without it, "edit then close the tab" left
   the cloud stale until the next edit on that device.
+- **Two changed copies are MERGED, not chosen between (2026-10-29)** — Money Map's
+  `e73c28b`, ported. The engine was right that both copies had moved, but its only answer
+  was "pick one whole copy", and nearly every press saves (picking a golfer is a save), so
+  devices were "both changed" far more often than either had work the other lacked.
+  **`makeCloudSync` is untouched** (still the family's verbatim engine); everything is in
+  the classic script's pure functions and the module's io hooks:
+  - **`gh-cloud-base-copy`** (`{uid, rev, at, state}`) is the CONTENT of the engine's base,
+    recorded at `adopt`, after a successful `transact` write (`.then`), and on a
+    `read`/snapshot whose tag IS the base. `baseCopy()` returns it only while its tag equals
+    `gh-cloud-base`; anything else is no base. Delete All Data removes it (it is a whole
+    second copy of the rounds).
+  - **`settleTwoCopies`** is the `ask` hook. With a base and rounds on both sides,
+    `mergePlans(base, local, remote)`: a change on one side only is kept; lists merge BY ID
+    (order follows the side that reordered; a delete lands unless the other side edited the
+    item — then it is a conflict). No conflicts → the merged copy is adopted through
+    `adoptInto` (the module's ONE `ghAdopt` call) and the engine's `keep()` pushes it
+    ("Combined changes from both devices"). Conflicts → the dialog lists ONLY them and the
+    choice resolves those alone. No base → the whole-copy choice, now listing `diffPlans`
+    and both save times. **An empty copy never merges**, and a NEWER-build copy is never
+    merged (`mergePlans` → null) so `ghAdopt`'s halt sees it untouched.
+  - **`activeGolfer` is the only view key** (`SYNC_VIEW`): this device's, never a conflict,
+    never listed. The tab and the allowance are already their own keys. `settings.primary`
+    is DATA on purpose — it travels because it orders the leaderboard everywhere — so it can
+    conflict. `SYNC_CACHES` is empty (nothing cached is saved); a future cache is named
+    there and `syncMergeCache` merges it key by key, newest `ts`.
+  - Every copy goes through `syncNormal` (= `normalizeState`, what `load()` uses) before
+    comparing, so a default filled in on one side (`holes`, `applyEsr`) is never a change.
+  - Labels (`describeChanges`) are cut to one round / golfer / course (a tee is part of its
+    course) / setting and named from either copy: `Round on <date> at <course> · <golfer>`,
+    `Golfer “X”`, `Course “X”`, the setting's name. A value only where it means something —
+    a round's score, a name when the name changed, a setting's on/off. The dialog builds
+    everything with `textContent`/`createElement`. The device time is `gh-updated`, which a
+    golfer pick also moves — it says "last saved", never "last edited", for that reason.
 - **Same-browser tabs share one copy.** A `storage` listener adopts another tab's write
   (localStorage is shared, so the tabs would otherwise last-write-wins each other). Adopt
   and render only — never `save()` from that listener: the writing tab already pushed to

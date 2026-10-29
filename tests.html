@@ -285,7 +285,7 @@ async function runSyncSim(W) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 391;
+const EXPECTED = 399;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -4756,6 +4756,134 @@ describe('Find: the keyboard lands on the view the hit took you to (2026-09-03 a
      the order of events that lost data can be played out exactly. Async, so it
      runs here and the tests below read what it recorded. */
   try { SIM.r = await runSyncSim(W); } catch (e) { SIM.error = String(e && e.stack || e); }
+
+  /* ── Keeping both devices' changes (2026-10-29) ────────────────────────────
+     Two changed copies used to be a whole-copy choice, and nearly every press
+     counts as a change (picking a golfer saves) — so one device's real work was
+     routinely thrown away. Now each device keeps the copy it last synced and the
+     two are compared item by item against it; only a thing BOTH changed is
+     asked about. Synthetic edits on the example league, never real rounds. The
+     dialog is driven here, before run(), because answering it is async. */
+  const LEAGUE0 = JSON.stringify(W.normalizeState(W.buildDemoLeague()));
+  const mSample = () => JSON.parse(LEAGUE0);
+  const DLG = {};
+  try {
+    const L = mSample(), R = mSample();
+    L.rounds[0].score += 3;
+    const items = W.describeChanges(W.diffPlans(L, R), L, R);
+    const doc = W.document;
+    const p = W.__ghSyncHooks.chooseSyncSource(L, R, 2000, { items, localAt: 1000 });
+    DLG.times = doc.getElementById('syncChoiceTimes').textContent;
+    DLG.items = doc.querySelectorAll('#syncChoiceList li').length;
+    DLG.list = doc.getElementById('syncChoiceList').textContent;
+    DLG.listHidden = doc.getElementById('syncChoiceList').hidden;
+    DLG.btn = doc.getElementById('syncKeepDeviceBtn').textContent;
+    doc.getElementById('syncKeepDeviceBtn').click();
+    DLG.answer = await p;
+    const many = Array.from({ length: 14 }, (_, i) => ({ label: 'Item ' + i, local: '', remote: '' }));
+    const p2 = W.__ghSyncHooks.chooseSyncSource(L, R, 1000, { conflicts: true, items: many, localAt: 2000 });
+    const lis = doc.querySelectorAll('#syncChoiceList li');
+    DLG.capped = { n: lis.length, last: lis[lis.length - 1].textContent };
+    DLG.times2 = doc.getElementById('syncChoiceTimes').textContent;
+    DLG.btns2 = [doc.getElementById('syncKeepDeviceBtn').textContent, doc.getElementById('syncKeepGoogleBtn').textContent];
+    doc.getElementById('syncKeepGoogleBtn').click();
+    DLG.answer2 = await p2;
+    DLG.open = doc.getElementById('syncChoiceDialog').open;
+  } catch (e) { DLG.error = String(e && e.stack || e); }
+
+  describe('Keeping both devices’ changes (2026-10-29)');
+  it('separate edits on each device are both kept, with no question', () => {
+    const base = mSample(), L = mSample(), R = mSample();
+    L.rounds[0].score = 77;
+    R.rounds[1].score = 99;
+    R.golfers.push({ id: 'g-new-there', name: 'Added There' });
+    L.courses[0].name = 'Renamed Here';
+    const m = W.mergePlans(base, L, R, 'local');
+    eq(m.conflicts.length, 0);
+    eq([m.merged.rounds[0].score, m.merged.rounds[1].score], [77, 99]);
+    ok(m.merged.golfers.some((g) => g.id === 'g-new-there'), 'the golfer added on the other device arrives');
+    eq(m.merged.courses[0].name, 'Renamed Here', 'and this device’s rename stays');
+  });
+  it('a round both changed is ONE conflict, named with both scores, and the choice decides only it', () => {
+    const base = mSample(), L = mSample(), R = mSample();
+    L.rounds[2].score = 81; L.rounds[2].note = 'here';
+    R.rounds[2].score = 83;
+    R.rounds[3].note = 'edited there';
+    const m = W.mergePlans(base, L, R, 'local'), g = W.mergePlans(base, L, R, 'remote');
+    eq(m.conflicts.length, 1, 'the note changed on one side only, so only the score clashes');
+    eq([m.merged.rounds[2].score, g.merged.rounds[2].score], [81, 83]);
+    eq(m.merged.rounds[2].note, 'here', 'the unclashing field of the same round is kept');
+    eq(m.merged.rounds[3].note, 'edited there', 'the other device’s edit elsewhere is kept either way');
+    const d = W.describeChanges(m.conflicts, L, R);
+    eq(d.length, 1);
+    ok(/^Round on .+ at .+ · .+$/.test(d[0].label), 'date, course and golfer', d[0].label);
+    eq([d[0].local, d[0].remote], ['score 81', 'score 83']);
+  });
+  it('lists match by id: a delete on one side lands; a delete against an edit is asked', () => {
+    const base = mSample(), L = mSample(), R = mSample();
+    const gone = L.rounds.splice(4, 1)[0];
+    let m = W.mergePlans(base, L, R, 'local');
+    eq([m.conflicts.length, m.merged.rounds.some((r) => r.id === gone.id)], [0, false]);
+    R.rounds.find((r) => r.id === gone.id).score = 120;
+    m = W.mergePlans(base, L, R, 'local');
+    eq(m.conflicts.length, 1);
+    eq(W.describeChanges(m.conflicts, L, R)[0].local, 'not there');
+    eq(W.describeChanges(m.conflicts, L, R)[0].remote, 'score 120');
+    ok(W.mergePlans(base, L, R, 'remote').merged.rounds.some((r) => r.id === gone.id && r.score === 120));
+  });
+  it('whose card is open is never a conflict or a difference, nor is a default filled in', () => {
+    const base = mSample(), L = mSample(), R = mSample();
+    L.activeGolfer = L.golfers[1].id; R.activeGolfer = R.golfers[2].id;
+    /* A copy saved before nines existed has no `holes`; boot reads that as 18. */
+    R.rounds.forEach((r) => { if (r.holes === 18) delete r.holes; });
+    delete R.settings.applyEsr;
+    const m = W.mergePlans(base, L, R, 'local');
+    eq(m.conflicts.length, 0);
+    eq(m.merged.activeGolfer, L.golfers[1].id, 'this device keeps its own golfer on screen');
+    eq(W.diffPlans(L, R), [], 'no difference to list');
+    eq(W.syncMergeCache({ a: { v: 1, ts: 10 } }, { a: { v: 2, ts: 20 }, b: { v: 3, ts: 5 } }),
+       { a: { v: 2, ts: 20 }, b: { v: 3, ts: 5 } }, 'a cache merges key by key, newest first');
+  });
+  it('golfers, courses and settings are named in the app’s own words', () => {
+    const L = mSample(), R = mSample();
+    R.golfers[0].name = 'Renamed There';
+    R.courses[1].tees[0].rating = 70.1;
+    L.settings.applyCaps = false;
+    const d = W.describeChanges(W.diffPlans(L, R), L, R);
+    const byLabel = Object.fromEntries(d.map((x) => [x.label, [x.local, x.remote]]));
+    eq(byLabel[`Golfer “${L.golfers[0].name}”`], [`“${L.golfers[0].name}”`, '“Renamed There”'], JSON.stringify(d));
+    eq(byLabel[`Course “${L.courses[1].name}”`], ['', ''], 'a tee is part of its course');
+    eq(byLabel['The official soft and hard caps'], ['off', 'on']);
+    eq(d.length, 3);
+  });
+  it('a copy from a NEWER build is never merged', () => {
+    const R = mSample();
+    R.version = W.__ghTestHooks.SCHEMA + 1;
+    eq(W.mergePlans(mSample(), mSample(), R, 'local'), null);
+  });
+  it('the window shows both save times, marks the newer, lists what differs, and caps the list', () => {
+    ok(!DLG.error, 'the dialog walk threw', DLG.error);
+    ok(/This device/.test(DLG.times) && /Google/.test(DLG.times), 'both copies dated', DLG.times);
+    ok(/the newer save/.test(DLG.times.split('Google')[1]), 'Google’s is marked newer', DLG.times);
+    eq([DLG.items, DLG.listHidden], [1, false]);
+    ok(/^Round on .+ — this device: score \d+; Google: score \d+$/.test(DLG.list), 'the round and both scores', DLG.list);
+    eq(DLG.answer, false, 'Keep This Device answers false');
+    eq(DLG.capped, { n: 13, last: '…and 2 more' }, '12 shown, the rest counted');
+    ok(/the newer save/.test(DLG.times2.split('Google')[0]), 'this device’s marked newer this time', DLG.times2);
+    eq(DLG.btns2, ['Keep This Device’s Version', 'Keep Google’s Version'], 'conflict mode names a version');
+    eq([DLG.answer2, DLG.open], [true, false], 'Keep Google’s answers true and closes the window');
+  });
+  it('the sync module merges only from a base copy that IS the engine’s base, and never an empty copy', () => {
+    const mod = APP_SRC.slice(APP_SRC.indexOf('<script type="module">'));
+    ok(/c\.rev !== b\.rev \|\| c\.at !== b\.at/.test(mod), 'the base copy is checked against the engine tag');
+    ok(mod.includes('const full = window.ghCount() > 0 && roundCount(d) > 0;'), 'empty never merges');
+    ok(/\}\)\.then\(\(out\) => \{ if \(out\.write\) rememberBase\(out\.write\);/.test(mod), 'a written copy becomes the base copy');
+    ok(mod.includes('ask: (localN, remoteN, at, d) => settleTwoCopies(d, at),'), 'the engine asks through the merge');
+    ok(mod.includes('adopt: (d) => { adoptInto(d.state, d.updatedAt); rememberBase(d); },'), 'an adopted copy becomes the base copy');
+    eq((mod.match(/window\.ghAdopt\(/g) || []).length, 1, 'ghAdopt is called in ONE place in the module');
+    const clear = APP_SRC.slice(APP_SRC.indexOf("getElementById('clearConfirm').addEventListener"));
+    ok(clear.slice(0, 900).includes("localStorage.removeItem('gh-cloud-base-copy')"), 'Delete All Data removes the base copy');
+  });
   run();
 }
 

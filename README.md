@@ -704,11 +704,24 @@ offline either way.
 - **An edit made offline never overwrites a newer copy from another device** (2026-10-26).
   Every save carries a version number (`rev`) that goes up by one each time, and each device
   remembers the version it last saw. A save is sent only if the cloud is still that version;
-  if another device saved in between, you are asked which copy to keep instead of one quietly
+  if another device saved in between, the two are **combined** (2026-10-29) rather than one
   replacing the other. An offline edit is held on this device — never queued inside Firebase
   to land later — and sent through the same check when the connection comes back (on
   reconnect, when the page comes back into view, or a minute later). Device clocks no
   longer decide anything, so a phone whose clock runs fast cannot win every time.
+- **When both devices changed something, both sets of changes are kept** (2026-10-29).
+  Each device remembers the copy it last synced, so it can tell what each side actually
+  changed since then: a round entered on the phone at the course and a tee rating fixed on
+  the laptop both survive, a golfer added on one and a course renamed on the other both
+  arrive. You are only asked about something **both** devices changed to different values —
+  the window names each one (for example "Round on Jun 7, 2026 at Old Mill · Alex Nash —
+  this device: score 99; Google: score 101") and your choice settles just those; everything
+  else is kept either way. Which golfer's card is open never counts as a change. When a
+  device has no remembered copy to compare against (the first sign-in on it, or the first
+  sync after this update), the window falls back to choosing a whole copy, but it now shows
+  when each copy was last saved, marks the newer one, and lists what is different. The
+  remembered copy stays in this browser (`gh-cloud-base-copy`) and "Delete all data"
+  removes it.
 - A device clearing everything **asks** the others rather than silently wiping them.
 - Two tabs of the **same browser** share one copy: an edit saved in one appears in the
   other immediately, signed in or not.

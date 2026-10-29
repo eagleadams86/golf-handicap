@@ -1133,6 +1133,15 @@ dialog { max-height: calc(100vh - var(--sp-8)
 .checklist-head { display: flex; align-items: baseline; justify-content: space-between;
   gap: var(--sp-4); margin-bottom: var(--sp-4); }
 dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+/* The which-copy window's evidence (2026-10-29): two dated lines, then what
+   differs. Money Map's block, in this app's spacing tokens; no new colour. */
+.sync-times { display: grid; grid-template-columns: auto 1fr; gap: var(--sp-2) var(--sp-5); margin: var(--sp-5) 0 0; font-size: var(--fs-xs); }
+.sync-times dt { color: var(--text-secondary); }
+.sync-times dd { margin: 0; }
+dialog p.sync-listhead { margin: var(--sp-6) 0 var(--sp-3); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.sync-diff { margin: 0; padding-left: 20px; max-height: 40vh; overflow: auto; font-size: var(--fs-xs); }
+.sync-diff li { margin: var(--sp-2) 0; overflow-wrap: anywhere; }
+.sync-diff .sync-vals { color: var(--text-secondary); }
 /* --fw-semibold, like every card heading here and every dialog title in the
    family. Without it a dialog title fell through to the UA's bold, so the
    ONE heading in the app that was heavier than the rest was the one on top
@@ -2206,6 +2215,11 @@ input:is([type="checkbox"], [type="radio"]) { flex: none; width: 1.25rem; height
 <dialog id="syncChoiceDialog" aria-labelledby="syncChoiceTitle">
   <h2 id="syncChoiceTitle">Which Copy Do You Want to Keep?</h2>
   <p id="syncChoiceBody"></p>
+  <!-- When each copy was last saved, and what differs between them: filled by
+       chooseSyncSource through textContent only (the names are the reader's). -->
+  <dl id="syncChoiceTimes" class="sync-times"></dl>
+  <p id="syncChoiceListHead" class="sync-listhead" hidden></p>
+  <ul id="syncChoiceList" class="sync-diff" hidden></ul>
   <div class="row-actions">
     <button type="button" id="syncKeepDeviceBtn">Keep This Device's</button>
     <button type="button" id="syncKeepGoogleBtn" class="primary">Keep the Google One</button>
@@ -2866,6 +2880,267 @@ function makeCloudSync(io) {
     dirty: dirty,
   };
 }
+
+/* ── Keeping both devices' changes (2026-10-29) ─────────────────────────────
+   The version number above tells a device THAT the cloud moved while it had an
+   unsent change, and until now the only answer was to pick one whole copy and
+   replace the other. That was right as a guard and wrong as a habit: nearly
+   every press saves (picking a golfer on the handicap tab is a save), so the
+   phone and the laptop were "both changed" far more often than either had real
+   work the other lacked — and when both did, the edits were usually to
+   different things (a round entered on the course, a tee fixed at home), so
+   whichever copy was picked lost the other's. Money Map lost typed figures this
+   way; this is its fix, ported.
+   Now each device also keeps the copy it last took or wrote (the sync module's
+   `gh-cloud-base-copy`, checked against the engine's base tag), and the
+   question is answered three ways at once:
+   - BASE → this device and BASE → the cloud are compared item by item: a
+     round, a golfer, a course and its tees, a setting (list items are matched
+     by `id`, never by position, so a round added on one side cannot shift
+     another's edit onto the wrong round). A change made on only one side is
+     simply kept.
+   - Only a thing BOTH sides changed, to different values, is a conflict, and
+     only those are asked about — named, with both values where they mean
+     something.
+   - `activeGolfer` (whose card this device is looking at) is this device's
+     own, never a conflict, never listed. Nothing else in the saved data is a
+     view: the tab and the course-handicap allowance already live in their own
+     keys, and "Show as primary" deliberately travels (it decides the
+     leaderboard's order everywhere), so it is data and can conflict.
+   Without a base copy (a device that has not synced since this shipped, or a
+   first sign-in) there is no telling an addition from a deletion, so it stays
+   the whole-copy choice — but it now says what differs. All pure and pinned. */
+const SYNC_VIEW = new Set(['activeGolfer']);
+/* Caches merge key by key, newest first, and are never a question. This app
+   saves none today; a future one is named here and syncMergeCache handles it. */
+const SYNC_CACHES = new Set();
+function syncIsObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+function syncStable(v) {
+  if (Array.isArray(v)) return '[' + v.map((x) => (x === undefined ? 'null' : syncStable(x))).join(',') + ']';
+  if (syncIsObj(v)) {
+    return '{' + Object.keys(v).sort().filter((k) => v[k] !== undefined)
+      .map((k) => JSON.stringify(k) + ':' + syncStable(v[k])).join(',') + '}';
+  }
+  return JSON.stringify(v);
+}
+function syncSame(a, b) {
+  if (a === b) return true;
+  if (a === undefined || b === undefined) return false;
+  return syncStable(a) === syncStable(b);
+}
+/* A list is matched by id only when EVERY item carries one and none repeats. */
+function syncIds(a) {
+  if (!Array.isArray(a)) return null;
+  const ids = [];
+  for (const e of a) {
+    if (!syncIsObj(e) || (typeof e.id !== 'string' && typeof e.id !== 'number')) return null;
+    ids.push(String(e.id));
+  }
+  return new Set(ids).size === ids.length ? ids : null;
+}
+function syncUnion(a, b) { return [...new Set([...(a || []), ...(b || [])])]; }
+/* The data as boot would read it (load() is normalizeState over the parsed
+   copy), so a default filled in on one side and not the other — `holes: 18`
+   on a round from before nines, `applyEsr` on old settings — is never a
+   "change". */
+function syncNormal(p) {
+  return JSON.parse(JSON.stringify(normalizeState(JSON.parse(JSON.stringify(p || {})))));
+}
+function syncMerge3(b, l, r, path, out) {
+  if (syncSame(l, r)) return l;
+  if (syncSame(b, l)) return r;
+  if (syncSame(b, r)) return l;
+  if (syncIsObj(l) && syncIsObj(r) && (b === undefined || syncIsObj(b))) {
+    const bb = b || {}, res = {};
+    for (const k of syncUnion(Object.keys(l), Object.keys(r))) {
+      const v = syncMerge3(bb[k], l[k], r[k], path.concat(k), out);
+      if (v !== undefined) res[k] = v;
+    }
+    return res;
+  }
+  if (Array.isArray(l) && Array.isArray(r) && (b === undefined || Array.isArray(b))) {
+    const bb = b || [];
+    const il = syncIds(l), ir = syncIds(r), ib = syncIds(bb);
+    if (il && ir && ib) return syncMergeById(bb, l, r, ib, il, ir, path, out);
+    if (l.length === r.length && bb.length === l.length) {
+      return l.map((_, i) => syncMerge3(bb[i], l[i], r[i], path.concat(i), out));
+    }
+  }
+  out.conflicts.push({ path, local: l, remote: r });
+  return out.prefer === 'remote' ? r : l;
+}
+function syncMergeById(b, l, r, ib, il, ir, path, out) {
+  const map = (a) => new Map(a.map((e) => [String(e.id), e]));
+  const B = map(b), L = map(l), R = map(r);
+  /* Order: the side that REORDERED wins; if this device kept the base order,
+     the cloud's order is the one to follow. Items only the other side has go
+     in after the item they followed there. */
+  const common = (ids) => ids.filter((id) => B.has(id) && L.has(id) && R.has(id));
+  const localKeptOrder = syncSame(common(il), common(ib));
+  const first = localKeptOrder ? ir : il, second = localKeptOrder ? il : ir;
+  const order = first.slice();
+  second.forEach((id, i) => {
+    if (order.includes(id)) return;
+    const prev = i ? second[i - 1] : null;
+    const at = prev === null ? 0 : (order.includes(prev) ? order.indexOf(prev) + 1 : order.length);
+    order.splice(at, 0, id);
+  });
+  const res = [];
+  for (const id of order) {
+    const v = syncMerge3(B.get(id), L.get(id), R.get(id), path.concat({ id }), out);
+    if (v !== undefined) res.push(v);
+  }
+  return res;
+}
+/* A cache: never a question. Key by key, the entry with the later `ts` (or
+   this device's, when neither says). */
+function syncMergeCache(l, r) {
+  if (!syncIsObj(l)) return r;
+  if (!syncIsObj(r)) return l;
+  const res = Object.assign({}, r, l);
+  for (const k of Object.keys(r)) {
+    if (k in l && syncIsObj(l[k]) && syncIsObj(r[k]) && Number(r[k].ts) > Number(l[k].ts)) res[k] = r[k];
+  }
+  return res;
+}
+/* → { merged, conflicts } — or null when the cloud copy comes from a NEWER
+   build (ghAdopt's halt must see it untouched). Conflicts are resolved toward
+   `prefer` ('local' | 'remote') in `merged`. */
+function mergePlans(base, local, remote, prefer) {
+  if (Number((remote && remote.version) || 1) > SCHEMA) return null;
+  const b = syncNormal(base), l = syncNormal(local), r = syncNormal(remote);
+  const out = { conflicts: [], prefer: prefer === 'remote' ? 'remote' : 'local' };
+  const merged = {};
+  for (const k of syncUnion(Object.keys(l), Object.keys(r))) {
+    let v;
+    if (SYNC_VIEW.has(k)) v = l[k];
+    else if (SYNC_CACHES.has(k)) v = syncMergeCache(l[k], r[k]);
+    else v = syncMerge3(b[k], l[k], r[k], [k], out);
+    if (v !== undefined) merged[k] = v;
+  }
+  return { merged, conflicts: out.conflicts };
+}
+/* Every place two copies differ, view state and caches left out — for the
+   case with no base copy, where nothing can be merged but the reader can still
+   be told what they are choosing between. */
+function diffPlans(local, remote) {
+  const l = syncNormal(local), r = syncNormal(remote), out = [];
+  const walk = (a, b, path) => {
+    if (syncSame(a, b)) return;
+    if (syncIsObj(a) && syncIsObj(b)) {
+      for (const k of syncUnion(Object.keys(a), Object.keys(b))) walk(a[k], b[k], path.concat(k));
+      return;
+    }
+    if (Array.isArray(a) && Array.isArray(b)) {
+      const ia = syncIds(a), ib = syncIds(b);
+      if (ia && ib) {
+        const A = new Map(a.map((e) => [String(e.id), e])), B = new Map(b.map((e) => [String(e.id), e]));
+        for (const id of syncUnion(ia, ib)) walk(A.get(id), B.get(id), path.concat({ id }));
+        return;
+      }
+      if (a.length === b.length) { a.forEach((_, i) => walk(a[i], b[i], path.concat(i))); return; }
+    }
+    out.push({ path, local: a, remote: b });
+  };
+  for (const k of syncUnion(Object.keys(l), Object.keys(r))) {
+    if (!SYNC_VIEW.has(k) && !SYNC_CACHES.has(k)) walk(l[k], r[k], [k]);
+  }
+  return out;
+}
+
+/* ── Naming a difference for a person ───────────────────────────────────────
+   Paths are cut back to the thing a reader would recognise — one round, one
+   golfer, one course (a tee is part of its course), one setting — and named
+   from whichever copy still has it. Several fields of one round are ONE line.
+   A value is shown only where it means something: a round's score, a golfer's
+   or course's name when that is what changed, a setting's on/off; anything
+   else says which copy has it, or that the two differ. Plain strings only —
+   the dialog sets them with textContent. */
+function syncHumanize(k) {
+  const s = String(k).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]+/g, ' ').toLowerCase();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+function syncItemCut(path) {
+  const at = path.findIndex((s) => syncIsObj(s));
+  if (at >= 0) return path.slice(0, at + 1);
+  return path.slice(0, Math.min(path.length, 2));
+}
+function syncFind(plans, list, id) {
+  for (const p of plans) {
+    const hit = (p && Array.isArray(p[list]) ? p[list] : []).find((e) => syncIsObj(e) && String(e.id) === String(id));
+    if (hit) return hit;
+  }
+  return null;
+}
+function syncNameIn(plans, list, id) {
+  const hit = syncFind(plans, list, id);
+  return (hit && String(hit.name || '').trim()) || 'unnamed';
+}
+const SYNC_SETTING_NAMES = {
+  method: 'The league handicap rule',
+  applyCaps: 'The official soft and hard caps',
+  applyEsr: 'The exceptional score reduction',
+  primary: 'Which handicap leads',
+};
+const SYNC_LIST_NAMES = { rounds: 'The rounds', golfers: 'The golfers', courses: 'The courses' };
+function syncLabel(path, plans) {
+  const list = path[0], item = path[1];
+  if (syncIsObj(item)) {
+    if (list === 'rounds') {
+      const r = syncFind(plans, 'rounds', item.id) || {};
+      const what = Number(r.holes) === 9 ? 'Nine-hole round' : 'Round';
+      return `${what} on ${fmtDate(String(r.date || ''))} at ${syncNameIn(plans, 'courses', r.courseId)}`
+        + ` · ${syncNameIn(plans, 'golfers', r.golferId)}`;
+    }
+    if (list === 'golfers') return `Golfer “${syncNameIn(plans, 'golfers', item.id)}”`;
+    if (list === 'courses') return `Course “${syncNameIn(plans, 'courses', item.id)}”`;
+    return `${syncHumanize(list)} “${syncNameIn(plans, list, item.id)}”`;
+  }
+  if (list === 'settings') return SYNC_SETTING_NAMES[item] || `Settings · ${syncHumanize(item || 'settings')}`;
+  if (path.length === 1 && SYNC_LIST_NAMES[list]) return SYNC_LIST_NAMES[list];
+  return path.filter((s) => typeof s === 'string').map(syncHumanize).join(' · ');
+}
+/* One side's short phrase for an item: "not there", a meaningful value, or ""
+   (present, and different in a way a short value would not say). */
+function syncSay(cut, v, other) {
+  if (v === undefined || v === null) return 'not there';
+  const both = other !== undefined && other !== null;
+  if (syncIsObj(cut[1])) {
+    if (cut[0] === 'rounds') return !both || v.score !== other.score ? `score ${v.score}` : '';
+    if (cut[0] === 'golfers' || cut[0] === 'courses') {
+      return both && v.name !== other.name ? `“${String(v.name || '').trim() || 'unnamed'}”` : '';
+    }
+    return '';
+  }
+  if (cut[0] === 'settings') {
+    if (cut[1] === 'applyCaps' || cut[1] === 'applyEsr') return v ? 'on' : 'off';
+    if (cut[1] === 'primary') return v === 'whs' ? 'the official index' : 'the league handicap';
+    if (cut[1] === 'method' && syncIsObj(v)) return `“${String(v.name || '').trim() || 'unnamed'}”`;
+  }
+  return '';
+}
+/* → [{ label, local, remote }] — one per recognisable item, in data order. */
+function describeChanges(changes, localPlan, remotePlan) {
+  const plans = [syncNormal(localPlan), syncNormal(remotePlan)];
+  const seen = new Map();
+  for (const c of changes) {
+    const cut = syncItemCut(c.path);
+    const key = syncStable(cut);
+    if (seen.has(key)) continue;
+    const pick = (plan) => {
+      let v = plan;
+      for (const s of cut) {
+        v = v && (syncIsObj(s) && Array.isArray(v) ? v.find((e) => syncIsObj(e) && String(e.id) === String(s.id)) : v[s]);
+      }
+      return v;
+    };
+    const lv = pick(plans[0]), rv = pick(plans[1]);
+    seen.set(key, { label: syncLabel(cut, plans), local: syncSay(cut, lv, rv), remote: syncSay(cut, rv, lv) });
+  }
+  return [...seen.values()];
+}
+/* Two copies are the same data when boot would read them the same way. */
+function samePlan(a, b) { return syncStable(syncNormal(a)) === syncStable(syncNormal(b)); }
 
 const DAY = 86400000;
 function isoOf(d) {
@@ -6261,6 +6536,10 @@ document.getElementById('clearConfirm').addEventListener('click', () => {
   const keepSettings = state.settings;
   state = blankState();
   state.settings = keepSettings;
+  /* Sync's base copy (2026-10-29) is a whole second copy of the rounds, kept so
+     two devices' changes can be combined. "Everything cleared" has to include
+     it; the next push records the emptied copy there. */
+  try { localStorage.removeItem('gh-cloud-base-copy'); } catch (e) { /* blocked */ }
   save();                       // the one write path, so this pushes to the cloud too
   /* …but save() debounces its push, and a clear must not sit in that window:
      clearing then closing the tab inside 1.2s would leave the cloud copy
@@ -7516,14 +7795,78 @@ const touchLocal = () => {
   catch (e) { /* storage blocked — the choice still holds for this session */ }
 };
 
-function chooseSyncSource(localCount, remoteCount, remoteUpdatedAt) {
+/* `opts.items` is describeChanges()' list; `opts.conflicts` says they are the
+   only things in question — everything else from both copies is already kept —
+   rather than the differences between two whole copies, one of which goes.
+   Every word is set with textContent or createElement: the names in the list
+   are the reader's own golfers and courses. */
+const SYNC_LIST_CAP = 12;
+function chooseSyncSource(local, remote, remoteUpdatedAt, opts) {
+  opts = opts || {};
   return new Promise((resolve) => {
     const dlg = document.getElementById('syncChoiceDialog');
     const body = document.getElementById('syncChoiceBody');
-    const when = remoteUpdatedAt ? new Date(remoteUpdatedAt).toLocaleString() : 'an earlier sign-in';
-    body.textContent = `This device has ${localCount} round${localCount === 1 ? '' : 's'} saved locally. Your Google account already has ${remoteCount} round${remoteCount === 1 ? '' : 's'} (last updated ${when}). Pick which to keep — the other copy will be replaced.`;
+    const items = opts.items || [];
+    const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+    const at = (t) => (t ? new Date(t).toLocaleString() : 'not known');
+    const localAt = Number(opts.localAt) || 0, remoteAt = Number(remoteUpdatedAt) || 0;
+    if (opts.conflicts) {
+      body.textContent = `Both copies changed the same ${items.length === 1 ? 'thing' : 'things'} since they last `
+        + `synced. Everything else either copy changed is kept. For the ${plural(items.length, 'item')} `
+        + `below, pick which version to keep.`;
+    } else {
+      const count = (s) => ({
+        rounds: s && Array.isArray(s.rounds) ? s.rounds.length : 0,
+        golfers: s && Array.isArray(s.golfers) ? s.golfers.length : 0,
+      });
+      const l = count(local), r = count(remote);
+      const counts = l.rounds === r.rounds && l.golfers === r.golfers
+        ? `Both copies hold ${plural(l.rounds, 'round')} for ${plural(l.golfers, 'golfer')}, but they differ.`
+        : `This device has ${plural(l.rounds, 'round')} for ${plural(l.golfers, 'golfer')}; `
+          + `your Google account has ${plural(r.rounds, 'round')} for ${plural(r.golfers, 'golfer')}.`;
+      body.textContent = `${counts} Pick which copy to keep — the other copy will be replaced, `
+        + `so anything listed below as only in the other copy will be lost.`;
+    }
+    const times = document.getElementById('syncChoiceTimes');
+    times.textContent = '';
+    const newer = localAt && remoteAt && localAt !== remoteAt ? (localAt > remoteAt ? 'local' : 'remote') : '';
+    [['This device', `last saved ${at(localAt)}`, 'local'],
+     ['Google', `last saved ${at(remoteAt)}`, 'remote']].forEach(([who, when, side]) => {
+      const dt = document.createElement('dt'), dd = document.createElement('dd');
+      dt.textContent = who;
+      dd.textContent = when + (newer === side ? ' — the newer save' : '');
+      times.append(dt, dd);
+    });
+    const head = document.getElementById('syncChoiceListHead');
+    const list = document.getElementById('syncChoiceList');
+    list.textContent = '';
+    head.hidden = list.hidden = !items.length;
+    head.textContent = opts.conflicts
+      ? `Changed in both (${items.length})`
+      : `What’s different (${items.length})`;
+    items.slice(0, SYNC_LIST_CAP).forEach((it) => {
+      const li = document.createElement('li');
+      li.append(document.createTextNode(it.label));
+      const say = (v, absent) => (v === 'not there' ? absent : v);
+      const lv = say(it.local, opts.conflicts ? 'deleted' : 'not there');
+      const rv = say(it.remote, opts.conflicts ? 'deleted' : 'not there');
+      const vals = document.createElement('span');
+      vals.className = 'sync-vals';
+      vals.textContent = lv || rv
+        ? ` — this device: ${lv || 'different'}; Google: ${rv || 'different'}`
+        : ' — different in each copy';
+      li.append(vals);
+      list.append(li);
+    });
+    if (items.length > SYNC_LIST_CAP) {
+      const li = document.createElement('li');
+      li.textContent = `…and ${items.length - SYNC_LIST_CAP} more`;
+      list.append(li);
+    }
     const deviceBtn = document.getElementById('syncKeepDeviceBtn');
     const googleBtn = document.getElementById('syncKeepGoogleBtn');
+    deviceBtn.textContent = opts.conflicts ? 'Keep This Device’s Version' : 'Keep This Device’s';
+    googleBtn.textContent = opts.conflicts ? 'Keep Google’s Version' : 'Keep the Google One';
     const preventCancel = (e) => e.preventDefault();
     function finish(keepGoogle) {
       deviceBtn.removeEventListener('click', onDevice);
@@ -7543,6 +7886,91 @@ function chooseSyncSource(localCount, remoteCount, remoteUpdatedAt) {
 
 const roundCount = (data) => (data && data.state && Array.isArray(data.state.rounds)) ? data.state.rounds.length : 0;
 
+/* The one road into ghAdopt — a copy from another device, or the two copies
+   combined — so there is one place that replaces `state` from sync. */
+function adoptInto(st, ts) { window.ghAdopt(st, ts); }
+/* ── The base copy: what makes "keep both" possible (2026-10-29) ────────────
+   The engine remembers only the TAG of the copy this device last took or wrote.
+   This is that copy's CONTENT, kept beside it so two changed copies can be
+   compared item by item against where they both started (mergePlans, in the
+   classic script). Stored with its own tag and used only while that tag is
+   still the engine's base — a stale or foreign copy is no base at all, and the
+   question falls back to the whole-copy choice. Recorded at the moments the
+   base is set: a copy adopted, a copy written, and a copy read (or heard live)
+   that turns out to BE the base, so a device already in step gains one
+   without an edit. Delete All Data removes it: it is a whole second copy. */
+const BASE_COPY_KEY = 'gh-cloud-base-copy';
+function rememberBase(doc) {
+  if (!user || !doc || !doc.state || !Array.isArray(doc.state.rounds)) return;
+  const rev = Number(doc.rev) || 0, at = Number(doc.updatedAt) || 0;
+  try {
+    const had = JSON.parse(localStorage.getItem(BASE_COPY_KEY) || 'null');
+    if (had && had.uid === user.uid && had.rev === rev && had.at === at) return;
+    localStorage.setItem(BASE_COPY_KEY, JSON.stringify({ uid: user.uid, rev, at, state: doc.state }));
+  } catch (e) { /* full or blocked — the whole-copy question still works */ }
+}
+function engineBase() {
+  try {
+    const b = JSON.parse(localStorage.getItem('gh-cloud-base') || 'null');
+    return b && user && b.uid === user.uid ? { rev: Number(b.rev) || 0, at: Number(b.at) || 0 } : null;
+  } catch (e) { return null; }
+}
+function rememberIfBase(doc) {
+  if (doc && sameTag(engineBase(), cloudTag(doc))) rememberBase(doc);
+}
+function baseCopy() {
+  try {
+    const c = JSON.parse(localStorage.getItem(BASE_COPY_KEY) || 'null');
+    const b = engineBase();
+    if (!c || !b || c.uid !== user.uid || c.rev !== b.rev || c.at !== b.at) return null;
+    return c.state && typeof c.state === 'object' ? c.state : null;
+  } catch (e) { return null; }
+}
+/* What the engine's `ask` hook answers. true = take Google's copy as it is;
+   false = keep this device's — which, after a merge, IS the merged copy, already
+   adopted here, so the engine's keep() pushes it through its usual transaction.
+   An empty copy on either side never merges: emptiness is not an edit to fold
+   in, and "an empty copy never silently beats one with data" outranks this. */
+let keptNews = '';
+async function settleTwoCopies(d, at) {
+  const local = window.ghGet(), remote = d && d.state;
+  const localAt = localTs();
+  const full = window.ghCount() > 0 && roundCount(d) > 0;
+  const base = full ? baseCopy() : null;
+  const take = (merged, said) => {
+    if (!samePlan(merged, local)) adoptInto(merged, Date.now());
+    keptNews = said;
+    return false;
+  };
+  if (full && base) {
+    const m = mergePlans(base, local, remote, 'local');
+    if (m && !m.conflicts.length) {
+      return take(m.merged, samePlan(m.merged, local) ? 'quiet' : 'merged');
+    }
+    if (m) {
+      const items = describeChanges(m.conflicts, local, remote);
+      const keepGoogle = await chooseSyncSource(local, remote, at, { conflicts: true, items, localAt });
+      const m2 = mergePlans(base, local, remote, keepGoogle ? 'remote' : 'local');
+      return take(m2.merged, keepGoogle ? 'merged-google' : 'merged-device');
+    }
+  }
+  /* A copy from a NEWER build is never read into anything here — ghAdopt's
+     halt has to see it untouched (mergePlans answers null for exactly that). */
+  if (full && mergePlans(local, local, remote, 'local')) {
+    const diffs = diffPlans(local, remote);
+    /* Nothing differs but whose card is open: nothing to choose between. */
+    if (!diffs.length) {
+      const m = mergePlans(local, local, remote, 'local');
+      if (m) return take(m.merged, 'quiet');
+    }
+    const items = describeChanges(diffs, local, remote);
+    return chooseSyncSource(local, remote, at, { items, localAt });
+  }
+  return chooseSyncSource(local, remote, at, { localAt });
+}
+/* For tests.html: the window can be drawn without a sign-in. It only shows. */
+window.__ghSyncHooks = { chooseSyncSource };
+
 /* The engine — makeCloudSync in the classic script, where tests.html drives it
    with a fake cloud. This is everything it needs from Firebase and the page. */
 const cloud = makeCloudSync({
@@ -7552,26 +7980,42 @@ const cloud = makeCloudSync({
   setItem: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* blocked */ } },
   stamp: localTs,
   touch: () => touchLocal(),
-  read: async () => { const snap = await F.getDoc(docRef()); return snap.exists() ? snap.data() : null; },
+  read: async () => {
+    const snap = await F.getDoc(docRef());
+    const d = snap.exists() ? snap.data() : null;
+    rememberIfBase(d);
+    return d;
+  },
   transact: (decide) => F.runTransaction(db, async (tx) => {
     const snap = await tx.get(docRef());
     const out = decide(snap.exists() ? snap.data() : null);
     if (out.write) tx.set(docRef(), out.write);
     return out;
-  }),
+  }).then((out) => { if (out.write) rememberBase(out.write); return out; }),
   localDoc: () => ({ state: forCloud(window.ghGet()) }),
   localCount: () => window.ghCount(),
   remoteCount: roundCount,
   valid: (d) => !!(d && d.state && Array.isArray(d.state.rounds)),
   firstSync: () => localStorage.getItem('gh-sync-uid') !== user.uid,
-  adopt: (d) => window.ghAdopt(d.state, d.updatedAt),
-  ask: (localN, remoteN, at) => chooseSyncSource(localN, remoteN, at),
+  adopt: (d) => { adoptInto(d.state, d.updatedAt); rememberBase(d); },
+  ask: (localN, remoteN, at, d) => settleTwoCopies(d, at),
   /* Clearing everything really is something people do, so an emptied cloud
      over a device with rounds asks rather than refusing — but it asks. */
   askEmptied: () => confirm('Another device has cleared all its rounds.\n\n'
     + 'Clear this device too? Cancel keeps what’s on this device and restores it to your other devices.'),
-  toast: (k) => window.toast({ loaded: 'Loaded your rounds from the cloud ☁️', synced: 'Synced from another device ☁️',
-    kept: 'Kept this device’s rounds' }[k]),
+  /* A 'kept' after settleTwoCopies merged is not "kept this device's rounds" —
+     keptNews says what really happened, and 'quiet' (only whose card is open
+     differed) says nothing at all. */
+  toast: (k) => {
+    const how = k === 'kept' ? keptNews : '';
+    keptNews = '';
+    if (how === 'quiet') return;
+    window.toast(how === 'merged' ? 'Combined changes from both devices ☁️'
+      : how === 'merged-device' ? 'Kept both devices’ changes — this device’s version where they clashed ☁️'
+      : how === 'merged-google' ? 'Kept both devices’ changes — Google’s version where they clashed ☁️'
+      : { loaded: 'Loaded your rounds from the cloud ☁️', synced: 'Synced from another device ☁️',
+          kept: 'Kept this device’s rounds' }[k]);
+  },
 });
 
 let starting = null;
@@ -7621,6 +8065,7 @@ function listen() {
     // A document with no state object is half-written or foreign, never an
     // intentional "delete everything" — adopting it would clear this device.
     if (!r || !r.state || !Array.isArray(r.state.rounds)) return;
+    rememberIfBase(r);
     // The engine compares it with the copy this device last took or wrote, and
     // takes it, ignores it, or asks — never by comparing two clocks.
     Promise.resolve(cloud.snapshot(r)).catch(setSyncError);
