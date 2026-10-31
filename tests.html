@@ -285,7 +285,7 @@ async function runSyncSim(W) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 400;
+const EXPECTED = 402;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -3082,6 +3082,14 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
       MAXI.label = btn().getAttribute('aria-label');
       MAXI.boxH = Math.round(wrap.getBoundingClientRect().height);
       MAXI.upViewBox = vb();
+      /* The full-screen view keeps the well (pack rule 21): same fill as the
+         tiles, and the drawing made at the size INSIDE the well's padding. */
+      { const wcs = MW.getComputedStyle(wrap);
+        MAXI.upWell = { fill: wcs.backgroundColor, edge: wcs.borderTopStyle,
+          tile: MW.getComputedStyle(MD.querySelector('.stat')).backgroundColor,
+          pad: parseFloat(wcs.paddingLeft),
+          inner: Math.round(wrap.clientWidth - parseFloat(wcs.paddingLeft) - parseFloat(wcs.paddingRight)) + 'x'
+               + Math.round(wrap.clientHeight - parseFloat(wcs.paddingTop) - parseFloat(wcs.paddingBottom)) }; }
       /* One chart, one canvas: the card is MOVED, so there is never a second
          drawing of it left behind on the page to go stale. */
       MAXI.oneChartOnly = MD.querySelectorAll('svg.chart').length;
@@ -3341,6 +3349,14 @@ describe('One chart, filling the window');
        'and up there it is drawn at the box\'s measured size', MAXI.upViewBox);
     eq(MAXI.backToPageViewBox, '0 0 900 280',
        'and it goes back to the fixed one on the way out:');
+  });
+  it('the full-screen chart keeps its well, and is drawn inside its padding (pack rule 21)', () => {
+    const u = MAXI.upWell || {};
+    eq(u.fill, u.tile, 'up there the plot area is still the tiles’ fill:');
+    eq(u.edge, 'solid', 'and still ruled:');
+    ok(u.pad > 0, 'with padding between the axis labels and the edge', u.pad);
+    eq(MAXI.upViewBox, '0 0 ' + String(u.inner || '').replace('x', ' '),
+       'and the drawing is the size of the box INSIDE that padding, so nothing is clipped or letterboxed:');
   });
   it('a re-render under it draws into the chart you are looking at', () => {
     ok(MAXI.survivesRender, 'the chart stays up through a render');
@@ -4923,6 +4939,50 @@ describe('Find: the keyboard lands on the view the hit took you to (2026-09-03 a
         ok(cs.getPropertyValue('--surface-alt').trim().length > 0 && alt !== 'rgba(0, 0, 0, 0)',
           th + ': --surface-alt resolves to a real fill');
       });
+    } finally {
+      el.setAttribute('data-theme', was || 'auto');
+      MH.__plant(before);
+    }
+  });
+  it('the trend chart’s plot area is a well too, and nothing in it is painted in the card colour (2026-10-31)', () => {
+    /* Rule 21, "charts are wells too": the card keeps its name and legend, and
+       the box the drawing sits in is the tiles' fill. Anything the drawing
+       PAINTS in the card's colour would show as a patch on the well, so the
+       drawn SVG must name neither --surface nor --bg-card anywhere, and every
+       painted fill must resolve to something other than the card. */
+    ok(MEASURE, 'no measuring frame');
+    const MW = MEASURE, MD = MW.document, MH = MW.__ghTestHooks, el = MD.documentElement;
+    const was = el.getAttribute('data-theme'), before = JSON.parse(JSON.stringify(MH.__state()));
+    const bg = (e) => MW.getComputedStyle(e).backgroundColor;
+    try {
+      const league = MW.buildDemoLeague();
+      MH.__plant({ version: MH.SCHEMA, golfers: league.golfers, courses: league.courses,
+        rounds: league.rounds, activeGolfer: 'demo-g-3' });
+      const wrap = MD.getElementById('chartWrap'), svg = wrap.querySelector('svg.chart');
+      ok(svg, 'the demo league draws the trend chart');
+      ok(wrap.classList.contains('is-well'), 'the plot area is marked as a well before it is drawn');
+      ok(!/var\(--(surface|bg-card)\)/.test(svg.outerHTML),
+        'no mark, plate or label in the drawing is painted in the card colour');
+      ['midnight', 'dark', 'light', 'sepia'].forEach((th) => {
+        el.setAttribute('data-theme', th);
+        const tile = bg(MD.querySelector('.stat')), card = bg(MD.getElementById('trendCard'));
+        const cs = MW.getComputedStyle(wrap);
+        eq(bg(wrap), tile, th + ': the chart well is the tiles’ fill');
+        ok(bg(wrap) !== card, th + ': and stands apart from the card it sits on');
+        eq(cs.borderTopStyle, 'solid', th + ': the chart well is ruled');
+        ok(parseFloat(cs.paddingLeft) > 0 && parseFloat(cs.paddingBottom) > 0,
+          th + ': with padding so the axis labels keep off its edge');
+        const fills = [...svg.querySelectorAll('[fill]')].map((n) => MW.getComputedStyle(n).fill)
+          .filter((f) => f !== 'none' && f !== 'rgba(0, 0, 0, 0)');
+        ok(fills.every((f) => f !== card), th + ': nothing painted inside is the card’s colour', fills.join(' / '));
+        eq(MW.getComputedStyle(MD.querySelector('.charttip')).backgroundColor, tile,
+          th + ': the hover panel is --surface-alt, as before');
+      });
+      const sr = svg.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
+      ok(sr.width <= wr.width - 2 && sr.height <= wr.height - 2,
+        'the drawing sits inside the well’s edge', sr.width + 'x' + sr.height + ' in ' + wr.width + 'x' + wr.height);
+      eq(MW.getComputedStyle(svg).minWidth, '302px',
+        'the floor is 320 less the well’s 18px, so a phone does not start scrolling sideways');
     } finally {
       el.setAttribute('data-theme', was || 'auto');
       MH.__plant(before);
