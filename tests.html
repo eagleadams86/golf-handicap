@@ -285,7 +285,7 @@ async function runSyncSim(W) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 399;
+const EXPECTED = 400;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -4883,6 +4883,50 @@ describe('Find: the keyboard lands on the view the hit took you to (2026-09-03 a
     eq((mod.match(/window\.ghAdopt\(/g) || []).length, 1, 'ghAdopt is called in ONE place in the module');
     const clear = APP_SRC.slice(APP_SRC.indexOf("getElementById('clearConfirm').addEventListener"));
     ok(clear.slice(0, 900).includes("localStorage.removeItem('gh-cloud-base-copy')"), 'Delete All Data removes the base copy');
+  });
+
+  describe('Content wells: tiles and tables are one fill in every theme (2026-10-31)');
+  it('the tiles and all four page tables share --surface-alt; heading band and the "you" row are --surface', () => {
+    /* Theme pack rule 21. --bg or a bare --surface as a table's fill matches the
+       tiles in two themes and is the odd one out in the other two, because the
+       pack's surfaces stack in different orders in light and dark palettes.
+       Computed style needs no layout, so the hidden Leaderboard panel still
+       answers. Read in MEASURE with the demo league planted (in memory only —
+       __plant never saves), then the frame's state is put back. */
+    ok(MEASURE, 'no measuring frame');
+    const MW = MEASURE, MD = MW.document, MH = MW.__ghTestHooks, el = MD.documentElement;
+    const was = el.getAttribute('data-theme'), before = JSON.parse(JSON.stringify(MH.__state()));
+    const bg = (e) => MW.getComputedStyle(e).backgroundColor;
+    try {
+      const league = MW.buildDemoLeague();
+      MH.__plant({ version: MH.SCHEMA, golfers: league.golfers, courses: league.courses,
+        rounds: league.rounds, activeGolfer: 'demo-g-3' });
+      const wells = ['courseStatsTable', 'roundsTable', 'leagueTable'].map((id) => MD.getElementById(id))
+        .concat([MD.querySelector('#strokesTable > .table-scroll')]);
+      ok(wells.every((w) => w && w.querySelector('table')), 'all four tables are drawn',
+        wells.map((w) => !!(w && w.querySelector('table'))).join(','));
+      const you = MD.querySelector('#leagueTable tr.is-you th');
+      ok(you, 'the leaderboard marks the golfer on screen');
+      ['midnight', 'dark', 'light', 'sepia'].forEach((th) => {
+        el.setAttribute('data-theme', th);
+        const cs = MW.getComputedStyle(el);
+        const alt = bg(MD.querySelector('.stat'));
+        const fills = wells.map(bg);
+        ok(fills.every((f) => f === alt), th + ': tile and every well the same — ' + alt + ' / ' + fills.join(' / '));
+        wells.forEach((w) => {
+          ok(bg(w.querySelector('thead th')) !== alt, th + ': the heading band stands apart from the well');
+          eq(MW.getComputedStyle(w).borderTopStyle, 'solid', th + ': the well is ruled');
+          eq(MW.getComputedStyle(w.querySelector('tbody tr:last-child > :last-child')).borderBottomStyle,
+            'none', th + ': the last row drops its rule against the well’s own edge');
+        });
+        eq(bg(you), bg(wells[2].querySelector('thead th')), th + ': the "you" row is --surface, not --accent-bg');
+        ok(cs.getPropertyValue('--surface-alt').trim().length > 0 && alt !== 'rgba(0, 0, 0, 0)',
+          th + ': --surface-alt resolves to a real fill');
+      });
+    } finally {
+      el.setAttribute('data-theme', was || 'auto');
+      MH.__plant(before);
+    }
   });
   run();
 }

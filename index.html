@@ -787,6 +787,32 @@ tr.dropped td, tr.dropped th { color: var(--text-muted); }
 .rowbtn { background: none; border: none; padding: 0; min-height: 0; color: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font: inherit;
   white-space: normal; text-align: left; }
 
+/* The content well (theme pack rule 21, adopted 2026-10-31 from Wine Cellar):
+   every table on a page card sits in a ruled box filled with --surface-alt —
+   the At a Glance tiles' fill — so tiles and tables are ONE colour in every
+   theme. Never --bg or a bare --surface: the pack's surfaces climb
+   bg < surface < surfaceAlt in Midnight and Dark but sit surfaceAlt ≈ bg <
+   surface in Light and Sepia, so either one matches in two themes and is the
+   odd one out in the other two. Inside a well the heading band, hover and the
+   tinted "you" row are --surface — the old hover colour IS the well now — so in
+   the dark themes a hovered row goes a shade darker. The "you" row was
+   --accent-bg until now, and the pack rules that out behind rows of text
+   (muted text on it is 3.43 in Dark); --surface alone is the same step as a
+   hover, so the row also keeps an --accent bar down its first cell — an inset
+   edge, not an elevation shadow (rule 14), and an existing token, so nothing
+   new to gate. Only a box that HOLDS a table is a well: an empty state ("No
+   rounds match that filter") stays bare. The Strokes on the Day table has its
+   own inner box because its footnote is drawn beside it and is not part of the
+   table. Dialog tables (Golfers & Courses) are not on a page card and are left. */
+:is(#courseStatsTable, #roundsTable, #leagueTable):has(> table), #strokesTable > .table-scroll {
+  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-alt); }
+:is(:is(#courseStatsTable, #roundsTable, #leagueTable):has(> table), #strokesTable > .table-scroll) :is(thead th, tbody tr:hover, tr.rowlink:hover :is(th, td), tr.is-you :is(th, td)) {
+  background: var(--surface); }
+:is(:is(#courseStatsTable, #roundsTable, #leagueTable):has(> table), #strokesTable > .table-scroll) tr.is-you > :first-child {
+  box-shadow: inset 3px 0 0 var(--accent); }
+:is(:is(#courseStatsTable, #roundsTable, #leagueTable):has(> table), #strokesTable > .table-scroll) tbody tr:last-child :is(th, td) {
+  border-bottom: 0; }
+
 /* A STATUS PILL, NOT A CONTROL — it is read, never pressed, so it keeps
    `--border-strong` and is deliberately left out of the control-border sweep of
    2026-08-22. WCAG 1.4.11 is about the boundary that tells you a component IS a
@@ -1820,7 +1846,9 @@ input:is([type="checkbox"], [type="radio"]) { flex: none; width: 1.25rem; height
           <select id="lbFormat"></select>
         </div>
       </div>
-      <div class="table-scroll" id="strokesTable"></div>
+      <!-- Not a scroll box itself: the table gets its own (a well, pack rule
+           21) and the footnote below it sits outside the well. -->
+      <div id="strokesTable"></div>
     </section>
   </div><!-- /leaguePanel -->
 </main>
@@ -4789,7 +4817,7 @@ function renderStrokes(rows) {
     </tr>`;
   }).join('');
 
-  box.innerHTML = `<table>
+  box.innerHTML = `<div class="table-scroll"><table>
     <caption class="sr-only">Every golfer's playing handicap at ${esc(course.name)}, ${esc(tee.name)} tees, for ${esc(allow.label)}.</caption>
     <thead><tr>
       <th scope="col">Golfer</th>
@@ -4797,7 +4825,7 @@ function renderStrokes(rows) {
       <th scope="col" class="num">Course handicap</th>
       <th scope="col" class="num">Plays off</th>
       <th scope="col" class="num">Receives</th>
-    </tr></thead><tbody>${body}</tbody></table>
+    </tr></thead><tbody>${body}</tbody></table></div>
     <p class="hint">${allow.pct === 100
       ? 'Full handicaps — nothing taken off.'
       : `${esc(String(allow.pct))}% of the course handicap, the recommended allowance for ${esc(allow.label.replace(/\s*\(\d+%\)$/, '').toLowerCase())}.`}
