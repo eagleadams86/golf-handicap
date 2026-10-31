@@ -881,6 +881,10 @@ details.danger-zone > summary { cursor: pointer; font-size: var(--fs-xs); font-w
 details.danger-zone > summary:hover { color: var(--text-primary); }
 details > summary:focus-visible { outline: 2px solid var(--focus-border); outline-offset: 2px; }
 .work { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-secondary); white-space: pre-wrap; margin-top: var(--sp-5); }
+/* The working is a box of content on the card, so it is a well (rule 21) like
+   the tables and the trend chart beside it — not bare text on the card. */
+.work:not(:empty) { background: var(--surface-alt); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: var(--sp-4) var(--sp-5); }
 
 .chart-wrap { overflow-x: auto; position: relative; }
 /* THE PLOT AREA IS A CONTENT WELL (theme pack rule 21, 2026-10-31). Its fill,
@@ -1544,6 +1548,17 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
    12–13px is a small target on a phone anyway. Last in the sheet so it wins at
    equal weight; size only, never a colour. */
 input:is([type="checkbox"], [type="radio"]) { flex: none; width: 1.25rem; height: 1.25rem; min-width: 0; min-height: 0; }
+
+/* A FIELD SITS ONE STEP OFF WHAT IS BEHIND IT (theme pack rule 21, 2026-10-31).
+   On a card that step is the tile shade, --surface-alt. A dialog section
+   (.formpanel) is itself filled with --surface-alt, so a field inside one
+   takes the card colour back — otherwise it melts into the box and only its
+   edge says it is there. A read-only box has no fill of its own: it sits flush
+   with whatever is behind it, which is what tells it apart from a box you type
+   in. background-color, not background: a select's arrow may be an image. */
+:is(.formpanel) :is(input, select, textarea):not([type=checkbox], [type=radio], [type=range], [readonly]) {
+  background-color: var(--surface); }
+:is(.formpanel) :is(input, textarea)[readonly] { background-color: transparent; }
 </style>
 </head>
 <body>
