@@ -271,6 +271,50 @@ async function runSyncSim(W) {
     await p1;
     r.askOnce = A.log.filter((x) => x === 'ask').length;
   });
+  /* 11. A push that THROWS with a copy parked behind it (2026-11-12). The copy
+     heard mid-push used to stay parked when the push failed — nothing reached
+     drain() — and the next push that worked replayed it: by then it was older
+     than this device's own write, and a device with nothing unsent adopts
+     whatever it hears, so the screen went back to the old copy until the next
+     snapshot put it right. */
+  await step(async () => {
+    const cloud = makeCloud(), A = makeDevice(cloud);
+    A.edit('a1'); await A.start();
+    A.edit('a2');
+    A.beforeCommit = async () => { A.sync.snapshot(clone(cloud.doc)); throw { code: 'unavailable' }; };
+    const err = await failed(A.sync.push());
+    const before = A.log.length;
+    await A.sync.push();
+    await new Promise((res) => setTimeout(res, 0));
+    r.failParked = { err: err, A: clone(A.rounds), cloud: clone(cloud.doc.state.rounds),
+      quiet: A.log.length === before, dirty: A.sync.dirty() };
+  });
+  /* 11b. The same failure with ANOTHER device's write parked: it is looked at
+     as soon as the push gives up, not forgotten — nothing here is unsent, so
+     it is simply taken. */
+  await step(async () => {
+    const cloud = makeCloud(), A = makeDevice(cloud), B = makeDevice(cloud);
+    A.edit('a1'); await A.start(); await B.start();
+    B.edit('b1'); await B.sync.push();
+    A.beforeCommit = async () => { A.sync.snapshot(clone(cloud.doc)); throw { code: 'unavailable' }; };
+    const err = await failed(A.sync.push());
+    await new Promise((res) => setTimeout(res, 0));
+    r.failHeard = { err: err, A: clone(A.rounds), asked: A.log.includes('ask') };
+  });
+  /* 12. A push that finds the cloud moved takes the copy the transaction read;
+     the one parked meanwhile is older or the same, and must not come back
+     after the next push. */
+  await step(async () => {
+    const cloud = makeCloud(), A = makeDevice(cloud), B = makeDevice(cloud);
+    A.edit('a1'); await A.start(); await B.start();
+    B.edit('b1'); await B.sync.push();
+    A.beforeCommit = async () => { A.sync.snapshot(clone(cloud.doc)); };
+    await A.sync.push();
+    const took = clone(A.rounds);
+    A.edit('a2'); await A.sync.push();
+    await new Promise((res) => setTimeout(res, 0));
+    r.movedParked = { took: took, A: clone(A.rounds), cloud: clone(cloud.doc.state.rounds) };
+  });
   r.errors = errors;
   return r;
 }
@@ -285,7 +329,7 @@ async function runSyncSim(W) {
    It is the number the suite registers today, so ADDING a test never fails the
    build; removing one does, which is the moment to ask whether it should have
    gone. Lower it deliberately when a test is deliberately retired. */
-const EXPECTED = 402;
+const EXPECTED = 406;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -1099,6 +1143,15 @@ async function onAppLoad() {
     eq(SIMR().firstSync, { asked: true, B: ['a1'] });
   });
   it('a copy heard while the question is up does not raise a second one', () => eq(SIMR().askOnce, 1));
+  it('a push that throws does not leave a parked copy to be replayed over this device’s later write', () => {
+    eq(SIMR().failParked, { err: 'unavailable', A: ['a1', 'a2'], cloud: ['a1', 'a2'], quiet: true, dirty: false });
+  });
+  it('another device’s write parked behind a push that throws is looked at, not forgotten', () => {
+    eq(SIMR().failHeard, { err: 'unavailable', A: ['a1', 'b1'], asked: false });
+  });
+  it('a push that finds the cloud moved leaves nothing parked to come back later', () => {
+    eq(SIMR().movedParked, { took: ['a1', 'b1'], A: ['a1', 'b1', 'a2'], cloud: ['a1', 'b1', 'a2'] });
+  });
   it('the module pushes through a transaction and never with a blind setDoc', () => {
     const mod = APP_SRC.slice(APP_SRC.indexOf('<script type="module">'));
     ok(mod.includes('F.runTransaction(db,'), 'a transaction');
@@ -1911,6 +1964,26 @@ describe('Google’s code is fetched when it is asked for, not on every visit');
       + 'straight to the button and presses Enter');
     ok(/function ensureInit\(\)/.test(code) && /if \(!initPromise\)/.test(code),
       'ensureInit must be idempotent, or a hover and a click start two Firebase apps');
+  });
+  it('a signed-in device that opened with no signal asks again when it comes back', () => {
+    /* 2026-11-12, first fixed in Wine Cellar. A signed-in device that OPENED
+       offline failed the boot load, hid the button, and nothing ever asked
+       again: catchUp returned on `!F`, and ensureInit handed every later caller
+       the same rejected promise. An installed app left open for days never
+       synced and never said so. Read as text for the same reason as above —
+       the real thing is exercised by hand against Google's servers, never here. */
+    const code = strip(APP_SRC);
+    const mod = code.slice(code.indexOf('<script type="module">'));
+    ok(/initPromise = init\(\)\.catch\(\(e\) => \{ initPromise = null; throw e; \}\)/.test(mod),
+      'a failed load must be forgotten, or every retry is handed the same rejection');
+    const cu = mod.slice(mod.indexOf('const catchUp = '), mod.indexOf("addEventListener('online', catchUp)"));
+    ok(/if \(!F\) \{/.test(cu), 'catchUp must have a branch for Firebase never having loaded');
+    ok(/shouldBootSync\(\)/.test(cu) && /!inTestHarness/.test(cu) && /!window\.ghViewOnly/.test(cu),
+      'and it retries only where the boot branch would have loaded it: signed in before, '
+      + 'not the harness, not a shared view');
+    ok(/ensureInit\(\)\.then\(\(\) => \{ btn\.hidden = false; \}\)/.test(cu),
+      'the retry loads Firebase and puts the button the failed boot hid back');
+    ok(!/if \(!user \|\| !F\) return;/.test(cu), 'the old early return is what made the failure permanent');
   });
 
   describe('Dependabot can see the one third-party thing this app runs');

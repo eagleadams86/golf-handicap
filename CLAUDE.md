@@ -1333,3 +1333,39 @@ stand on it.
   loads there), so it is pinned at the source: the gate is made, both entry points call
   `request`, `release` sits between `syncDecision(` and `listen();`, and `hold()` is in the
   auth handler before `startSync()`.
+
+## Sync Fixes From Wine Cellar's 2026-11-12 Review
+
+Three findings in shared family code, checked here first because the sync module and the
+engine originate in this repo. The engine and `runSyncSim` were then copied verbatim to Money
+Map and Wine Cellar (a `diff` of the two functions against this repo's must be empty); League
+Night has no engine but carries the offline-launch fix in its own shape. Don't re-audit these.
+
+- **A parked snapshot is never replayed stale.** `makeCloudSync` parks a copy heard while a
+  push or the which-copy question is in flight (`held`) and looks at it afterwards in `drain()`.
+  Two paths never reached `drain()` and left it parked: a push that THREW (offline), and a push
+  that found the cloud moved and adopted the copy the transaction read. The next push that
+  worked then replayed the parked copy — by then older than this device's own write — and a
+  device with nothing unsent adopts what it hears, so the screen went back to an older copy
+  until the next snapshot put it right. Now: the failure path runs `drain()` before rethrowing
+  (the copy is judged against the base the failure left untouched, and whatever that look does
+  reports itself — the error thrown is still the push's); the moved path drops `held`; and
+  `snapshot()` / `start()` drop it whenever they look at a fresher copy directly. Sim
+  scenarios 11, 11b and 12 (`failParked`, `failHeard`, `movedParked`), each red first.
+- **Sync starts by itself after an offline launch.** A signed-in device that opened with no
+  signal failed the boot load (`import()` and `loadGis()` reject), hid `#syncBtn`, and nothing
+  asked again: `catchUp` returned on `!F`, and `ensureInit` handed every later caller the same
+  rejected promise, so even a press could not load Google's code until a reload. Now
+  `ensureInit` forgets a failed load (it fails before `initializeApp`, so a retry cannot make a
+  second Firebase app), and `catchUp` — on `online` and on the page becoming visible — calls
+  it when Firebase never loaded, under exactly the boot branch's conditions (`shouldBootSync()`,
+  not the harness, not a shared view), then un-hides the button. The suite pins the shape as
+  text (Firebase never loads there); the behaviour was driven once by hand in headless
+  Chromium and WebKit with Google's hosts blocked and then released: button hidden after the
+  offline boot, back after `online`. Both engines re-fetch a dynamic `import()` that failed.
+- **The Back Up window at 320px was measured and left alone.** Wine Cellar's overflowed
+  (WCAG 1.4.10) because one label, "Download Opened Bottles (CSV)", is 281px in a 250px row.
+  Here the widest is "Download Backup (JSON)" at 233px, mouse and touch; the dialog's
+  `scrollWidth` equals its `clientWidth` (286). No rule added. A NEW label longer than about
+  28 characters needs Wine Cellar's `#dataDialog .datarow button { max-width: 100%;
+  white-space: normal; }`.

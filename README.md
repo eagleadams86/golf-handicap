@@ -709,6 +709,14 @@ offline either way.
   to land later — and sent through the same check when the connection comes back (on
   reconnect, when the page comes back into view, or a minute later). Device clocks no
   longer decide anything, so a phone whose clock runs fast cannot win every time.
+- **A signed-in device opened with no signal starts syncing by itself when the signal
+  returns** (2026-11-12). Before, the failed start hid the sync button and nothing tried
+  again until the page was reloaded — an installed app left open could go days without
+  syncing and never say so.
+- **A save that fails part-way no longer flashes an older copy** (2026-11-12). A copy that
+  arrived from the cloud while a save was being sent used to be set aside and, if that save
+  failed, replayed after the next one that worked — briefly putting an older copy on screen.
+  It is now looked at straight away, or dropped when a fresher one has been seen.
 - **When both devices changed something, both sets of changes are kept** (2026-10-29).
   Each device remembers the copy it last synced, so it can tell what each side actually
   changed since then: a round entered on the phone at the course and a tee rating fixed on
