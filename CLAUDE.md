@@ -1369,3 +1369,15 @@ Night has no engine but carries the offline-launch fix in its own shape. Don't r
   `scrollWidth` equals its `clientWidth` (286). No rule added. A NEW label longer than about
   28 characters needs Wine Cellar's `#dataDialog .datarow button { max-width: 100%;
   white-space: normal; }`.
+
+## The Late Echo (2026-11-19, found in Money Map)
+
+`onSnapshot` hears this device's own transaction write some time AFTER the commit returns. Two
+saves close together both commit, and then the first one's echo arrives: not the base, nothing
+unsent, so `syncPlan` said `adopt` — the screen went back a save and toasted "Synced from
+another device", twice, with no other device involved. `makeCloudSync` now remembers every tag
+`setBase` replaces (`past` / `wasBase`, 64, in memory) and `snapshot()` drops a copy this device
+once held as its base. Not "ignore a lower rev": an old-code page writes with no `rev` and must
+still be heard. The copy a transaction read and the one `start()` reads are never filtered.
+Sim scenarios 13 and 13b (`lateEcho`, `lateEchoParked`), red first. Same text in Money Map,
+Golf Handicap, Wine Cellar and PAPTrack web.

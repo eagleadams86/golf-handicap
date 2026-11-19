@@ -713,6 +713,7 @@ offline either way.
   returns** (2026-11-12). Before, the failed start hid the sync button and nothing tried
   again until the page was reloaded — an installed app left open could go days without
   syncing and never say so.
+- **The app no longer mistakes its own save for another device's** (2026-11-19). Two saves close together both reached Google, and then Google's echo of the FIRST one arrived; the app read it as a change from somewhere else, stepped the screen back one save and said "Synced from another device" — with one device and nothing else open. It now remembers the copies it has already moved on from and ignores them when they come round again. Found in Money Map.
 - **A save that fails part-way no longer flashes an older copy** (2026-11-12). A copy that
   arrived from the cloud while a save was being sent used to be set aside and, if that save
   failed, replayed after the next one that worked — briefly putting an older copy on screen.
